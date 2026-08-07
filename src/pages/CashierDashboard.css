@@ -1,0 +1,462 @@
+/* ==========================================================================
+   Global & Reset Styles (Enforce application height window lock)
+   ========================================================================== */
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #050a15; /* Deeper midnight black-blue */
+  color: #e2e8f0; /* Crisp slate white for text */
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden; /* Lock master viewport window body scroll completely */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==========================================================================
+   Dashboard Main Container
+   ========================================================================== */
+.dashboard-container {
+  background-color: #050a15;
+  color: #e2e8f0;
+  height: 100vh; /* Exactly fill browser canvas */
+  max-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-wrapper {
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* Critical flex layout overflow engine flag */
+}
+
+/* ==========================================================================
+   Header Section (Compact Layout)
+   ========================================================================== */
+.dashboard-header {
+  background: linear-gradient(145deg, #0b1329, #080e1e); /* Deep Navy Glassmorphism */
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 200, 255, 0.15); /* Techy faint cyan border */
+  margin-bottom: 16px;
+  flex-shrink: 0; /* Protect header size allocation */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.header-title {
+  margin: 0;
+  color: #00c8ff;
+  font-size: 26px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-shadow: 0 0 10px rgba(0, 200, 255, 0.3);
+}
+
+.package-remaining-container {
+  text-align: right;
+}
+
+.package-text {
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.package-bar-bg {
+  width: 180px;
+  height: 10px;
+  background: #1e293b;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.package-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #00c8ff);
+  box-shadow: 0 0 8px rgba(0, 200, 255, 0.5);
+  transition: width 0.3s ease;
+}
+
+/* Stats Info Bar */
+.header-stats {
+  display: flex;
+  gap: 24px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 16px;
+  border-radius: 8px;
+  width: fit-content;
+}
+
+.stat-cashier { color: #38bdf8; }
+.stat-sold { color: #4ade80; }
+.stat-income { color: #fbbf24; }
+
+/* Control Buttons Block */
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* Finance Dropdown Panel */
+.finance-panel {
+  margin-top: 10px;
+  padding: 12px;
+  background: #0f172a;
+  border-radius: 8px;
+  border: 1px dashed #fbbf24;
+  font-size: 14px;
+}
+
+.finance-input {
+  background: #020617;
+  color: #fff;
+  border: 1px solid #fbbf24;
+  padding: 6px;
+  border-radius: 6px;
+  width: 70px;
+  margin-left: 8px;
+  outline: none;
+  font-weight: bold;
+}
+
+.finance-summary {
+  margin-top: 6px;
+  color: #94a3b8;
+}
+
+/* ==========================================================================
+   Two-Column Layout Flex-Grid
+   ========================================================================== */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr; /* Fixed left controls space, adaptive right space */
+  gap: 16px;
+  flex: 1;
+  min-height: 0; /* Crucial block window: allows columns to drop layout anchors without escaping box bounds */
+  margin-bottom: 8px;
+}
+
+/* ==========================================================================
+   Cards, Containers, and Sections
+   ========================================================================== */
+.panel-card {
+  background: linear-gradient(145deg, #0f172a, #0b1329);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0; 
+  overflow-y: auto; /* Fallback column container container if content shifts */
+  padding-right: 4px;
+}
+
+.right-column {
+  background: linear-gradient(145deg, #0b1329, #070c18);
+  padding: 18px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 200, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Enforces absolute frame clipping boundary height limit */
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
+}
+
+/* Section Titles */
+.panel-title {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+}
+
+.title-bet { color: #94a3b8; }
+.title-sold { color: #f59e0b; }
+.title-patterns { color: #00c8ff; }
+
+/* ==========================================================================
+   Buttons and Controls
+   ========================================================================== */
+.btn {
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-danger { background-color: #ef4444; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2); }
+.btn-success { background-color: #10b981; color: white; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
+.btn-neutral { background-color: #334155; color: #f1f5f9; }
+
+.btn-primary-neon {
+  background: linear-gradient(135deg, #00c8ff, #0099ff);
+  color: #020617;
+  font-weight: 800;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 10px 20px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 14px rgba(0, 200, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-primary-neon:hover {
+  box-shadow: 0 6px 20px rgba(0, 200, 255, 0.5);
+  filter: brightness(1.1);
+}
+
+.btn-primary-neon:active {
+  transform: scale(0.97);
+}
+
+.btn-large-print {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  border: none;
+  padding: 14px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.btn-large-print:hover {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+}
+
+/* Double Bet Adjustment Buttons */
+.bet-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.bet-adjust-btn {
+  flex: 1;
+  padding: 12px;
+  background: #1e293b;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700; /* Fixed typo (was 70) */
+  font-size: 14px;  /* Fixed typo (was 1px) */
+  transition: all 0.15s ease;
+}
+
+.bet-adjust-btn:hover {
+  background: #2d3748;
+  border-color: rgba(0, 200, 255, 0.3);
+}
+
+/* ==========================================================================
+   Sold Cartelas Tags
+   ========================================================================== */
+.sold-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 110px; /* Constrained boundary height layout block */
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.sold-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+}
+
+.sold-tag span {
+  font-size: 16px;
+  font-weight: 700;
+  color: white;
+}
+
+.sold-remove-btn {
+  border: none;
+  background: transparent;
+  color: #f87171;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  line-height: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.sold-number {
+  font-size: 27px !important;
+  font-weight: 700 !important;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.sold-remove-btn {
+  font-size: 8px !important;
+  width: 7px;
+  height: 14px;
+  padding: 0;
+  margin-left: 4px;
+}
+
+/* ==========================================================================
+   150 Cartelas Grid Selection Area
+   ========================================================================== */
+.grid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.selected-number-display {
+  color: #ffaa00;
+  font-weight: 800;
+  margin: 0 0 10px 0;
+  font-size: 22px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* Grid Container with Responsive Local Auto-Fill Height Engine */
+.cartela-scroll-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); /* Slightly larger for easier click targets */
+  gap: 8px;
+  flex: 1; /* Automatically consumes all remaining vertical dashboard height space */
+  overflow-y: auto;
+  padding: 12px;
+  background-color: #020617; /* Slate Black background matrix panel */
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  min-height: 0;
+}
+
+/* Matrix Cartela Button */
+.grid-cell-btn {
+  padding: 4px 0 !important; /* Shrunk vertical padding to give text total room */
+  border-radius: 10px;
+  font-weight: 900 !important; /* Maximum thickness */
+  font-size: 20px !important; /* Significantly enlarged numbers */
+  line-height: 1 !important; /* Lock vertical alignment to stop cutoff text */
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-cell-btn.available {
+  background-color: #0f172a; /* Sophisticated gray-blue button base */
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+}
+
+.grid-cell-btn.available:hover {
+  background-color: #1e293b;
+  color: #fff;
+  border-color: rgba(0, 200, 255, 0.4);
+  box-shadow: 0 0 8px rgba(0, 200, 255, 0.2);
+}
+
+.grid-cell-btn.selected {
+  background: linear-gradient(135deg, #00ff66, #00cc44);
+  color: #020617;
+  border: 1px solid #fff;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(0, 255, 102, 0.4);
+}
+
+.grid-cell-btn.sold {
+  background-color: #070a12;
+  color: #334155;
+  border: 1px solid transparent;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* Custom Scrollbar Styles for Scrollboxes */
+.cartela-scroll-grid::-webkit-scrollbar,
+.sold-list::-webkit-scrollbar,
+.left-column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-track,
+.sold-list::-webkit-scrollbar-track,
+.left-column::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-thumb,
+.sold-list::-webkit-scrollbar-thumb,
+.left-column::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-thumb:hover,
+.sold-list::-webkit-scrollbar-thumb:hover,
+.left-column::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
