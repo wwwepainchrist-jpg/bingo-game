@@ -10,7 +10,7 @@ export default function LiveBingo() {
   const [speed, setSpeed] = useState(3);
   const [paused, setPaused] = useState(false);
 
-  const API_URL = "http://localhost:5000/api";
+  const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
 
   // Fetch initial game state for the cashier/house
   useEffect(() => {

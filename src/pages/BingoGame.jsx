@@ -142,7 +142,7 @@ export default function BingoGame() {
   useEffect(() => {
     async function fetchGameData() {
       try {
-        const response = await fetch(`http://localhost:5000/api/games/active/${id}`);
+        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/active/${id}`);
         if (response.ok) {
           const data = await response.json();
           setGame(prev => ({
@@ -609,7 +609,7 @@ export default function BingoGame() {
     isDrawingBallRef.current = false;
 
     try {
-      await fetch(`http://localhost:5000/api/games/${game.game_id}/call-number`, {
+      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game.game_id}/call-number`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -661,7 +661,7 @@ export default function BingoGame() {
       const verifyGameId = currentGame.game_id || currentGame.id;
 
       const response = await fetch(
-        `http://localhost:5000/api/games/${verifyGameId}/verify-cartela`,
+        `https://bingo-backend-ccn6.onrender.com/api/games/${verifyGameId}/verify-cartela`,
         {
           method: "POST",
           headers: {
@@ -756,7 +756,7 @@ export default function BingoGame() {
     hasAnnouncedLetsGo.current = false;
 
     try {
-      await fetch(`http://localhost:5000/api/games/${game.id}/reset`, { method: "POST" });
+      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game.id}/reset`, { method: "POST" });
     } catch (err) {
       console.error("Error resetting game state on server:", err);
     }
@@ -1177,9 +1177,9 @@ export default function BingoGame() {
                 outline: 'none'
               }}
             >
-              <option value="recorded">🎙️ Recorded Audio</option>
+              <option value="recorded">🎙️ bulchaa voice</option>
               <option value="synthetic">🤖 English (Native Voice)</option>
-              <option value="oromo">🇪🇹 Afaan Oromo</option>
+              <option value="oromo">robot Afaan Oromo</option>
             </select>
 
             <button className="ctrl-btn blue-border" style={{ padding: "2px 6px", fontSize: "9px", fontWeight: 'bold', cursor: 'pointer' }} onClick={() => setTvMode(!tvMode)}>

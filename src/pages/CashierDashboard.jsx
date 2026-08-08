@@ -71,7 +71,7 @@ export default function CashierDashboard() {
   useEffect(() => {
     async function fetchDashboardData() {
       try {
-        const res = await fetch(`http://localhost:5000/api/cashier-dashboard/${id}`);
+        const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashier-dashboard/${id}`);
         if (res.ok) {
           const data = await res.json();
           if (data.bet !== undefined) setBet(data.bet);
@@ -133,7 +133,7 @@ export default function CashierDashboard() {
 
   async function updateSetting(key, value) {
     try {
-      await fetch("http://localhost:5000/api/settings", {
+      await fetch("https://bingo-backend-ccn6.onrender.com/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key, value })
@@ -240,12 +240,12 @@ export default function CashierDashboard() {
 
     console.log("Sending game:", JSON.stringify(game, null, 2));
     try {
-      await fetch("http://localhost:5000/api/games", {
+      await fetch("https://bingo-backend-ccn6.onrender.com/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ game, remainingPackage: updatedPackage, cashierId: id })
       });
-      await fetch("http://localhost:5000/api/sold-cartelas", {
+      await fetch("https://bingo-backend-ccn6.onrender.com/api/sold-cartelas", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -256,7 +256,7 @@ export default function CashierDashboard() {
           soldCartelas
         }),
       });
-      await fetch(`http://localhost:5000/api/houses/${houseId}/package`, {
+      await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${houseId}/package`, {
   method: "PUT",
   headers: {
     "Content-Type": "application/json",

@@ -43,28 +43,28 @@ export default function HouseDashboard() {
   const refreshDashboardData = async () => {
     try {
       // 1. Fetch house profile and details
-      const houseRes = await fetch(`http://localhost:5000/api/houses/${id}`);
+      const houseRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${id}`);
       if (houseRes.ok) {
         const houseData = await houseRes.json();
         setCurrentHouseUser(houseData);
       }
 
       // 2. Fetch cashiers belonging to this house
-      const cashiersRes = await fetch(`http://localhost:5000/api/cashiers/${id}`);
+      const cashiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashiers/${id}`);
       if (cashiersRes.ok) {
         const cashiersData = await cashiersRes.json();
         if (Array.isArray(cashiersData)) setCashiers(cashiersData);
       }
 
       // 3. Fetch games related to this house
-      const gamesRes = await fetch(`http://localhost:5000/api/games/house/${id}`);
+      const gamesRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}`);
       if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
         if (Array.isArray(gamesData)) setHouseGames(gamesData);
       }
 
       // 4. Fetch house package information (Robustly parses both naming conventions)
-      const packageRes = await fetch(`http://localhost:5000/api/houses/${id}/package`);
+      const packageRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${id}/package`);
       if (packageRes.ok) {
         const pkgData = await packageRes.json();
         console.log("Package Data:", pkgData);
@@ -75,7 +75,7 @@ export default function HouseDashboard() {
       }
 
       // 5. Fetch Super Admin tier packages config
-      const tiersRes = await fetch(`http://localhost:5000/api/superadmin/tiers`);
+      const tiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers`);
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         setTierPackages({
@@ -105,7 +105,7 @@ export default function HouseDashboard() {
   useEffect(() => {
     async function loadPerformance() {
       try {
-        const response = await fetch(`http://localhost:5000/api/games/house/${id}/performance`);
+        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`);
         const data = await response.json();
 
         if (data.success && data.performance) {
@@ -178,7 +178,7 @@ export default function HouseDashboard() {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/games/house/${id}/period`, {
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/period`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ period: selectedPeriod, minDays, maxDays }),
@@ -254,7 +254,7 @@ export default function HouseDashboard() {
       if (editingCashierId) {
         // UPDATE CASHIER
         response = await fetch(
-          `http://localhost:5000/api/cashiers/${editingCashierId}`,
+          `https://bingo-backend-ccn6.onrender.com/api/cashiers/${editingCashierId}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -268,7 +268,7 @@ export default function HouseDashboard() {
         );
       } else {
         // CREATE CASHIER
-        response = await fetch("http://localhost:5000/api/register", {
+        response = await fetch("https://bingo-backend-ccn6.onrender.com/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -820,7 +820,7 @@ export default function HouseDashboard() {
                         onClick={async () => {
                           if (window.confirm(`Are you sure you want to delete ${rowUsername}?`)) {
                             try {
-                              const res = await fetch(`http://localhost:5000/api/users/${cashier.id || rowUsername}`, {
+                              const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/users/${cashier.id || rowUsername}`, {
                                 method: "DELETE",
                               });
                               if (res.ok) {

@@ -31,13 +31,13 @@ export default function SuperAdminDashboard() {
   // Fetch all Super Admin system data from backend API
   const fetchSuperAdminData = async () => {
     try {
-      const usersRes = await fetch("http://localhost:5000/api/users");
+      const usersRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/users");
       if (usersRes.ok) {
         const usersData = await usersRes.json();
         if (Array.isArray(usersData)) setUsers(usersData);
       }
 
-      const housesRes = await fetch("http://localhost:5000/api/houses");
+      const housesRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/houses");
 
 if (housesRes.ok) {
   const housesData = await housesRes.json();
@@ -54,25 +54,25 @@ console.log(JSON.stringify(house6, null, 2));
   }
 }
 
-      const gamesRes = await fetch("http://localhost:5000/api/games");
+      const gamesRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/games");
       if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
         if (Array.isArray(gamesData)) setGames(gamesData);
       }
 
-      const salesRes = await fetch("http://localhost:5000/api/sales");
+      const salesRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/sales");
       if (salesRes.ok) {
         const salesData = await salesRes.json();
         if (Array.isArray(salesData)) setSales(salesData);
       }
 
-      const notifRes = await fetch("http://localhost:5000/api/notifications");
+      const notifRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/notifications");
       if (notifRes.ok) {
         const notifData = await notifRes.json();
         if (Array.isArray(notifData)) setNotifications(notifData);
       }
 
-      const tiersRes = await fetch("http://localhost:5000/api/superadmin/tiers");
+      const tiersRes = await fetch("https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers");
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
         setSilverTier(tiersData.silver ?? "8000");
@@ -113,7 +113,7 @@ console.log(JSON.stringify(house6, null, 2));
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/houses/${selectedHouse}/package`, {
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${selectedHouse}/package`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: Number(packageAmount) }),
@@ -137,7 +137,7 @@ console.log(JSON.stringify(house6, null, 2));
 
   async function saveTierPackages() {
     try {
-      const response = await fetch("http://localhost:5000/api/superadmin/tiers", {
+      const response = await fetch("https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -163,7 +163,7 @@ console.log(JSON.stringify(house6, null, 2));
 
   async function updateRemainingPackage(houseId) {
     try {
-      const response = await fetch(`http://localhost:5000/api/houses/${houseId}/remaining-package`, {
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${houseId}/remaining-package`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ remaining_package: Number(editedRemainingPackage) }),

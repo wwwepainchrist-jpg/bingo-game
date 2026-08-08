@@ -14,7 +14,7 @@ export default function ManageCashiers() {
   // Fetch cashiers belonging to this house from the backend PostgreSQL API
   const fetchCashiers = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/cashiers/${id}`);
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashiers/${id}`);
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) setCashiers(data);
@@ -38,7 +38,7 @@ export default function ManageCashiers() {
     try {
       if (editId !== null) {
         // UPDATE EXISTING CASHIER
-        const response = await fetch(`http://localhost:5000/api/cashiers/${editId}`, {
+        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashiers/${editId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -61,7 +61,7 @@ export default function ManageCashiers() {
         alert("Cashier Updated Successfully!");
       } else {
         // CREATE NEW CASHIER
-        const response = await fetch("http://localhost:5000/api/register", {
+        const response = await fetch("https://bingo-backend-ccn6.onrender.com/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -108,7 +108,7 @@ export default function ManageCashiers() {
     if (!window.confirm("Are you sure you want to delete this cashier?")) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/cashiers/${cashierId}`, {
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashiers/${cashierId}`, {
         method: "DELETE",
       });
 

@@ -16,7 +16,7 @@ export default function BingoGame(){
   useEffect(() => {
     async function fetchActiveGame() {
       try {
-        const res = await fetch(`http://localhost:5000/api/cashier/${id}/active-game`);
+        const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashier/${id}/active-game`);
         if (res.ok) {
           const data = await res.json();console.log("Backend game:", data.game);
           setGame(data.game || { gameName: "Active Game", cartelasSold: [] });
@@ -43,7 +43,7 @@ export default function BingoGame(){
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/games/${game?.id || id}/sell-cartela`, {
+      const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game?.id || id}/sell-cartela`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cartela: selectedCartela, cashier: id })
@@ -97,7 +97,7 @@ export default function BingoGame(){
 
     // Persist drawn numbers to backend
     try {
-      await fetch(`http://localhost:5000/api/games/${game?.id || id}/drawn-numbers`, {
+      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game?.id || id}/drawn-numbers`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ drawnNumbers: updatedDrawn })
@@ -111,7 +111,7 @@ export default function BingoGame(){
     setDrawnNumbers([]);
     setCurrent("");
     try {
-      await fetch(`http://localhost:5000/api/games/${game?.id || id}/drawn-numbers`, {
+      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game?.id || id}/drawn-numbers`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ drawnNumbers: [] })

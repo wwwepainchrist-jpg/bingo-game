@@ -37,7 +37,7 @@ useEffect(() => {
   useEffect(() => {
     async function fetchPlayerCartelaData() {
       try {
-        const res = await fetch(`http://localhost:5000/api/player-cartelas/${id || "default"}`);
+        const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/player-cartelas/${id || "default"}`);
         if (res.ok) {
           const data = await res.json();
           if (data.selectedCards && Array.isArray(data.selectedCards)) {
@@ -59,7 +59,7 @@ useEffect(() => {
   // Synchronize selected cartelas with backend database
   async function syncSelectedCards(updatedCards) {
     try {
-      await fetch("http://localhost:5000/api/player-cartelas", {
+      await fetch("https://bingo-backend-ccn6.onrender.com/api/player-cartelas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ playerId: id, selectedCards: updatedCards })

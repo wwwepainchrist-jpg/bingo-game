@@ -12,7 +12,7 @@ export default function CartelaSales(){
   useEffect(() => {
     async function fetchActiveGame() {
       try {
-        const response = await fetch(`http://localhost:5000/api/games/active/${id}`);
+        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/active/${id}`);
         if (response.ok) {
           const data = await response.json();
           setGame(data); // Expecting { id, gameName, bet, cartelasSold: [...] }
@@ -46,7 +46,7 @@ export default function CartelaSales(){
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/games/${game.id}/sell`, {
+      const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game.id}/sell`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cartelaNumber: selected })

@@ -17,7 +17,7 @@ export default function UserList() {
   const [showPasswords, setShowPasswords] = useState({});
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/users")
+    fetch("https://bingo-backend-ccn6.onrender.com/api/users")
       .then((res) => res.json())
       .then((data) => setUsers(data))
       .catch((err) => console.error(err));
@@ -43,7 +43,7 @@ export default function UserList() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/users/${id}`,
+        `https://bingo-backend-ccn6.onrender.com/api/users/${id}`,
         {
           method: "DELETE",
         }
@@ -80,7 +80,7 @@ export default function UserList() {
   async function saveUser() {
     try {
       const response = await fetch(
-        `http://localhost:5000/api/users/${editingUser.id}`,
+        `https://bingo-backend-ccn6.onrender.com/api/users/${editingUser.id}`,
         {
           method: "PUT",
           headers: {
@@ -108,7 +108,7 @@ export default function UserList() {
       alert("User updated successfully!");
       setEditingUser(null);
 
-      const res = await fetch("http://localhost:5000/api/users");
+      const res = await fetch("https://bingo-backend-ccn6.onrender.com/api/users");
       const list = await res.json();
       setUsers(list);
     } catch (err) {

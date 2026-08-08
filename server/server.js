@@ -63,12 +63,13 @@ app.get("/", async (req, res) => {
       message: "🎉 Bingo Backend Connected!",
       databaseTime: result.rows[0].now,
     });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Database connection failed",
-    });
-  }
+ } catch (err) {
+  console.error("DATABASE ERROR:", err);
+  res.status(500).json({
+    error: "Database connection failed",
+    details: err.message,
+  });
+}
 });
 
 // ==========================================================================

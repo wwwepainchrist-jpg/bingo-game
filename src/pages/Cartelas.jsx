@@ -9,7 +9,7 @@ function Cartelas() {
   useEffect(() => {
     async function fetchCartelas() {
       try {
-        const response = await fetch("http://localhost:5000/api/cartelas");
+        const response = await fetch("https://bingo-backend-ccn6.onrender.com/api/cartelas");
         if (response.ok) {
           const data = await response.json();
           setCartelas(data);

@@ -17,7 +17,7 @@ export default function Login() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
-  const API_URL = "http://localhost:5000/api";
+ const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
 
   useEffect(() => {
     setUsername("");

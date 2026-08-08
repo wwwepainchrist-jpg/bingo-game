@@ -6,7 +6,7 @@ export default function HouseList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const API_URL = "http://localhost:5000/api/houses";
+ const API_URL = "https://bingo-backend-ccn6.onrender.com/api/houses";
 
   useEffect(() => {
     fetch(API_URL)

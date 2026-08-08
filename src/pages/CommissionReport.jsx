@@ -12,7 +12,7 @@ export default function CommissionReport() {
   useEffect(() => {
     async function fetchAgentRecharges() {
       try {
-        const response = await fetch("http://localhost:5000/api/recharges");
+        const response = await fetch("https://bingo-backend-ccn6.onrender.com/api/recharges");
         if (response.ok) {
           const data = await response.json();
           if (Array.isArray(data)) {
