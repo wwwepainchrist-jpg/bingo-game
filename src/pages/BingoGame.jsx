@@ -179,115 +179,175 @@ export default function BingoGame() {
     };
   }, []);
 
-  // --- Audio & Voice Initialization ---
-  useEffect(() => {
-    const updateVoices = () => {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        setVoices(window.speechSynthesis.getVoices());
-      }
-    };
-    updateVoices();
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+ // --- Audio & Voice Initialization ---
+useEffect(() => {
+  const updateVoices = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.speechSynthesis
+    ) {
+      setVoices(window.speechSynthesis.getVoices());
     }
+  };
 
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        const ctx = new AudioContext();
-        shuffleAudioRef.current = {
-          play: () => {
-            if (ctx.state === 'suspended') {
-              ctx.resume();
-            }
-            const bufferSize = ctx.sampleRate * 1.5;
-            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-              data[i] = Math.random() * 2 - 1;
-            }
+  updateVoices();
 
-            const noise = ctx.createBufferSource();
-            noise.buffer = buffer;
-
-            const filter = ctx.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.value = 1000;
-            filter.Q.value = 3;
-
-            const gain = ctx.createGain();
-            gain.gain.setValueAtTime(0.5, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
-
-            noise.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-
-            noise.start();
-            
-            return new Promise((resolve) => {
-              setTimeout(() => {
-                if (typeof shuffleAudioRef.current?.onended === 'function') {
-                  shuffleAudioRef.current.onended();
-                }
-                resolve();
-              }, 1500);
-            });
-          },
-          pause: () => {},
-          currentTime: 0,
-          onended: null
-        };
-      }
-    } catch (e) {
-      shuffleAudioRef.current = null;
-    }
-  }, []);
-
-  function playRecordedAudio(fileName, onComplete = () => {}) {
-    const cleanName = String(fileName).trim().toLowerCase();
-    const possiblePaths = [
-      `/${cleanName}.mp3`,
-      `/${cleanName}.wav`
-    ];
-
-    const tryPaths = async () => {
-      for (const audioPath of possiblePaths) {
-        try {
-          await new Promise((resolve, reject) => {
-            const audio = new Audio(audioPath);
-            activeAudioRef.current = audio;
-
-            audio.onended = () => {
-              activeAudioRef.current = null;
-              resolve();
-            };
-
-            audio.onerror = () => {
-              audio.pause();
-              activeAudioRef.current = null;
-              reject();
-            };
-
-            audio.play().catch(() => {
-              activeAudioRef.current = null;
-              reject();
-            });
-          });
-          
-          onComplete();
-          return;
-        } catch (e) {
-          // Try next path
-        }
-      }
-
-      onComplete();
-    };
-
-    tryPaths();
+  if (
+    typeof window !== "undefined" &&
+    window.speechSynthesis
+  ) {
+    window.speechSynthesis.onvoiceschanged = updateVoices;
   }
 
+  try {
+    const AudioContext =
+      window.AudioContext || window.webkitAudioContext;
+
+    if (AudioContext) {
+      const ctx = new AudioContext();
+
+      shuffleAudioRef.current = {
+        play: () => {
+          if (ctx.state === "suspended") {
+            ctx.resume();
+          }
+
+          const bufferSize = Math.floor(ctx.sampleRate * 1.5);
+
+          const buffer = ctx.createBuffer(
+            1,
+            bufferSize,
+            ctx.sampleRate
+          );
+
+          const data = buffer.getChannelData(0);
+
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.value = 1000;
+          filter.Q.value = 3;
+
+          const gain = ctx.createGain();
+
+          gain.gain.setValueAtTime(
+            0.5,
+            ctx.currentTime
+          );
+
+          gain.gain.exponentialRampToValueAtTime(
+            0.01,
+            ctx.currentTime + 1.5
+          );
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+
+          noise.start();
+
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              if (
+                typeof shuffleAudioRef.current?.onended ===
+                "function"
+              ) {
+                shuffleAudioRef.current.onended();
+              }
+
+              resolve();
+            }, 1500);
+          });
+        },
+
+        pause: () => {},
+
+        currentTime: 0,
+
+        onended: null
+      };
+    }
+  } catch (e) {
+    console.error(
+      "Audio initialization failed:",
+      e
+    );
+
+    shuffleAudioRef.current = null;
+  }
+
+  return () => {
+    if (
+      typeof window !== "undefined" &&
+      window.speechSynthesis
+    ) {
+      window.speechSynthesis.onvoiceschanged = null;
+    }
+  };
+}, []);
+
+function playRecordedAudio(
+  fileName,
+  onComplete = () => {}
+) {
+  const cleanName = String(fileName)
+    .trim()
+    .toLowerCase();
+
+  const possiblePaths = [
+    `/${cleanName}.mp3`,
+    `/${cleanName}.wav`
+  ];
+
+  const tryPaths = async () => {
+    for (const audioPath of possiblePaths) {
+      try {
+        await new Promise((resolve, reject) => {
+          const audio = new Audio(audioPath);
+
+          activeAudioRef.current = audio;
+
+          audio.onended = () => {
+            activeAudioRef.current = null;
+            resolve();
+          };
+
+          audio.onerror = () => {
+            audio.pause();
+            activeAudioRef.current = null;
+            reject();
+          };
+
+          const playPromise = audio.play();
+
+          if (playPromise) {
+            playPromise.catch(() => {
+              activeAudioRef.current = null;
+              reject();
+            });
+          }
+        });
+
+        onComplete();
+        return;
+      } catch (e) {
+        // Try the next audio format
+      }
+    }
+
+    // No audio file worked
+    activeAudioRef.current = null;
+    onComplete();
+  };
+
+  tryPaths();
+}
   function playShuffleSound(onComplete = () => {}) {
     playRecordedAudio("shuffle", () => {
       onComplete();
