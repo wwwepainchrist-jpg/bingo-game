@@ -120,12 +120,51 @@ export default function BingoGame(){
       console.error("Error resetting game:", err);
     }
   }
+const speechQueueRef = useRef([]);
+const isSpeakingRef = useRef(false);
 
-  function speak(text){
-    const voice = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(voice);
+function speak(text) {
+  if (
+    typeof window === "undefined" ||
+    !window.speechSynthesis
+  ) {
+    return;
   }
 
+  speechQueueRef.current.push(String(text));
+  processSpeechQueue();
+}
+
+function processSpeechQueue() {
+  if (
+    typeof window === "undefined" ||
+    !window.speechSynthesis
+  ) {
+    return;
+  }
+
+  if (isSpeakingRef.current) return;
+
+  if (speechQueueRef.current.length === 0) return;
+
+  const text = speechQueueRef.current.shift();
+
+  const voice = new SpeechSynthesisUtterance(text);
+
+  isSpeakingRef.current = true;
+
+  voice.onend = () => {
+    isSpeakingRef.current = false;
+    processSpeechQueue();
+  };
+
+  voice.onerror = () => {
+    isSpeakingRef.current = false;
+    processSpeechQueue();
+  };
+
+  window.speechSynthesis.speak(voice);
+}
   async function checkWinner() {
     if (!winnerCartelaInput) {
       alert("Enter Cartela ID");

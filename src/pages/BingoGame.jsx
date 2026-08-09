@@ -43,28 +43,11 @@ const afaanOromoNumbers = {
 
 const afaanOromoDigitWords = { "0": "Zeeroo", "1": "Tokko", "2": "Lama", "3": "Sadii", "4": "Afuurr", "5": "Shaan", "6": "Jaha", "7": "Torrba", "8": "Saddeet", "9": "Sagal" };
 
-
 const footballLegends = {
-  1: "buffon",
-  2: "Cafu",
-  3: " Maldini",
-  4: " Ramos",
-  5: " madrid",
-  6: "Xavi Hernández",
-  7: "Cristiano Ronaldo",
-  8: " Iniesta",
-  9: "Ronaldo Nazário",
-  10: "Pelé",
-  11: "Neymar Jr.",
-  12: "Marcelo",
-  13: " arsenal",
-  14: "Johan Cruyff",
-  15: " Vidić",
-  16: "Roy Keane",
-  17: "Kevin De Bruyne",
-  18: "Paul Scholes",
-  19: "Lionel Messi",
-  20: "Luka Modrić"
+  1: "buffon", 2: "Cafu", 3: " Maldini", 4: " Ramos", 5: " madrid",
+  6: "Xavi Hernández", 7: "Cristiano Ronaldo", 8: " Iniesta", 9: "Ronaldo Nazário", 10: "Pelé",
+  11: "Neymar Jr.", 12: "Marcelo", 13: " arsenal", 14: "Johan Cruyff", 15: " Vidić",
+  16: "Roy Keane", 17: "Kevin De Bruyne", 18: "Paul Scholes", 19: "Lionel Messi", 20: "Luka Modrić"
 };
 
 const digitWords = { "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine" };
@@ -124,12 +107,15 @@ export default function BingoGame() {
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
   const isDrawingBallRef = useRef(false);
-  const loopTimeoutRef = useRef(null);
 
   const remainingNumbersRef = useRef(Array.from({ length: 75 }, (_, i) => i + 1));
   const activeUtteranceRef = useRef(null);
   const activeAudioRef = useRef(null);
   const audioTimeoutRef = useRef(null);
+
+  // New sync refs
+  const lastSpokenNumberRef = useRef(null);
+  const pollingRef = useRef(null);
   
   const calledRef = useRef(called);
   const stateRef = useRef({ called, paused, speed, current, game });
@@ -138,254 +124,318 @@ export default function BingoGame() {
     stateRef.current = { called, paused, speed, current, game };
   }, [called, paused, speed, current, game]);
 
-  // --- Fetch Active Game from Backend ---
+  // --- Fetch Active Game from Backend with Polling ---
   useEffect(() => {
-    async function fetchGameData() {
+    let cancelled = false;
+
+    const fetchGameData = async (announceNewNumber = false) => {
       try {
-        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/active/${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setGame(prev => ({
-            ...prev,
-            ...data,
-            voiceMode: data.voice_mode || "recorded",
-            speechLang: prev.speechLang || "en-US"
-          }));
-          
-          if (data.calledNumbers && Array.isArray(data.calledNumbers)) {
-            setCalled(data.calledNumbers);
-            if (data.calledNumbers.length > 0) {
-              setCurrent(data.calledNumbers[data.calledNumbers.length - 1]);
-              const calledNumsSet = new Set(data.calledNumbers.map(item => parseInt(item.split(" ")[1], 10)));
-              remainingNumbersRef.current = Array.from({ length: 75 }, (_, i) => i + 1).filter(n => !calledNumsSet.has(n));
+        const response = await fetch(
+          `https://bingo-backend-ccn6.onrender.com/api/games/active/${id}`,
+          {
+            cache: "no-store"
+          }
+        );
+
+        if (!response.ok || cancelled) {
+          return;
+        }
+
+        const data = await response.json();
+
+        setGame(prev => ({
+          ...prev,
+          ...data,
+          voiceMode:
+            data.voice_mode ||
+            data.voiceMode ||
+            prev.voiceMode ||
+            "recorded",
+          speechLang:
+            prev.speechLang ||
+            "en-US"
+        }));
+
+        if (
+          data.calledNumbers &&
+          Array.isArray(data.calledNumbers)
+        ) {
+          const serverCalledNumbers = data.calledNumbers;
+
+          calledRef.current = serverCalledNumbers;
+          setCalled(serverCalledNumbers);
+
+          /*
+           * Update remaining numbers from the SERVER.
+           */
+          const calledNumsSet = new Set(
+            serverCalledNumbers
+              .map(item => {
+                const parts = String(item).split(" ");
+                return parseInt(parts[1], 10);
+              })
+              .filter(Number.isFinite)
+          );
+
+          remainingNumbersRef.current = Array.from(
+            { length: 75 },
+            (_, i) => i + 1
+          ).filter(
+            number => !calledNumsSet.has(number)
+          );
+
+          /*
+           * Update current number.
+           */
+          if (serverCalledNumbers.length > 0) {
+            const latest =
+              serverCalledNumbers[
+                serverCalledNumbers.length - 1
+              ];
+
+            setCurrent(latest);
+
+            /*
+             * IMPORTANT:
+             *
+             * Only announce a number that THIS browser
+             * has not announced yet.
+             *
+             * This ref is local to this browser.
+             *
+             * Browser A has its own ref.
+             * Browser B has its own ref.
+             * Browser C has its own ref.
+             */
+            if (
+              announceNewNumber &&
+              lastSpokenNumberRef.current !== latest
+            ) {
+              lastSpokenNumberRef.current = latest;
+
+              const parts = String(latest).trim().split(/\s+/);
+
+              const letter = parts[0];
+              const number = parseInt(parts[1], 10);
+
+              if (
+                letter &&
+                Number.isFinite(number)
+              ) {
+                speakBallSequence(
+                  letter,
+                  number
+                );
+              }
             }
           }
         }
+
       } catch (error) {
-        console.error("Error connecting to backend API:", error);
+        if (!cancelled) {
+          console.error(
+            "Error connecting to backend API:",
+            error
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    }
-    fetchGameData();
+    };
+
+    /*
+     * Initial load.
+     *
+     * Do NOT speak the existing last number when
+     * opening/reloading a browser.
+     */
+    fetchGameData(false);
+
+    /*
+     * Every browser independently watches the backend.
+     */
+    pollingRef.current = setInterval(() => {
+      fetchGameData(true);
+    }, 800);
+
+    return () => {
+      cancelled = true;
+
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
   }, [id]);
 
   // --- Cleanup on Unmount ---
   useEffect(() => {
     return () => {
       stopAllActiveAudio();
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
       if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
     };
   }, []);
 
- // --- Audio & Voice Initialization ---
-useEffect(() => {
-  const updateVoices = () => {
-    if (
-      typeof window !== "undefined" &&
-      window.speechSynthesis
-    ) {
-      setVoices(window.speechSynthesis.getVoices());
+  // --- Audio & Voice Initialization ---
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        setVoices(window.speechSynthesis.getVoices());
+      }
+    };
+
+    updateVoices();
+
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
     }
-  };
 
-  updateVoices();
+    let audioCtx = null;
 
-  if (
-    typeof window !== "undefined" &&
-    window.speechSynthesis
-  ) {
-    window.speechSynthesis.onvoiceschanged = updateVoices;
-  }
-
- let audioCtx = null;
-
-try {
-  const AudioContext =
-    window.AudioContext || window.webkitAudioContext;
-
-  if (AudioContext) {
-    const ctx = new AudioContext();
-    audioCtx = ctx;
-
-      shuffleAudioRef.current = {
-        play: () => {
-          if (ctx.state === "suspended") {
-            ctx.resume();
-          }
-
-          const bufferSize = Math.floor(ctx.sampleRate * 1.5);
-
-          const buffer = ctx.createBuffer(
-            1,
-            bufferSize,
-            ctx.sampleRate
-          );
-
-          const data = buffer.getChannelData(0);
-
-          for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-          }
-
-          const noise = ctx.createBufferSource();
-          noise.buffer = buffer;
-
-          const filter = ctx.createBiquadFilter();
-          filter.type = "bandpass";
-          filter.frequency.value = 1000;
-          filter.Q.value = 3;
-
-          const gain = ctx.createGain();
-
-          gain.gain.setValueAtTime(
-            0.5,
-            ctx.currentTime
-          );
-
-          gain.gain.exponentialRampToValueAtTime(
-            0.01,
-            ctx.currentTime + 1.5
-          );
-
-          noise.connect(filter);
-          filter.connect(gain);
-          gain.connect(ctx.destination);
-
-          noise.start();
-
-          return new Promise((resolve) => {
-            setTimeout(() => {
-              if (
-                typeof shuffleAudioRef.current?.onended ===
-                "function"
-              ) {
-                shuffleAudioRef.current.onended();
-              }
-
-              resolve();
-            }, 1500);
-          });
-        },
-
-        pause: () => {},
-
-        currentTime: 0,
-
-        onended: null
-      };
-    }
-  } catch (e) {
-    console.error(
-      "Audio initialization failed:",
-      e
-    );
-
-    shuffleAudioRef.current = null;
-  }
-
-  return () => {
-  // Stop browser speech immediately
-  if (
-    typeof window !== "undefined" &&
-    window.speechSynthesis
-  ) {
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.onvoiceschanged = null;
-  }
-
-  // Stop recorded audio immediately
-  if (activeAudioRef.current) {
     try {
-      activeAudioRef.current.pause();
-      activeAudioRef.current.currentTime = 0;
-      activeAudioRef.current.onended = null;
-      activeAudioRef.current.onerror = null;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+
+      if (AudioContext) {
+        const ctx = new AudioContext();
+        audioCtx = ctx;
+
+        shuffleAudioRef.current = {
+          play: () => {
+            if (ctx.state === "suspended") {
+              ctx.resume();
+            }
+
+            const bufferSize = Math.floor(ctx.sampleRate * 1.5);
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 1000;
+            filter.Q.value = 3;
+
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.5, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1.5);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            noise.start();
+
+            return new Promise((resolve) => {
+              setTimeout(() => {
+                if (typeof shuffleAudioRef.current?.onended === "function") {
+                  shuffleAudioRef.current.onended();
+                }
+                resolve();
+              }, 1500);
+            });
+          },
+          pause: () => {},
+          currentTime: 0,
+          onended: null
+        };
+      }
     } catch (e) {
-      console.error("Audio cleanup error:", e);
+      console.error("Audio initialization failed:", e);
+      shuffleAudioRef.current = null;
     }
 
-    activeAudioRef.current = null;
-  }
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.onvoiceschanged = null;
+      }
 
-  // Stop shuffle audio
-  if (shuffleAudioRef.current) {
-    try {
-      shuffleAudioRef.current.pause?.();
-      shuffleAudioRef.current.onended = null;
-    } catch (e) {
-      console.error("Shuffle cleanup error:", e);
-    }
+      if (activeAudioRef.current) {
+        try {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.currentTime = 0;
+          activeAudioRef.current.onended = null;
+          activeAudioRef.current.onerror = null;
+        } catch (e) {
+          console.error("Audio cleanup error:", e);
+        }
+        activeAudioRef.current = null;
+      }
 
-    shuffleAudioRef.current = null;
-  }
+      if (shuffleAudioRef.current) {
+        try {
+          shuffleAudioRef.current.pause?.();
+          shuffleAudioRef.current.onended = null;
+        } catch (e) {
+          console.error("Shuffle cleanup error:", e);
+        }
+        shuffleAudioRef.current = null;
+      }
 
-  // Stop the Web Audio API context
-  try {
-    ctx?.close?.();
-  } catch (e) {
-    console.error("AudioContext cleanup error:", e);
-  }
-};
-}, []);
-
-function playRecordedAudio(
-  fileName,
-  onComplete = () => {}
-) {
-  const cleanName = String(fileName)
-    .trim()
-    .toLowerCase();
-
-  const possiblePaths = [
-    `/${cleanName}.mp3`,
-    `/${cleanName}.wav`
-  ];
-
-  const tryPaths = async () => {
-    for (const audioPath of possiblePaths) {
       try {
-        await new Promise((resolve, reject) => {
-          const audio = new Audio(audioPath);
+        audioCtx?.close?.();
+      } catch (e) {
+        console.error("AudioContext cleanup error:", e);
+      }
+    };
+  }, []);
 
-          activeAudioRef.current = audio;
+  function playRecordedAudio(fileName, onComplete = () => {}) {
+    const cleanName = String(fileName).trim().toLowerCase();
+    const possiblePaths = [
+      `/${cleanName}.mp3`,
+      `/${cleanName}.wav`
+    ];
 
-          audio.onended = () => {
-            activeAudioRef.current = null;
-            resolve();
-          };
+    const tryPaths = async () => {
+      for (const audioPath of possiblePaths) {
+        try {
+          await new Promise((resolve, reject) => {
+            const audio = new Audio(audioPath);
+            activeAudioRef.current = audio;
 
-          audio.onerror = () => {
-            audio.pause();
-            activeAudioRef.current = null;
-            reject();
-          };
+            audio.onended = () => {
+              activeAudioRef.current = null;
+              resolve();
+            };
 
-          const playPromise = audio.play();
-
-          if (playPromise) {
-            playPromise.catch(() => {
+            audio.onerror = () => {
+              audio.pause();
               activeAudioRef.current = null;
               reject();
-            });
-          }
-        });
+            };
 
-        onComplete();
-        return;
-      } catch (e) {
-        // Try the next audio format
+            const playPromise = audio.play();
+            if (playPromise) {
+              playPromise.catch(() => {
+                activeAudioRef.current = null;
+                reject();
+              });
+            }
+          });
+
+          onComplete();
+          return;
+        } catch (e) {
+          // Try next audio format
+        }
       }
-    }
 
-    // No audio file worked
-    activeAudioRef.current = null;
-    onComplete();
-  };
+      activeAudioRef.current = null;
+      onComplete();
+    };
 
-  tryPaths();
-}
+    tryPaths();
+  }
+
   function playShuffleSound(onComplete = () => {}) {
     playRecordedAudio("shuffle", () => {
       onComplete();
@@ -467,10 +517,9 @@ function playRecordedAudio(
       speech.lang = requestedLang;
     }
 
-    // Tuned for deep, booming, energetic, stadium-announcer delivery
-    speech.rate = options.rate ?? 0.81;   // Energetic and punchy pacing
-    speech.pitch = options.pitch ?? 0.90; // Deep and commanding pitch
-    speech.volume = options.volume ?? 1.0; // Maximum power and volume
+    speech.rate = options.rate ?? 0.81;
+    speech.pitch = options.pitch ?? 0.90;
+    speech.volume = options.volume ?? 1.0;
 
     speech.onend = () => {
       activeUtteranceRef.current = null;
@@ -487,8 +536,8 @@ function playRecordedAudio(
   }
 
   // --- Dynamic Arena Announcer Sequence ---
- function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
-  if (stateRef.current.paused) return;
+  function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
+    if (stateRef.current.paused) return;
 
     const currentGame = stateRef.current.game || game;
     const activeVoiceMode = currentGame.voiceMode || currentGame.voice_mode;
@@ -530,19 +579,15 @@ function playRecordedAudio(
       return;
     }
 
-    // Professional live bingo cadence with dramatic pauses, deep booming voice, and maximum energy
     const fullNumberWord = number.toLocaleString("en-US");
     const letterWord = spokenLetter[letter] || letter;
 
-    // Step 1: Call the Letter with high energy & deep booming voice
     speakWithStyledVoice(letterWord, () => {
       if (stateRef.current.paused) return;
 
-      // Step 2: Call the Full Number with maximum force and clear pronunciation
       speakWithStyledVoice(fullNumberWord, () => {
         if (stateRef.current.paused) return;
 
-        // Step 3: Announce separate digits and football legend nickname with booming stadium style
         let suffixParts = [];
         if (isTwoDigit) {
           const digits = String(number).split("");
@@ -627,7 +672,6 @@ function playRecordedAudio(
     } else {
       setPaused(true);
       stopAllActiveAudio();
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
     }
   };
 
@@ -667,14 +711,27 @@ function playRecordedAudio(
     };
   }, [paused]);
 
+  // --- Replaced generateNumber ---
   async function generateNumber() {
-    if (isDrawingBallRef.current || stateRef.current.paused) return;
-
-    if (!game?.game_id) {
+    if (
+      isDrawingBallRef.current ||
+      stateRef.current.paused
+    ) {
       return;
     }
 
-    const currentRemaining = remainingNumbersRef.current;
+    const currentGame =
+      stateRef.current.game || game;
+
+    if (!currentGame?.game_id) {
+      console.error(
+        "Cannot generate number: no game_id"
+      );
+      return;
+    }
+
+    const currentRemaining =
+      remainingNumbersRef.current;
 
     if (!currentRemaining.length) {
       setPaused(true);
@@ -683,57 +740,62 @@ function playRecordedAudio(
 
     isDrawingBallRef.current = true;
 
-    const randomIndex = Math.floor(Math.random() * currentRemaining.length);
-    const number = currentRemaining[randomIndex];
-
-    remainingNumbersRef.current = currentRemaining.filter(n => n !== number);
-
-    let letter = "B";
-    if (number >= 16) letter = "I";
-    if (number >= 31) letter = "N";
-    if (number >= 46) letter = "G";
-    if (number >= 61) letter = "O";
-
-    const result = `${letter} ${number}`;
-
-    setCurrent(result);
-
-    const updatedCalled = [...calledRef.current, result];
-    calledRef.current = updatedCalled;
-    setCalled(updatedCalled);
-
-    isDrawingBallRef.current = false;
-
     try {
-      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game.game_id}/call-number`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ball: result,
-        }),
-      });
-    } catch (err) {
-      console.error(err);
+      const randomIndex = Math.floor(
+        Math.random() *
+          currentRemaining.length
+      );
+
+      const number =
+        currentRemaining[randomIndex];
+
+      let letter = "B";
+
+      if (number >= 16) letter = "I";
+      if (number >= 31) letter = "N";
+      if (number >= 46) letter = "G";
+      if (number >= 61) letter = "O";
+
+      const result = `${letter} ${number}`;
+
+      const response = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/games/${currentGame.game_id}/call-number`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            ball: result
+          })
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.status === 409) {
+        console.warn(
+          "Number was already called:",
+          result
+        );
+        return;
+      }
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.error ||
+          `Call-number failed: ${response.status}`
+        );
+      }
+
+    } catch (error) {
+      console.error(
+        "Error calling Bingo number:",
+        error
+      );
+    } finally {
+      isDrawingBallRef.current = false;
     }
-
-    speakBallSequence(letter, number, () => {
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
-
-      const currentGame = stateRef.current.game || game;
-      const activeVoiceMode = currentGame.voiceMode || currentGame.voice_mode;
-
-      const delay = activeVoiceMode === "recorded" 
-        ? 80
-        : stateRef.current.speed * 1000;
-  
-      loopTimeoutRef.current = setTimeout(() => {
-        if (!stateRef.current.paused) {
-          generateNumber();
-        }   
-      }, delay);
-    });
   }
 
   const checkWinner = async () => {
@@ -806,7 +868,7 @@ function playRecordedAudio(
           playRecordedAudio("winner");
         } else {
           stopAllActiveAudio();
-         const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
+          const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
           speech.pitch = 0.6;
           speech.rate = 1.2; 
           window.speechSynthesis.speak(speech);
@@ -840,7 +902,6 @@ function playRecordedAudio(
 
   async function reset() {
     stopAllActiveAudio();
-    if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
     setCurrent("");
     setCalled([]);
     setWinnerMessage("");
@@ -1274,10 +1335,8 @@ function playRecordedAudio(
               }}
             >
               <option value="recorded">🎙️ bulchaa voice</option>
-              
               <option value="oromo">robot Afaan Oromo</option>
             </select>
-
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#0c162d', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '4px', fontSize: '9px' }}>
               <span style={{ color: '#8c9cb3', fontWeight: 'bold' }}>⏱️ {speed}s</span>
