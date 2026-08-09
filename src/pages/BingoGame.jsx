@@ -199,12 +199,15 @@ useEffect(() => {
     window.speechSynthesis.onvoiceschanged = updateVoices;
   }
 
-  try {
-    const AudioContext =
-      window.AudioContext || window.webkitAudioContext;
+ let audioCtx = null;
 
-    if (AudioContext) {
-      const ctx = new AudioContext();
+try {
+  const AudioContext =
+    window.AudioContext || window.webkitAudioContext;
+
+  if (AudioContext) {
+    const ctx = new AudioContext();
+    audioCtx = ctx;
 
       shuffleAudioRef.current = {
         play: () => {
@@ -283,13 +286,48 @@ useEffect(() => {
   }
 
   return () => {
-    if (
-      typeof window !== "undefined" &&
-      window.speechSynthesis
-    ) {
-      window.speechSynthesis.onvoiceschanged = null;
+  // Stop browser speech immediately
+  if (
+    typeof window !== "undefined" &&
+    window.speechSynthesis
+  ) {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.onvoiceschanged = null;
+  }
+
+  // Stop recorded audio immediately
+  if (activeAudioRef.current) {
+    try {
+      activeAudioRef.current.pause();
+      activeAudioRef.current.currentTime = 0;
+      activeAudioRef.current.onended = null;
+      activeAudioRef.current.onerror = null;
+    } catch (e) {
+      console.error("Audio cleanup error:", e);
     }
-  };
+
+    activeAudioRef.current = null;
+  }
+
+  // Stop shuffle audio
+  if (shuffleAudioRef.current) {
+    try {
+      shuffleAudioRef.current.pause?.();
+      shuffleAudioRef.current.onended = null;
+    } catch (e) {
+      console.error("Shuffle cleanup error:", e);
+    }
+
+    shuffleAudioRef.current = null;
+  }
+
+  // Stop the Web Audio API context
+  try {
+    ctx?.close?.();
+  } catch (e) {
+    console.error("AudioContext cleanup error:", e);
+  }
+};
 }, []);
 
 function playRecordedAudio(
@@ -449,10 +487,8 @@ function playRecordedAudio(
   }
 
   // --- Dynamic Arena Announcer Sequence ---
-  function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
-    stopAllActiveAudio();
-
-    if (stateRef.current.paused) return;
+ function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
+  if (stateRef.current.paused) return;
 
     const currentGame = stateRef.current.game || game;
     const activeVoiceMode = currentGame.voiceMode || currentGame.voice_mode;
@@ -770,9 +806,9 @@ function playRecordedAudio(
           playRecordedAudio("winner");
         } else {
           stopAllActiveAudio();
-          const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
+         const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
           speech.pitch = 0.6;
-          speech.rate = 1.2;
+          speech.rate = 1.2; 
           window.speechSynthesis.speak(speech);
         }
       } else {
@@ -1238,16 +1274,11 @@ function playRecordedAudio(
               }}
             >
               <option value="recorded">🎙️ bulchaa voice</option>
-              <option value="synthetic">🤖 English (Native Voice)</option>
+              
               <option value="oromo">robot Afaan Oromo</option>
             </select>
 
-            <button className="ctrl-btn blue-border" style={{ padding: "2px 6px", fontSize: "9px", fontWeight: 'bold', cursor: 'pointer' }} onClick={() => setTvMode(!tvMode)}>
-              <span>{tvMode ? 'MOBILE VIEW' : t.tvBroadcast}</span>
-            </button>
-            <button className="ctrl-btn red-border" style={{ padding: "2px 6px", fontSize: "9px", fontWeight: 'bold', cursor: 'pointer' }} onClick={reset}>
-              <span>{t.resetBoard}</span>
-            </button>
+            
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#0c162d', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '4px', fontSize: '9px' }}>
               <span style={{ color: '#8c9cb3', fontWeight: 'bold' }}>⏱️ {speed}s</span>
               <button style={{ background: '#122042', border: '1px solid #00c8ff', color: '#fff', borderRadius: '2px', width: '12px', height: '12px', fontSize: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => speed > 1 && setSpeed(speed - 1)}>-</button>
