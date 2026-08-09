@@ -129,192 +129,32 @@ router.get("/house/:id", async (req, res) => {
 // =======================
 // GET ACTIVE GAME BY CASHIER
 // =======================
-// =======================
-// GET ACTIVE GAME + CALLED NUMBERS
-// =======================
 router.get("/active/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Your existing frontend passes the cashier ID here.
-    const gameResult = await pool.query(
-      `
-      SELECT *
-      FROM games
-      WHERE cashier_id = $1
-      ORDER BY id DESC
-      LIMIT 1
-      `,
+    const result = await pool.query(
+      `SELECT *
+       FROM games
+       WHERE cashier_id = $1
+       ORDER BY id DESC
+       LIMIT 1`,
       [id]
     );
 
-    if (gameResult.rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(404).json({
         error: "No active game found"
       });
     }
 
-    const game = gameResult.rows[0];
-
-    // Get all numbers already called for this game.
-    const calledResult = await pool.query(
-      `
-      SELECT ball
-      FROM called_balls
-      WHERE game_id = $1
-      ORDER BY id ASC
-      `,
-      [game.game_id]
-    );
-
-    const calledNumbers = calledResult.rows.map(row => row.ball);
-
-    res.json({
-      ...game,
-      calledNumbers
-    });
+    res.json(result.rows[0]);
 
   } catch (err) {
-    console.error("Error fetching active game:", err);
-
+    console.error(err);
     res.status(500).json({
       error: err.message
     });
-  }
-});
-
-
-// =======================
-// CALL NEW BINGO NUMBER
-// =======================
-router.post("/:gameId/call-number", async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    const { gameId } = req.params;
-    const { ball } = req.body;
-
-    if (!gameId || !ball) {
-      return res.status(400).json({
-        success: false,
-        error: "gameId and ball are required"
-      });
-    }
-
-    await client.query("BEGIN");
-
-    /*
-     * Lock this game's called-ball rows while we check.
-     *
-     * This prevents two browsers from successfully inserting
-     * the exact same ball at the same time.
-     */
-    const existingResult = await client.query(
-      `
-      SELECT id, ball
-      FROM called_balls
-      WHERE game_id = $1
-      ORDER BY id ASC
-      FOR UPDATE
-      `,
-      [gameId]
-    );
-
-    const existingBalls = existingResult.rows.map(row => row.ball);
-
-    // Never allow the same Bingo ball twice.
-    if (existingBalls.includes(ball)) {
-      await client.query("ROLLBACK");
-
-      return res.status(409).json({
-        success: false,
-        duplicate: true,
-        error: "This Bingo number has already been called",
-        ball,
-        calledNumbers: existingBalls
-      });
-    }
-
-    /*
-     * Validate the Bingo ball format.
-     */
-    const match = /^([BINGO])\s+(\d+)$/.exec(ball.trim());
-
-    if (!match) {
-      await client.query("ROLLBACK");
-
-      return res.status(400).json({
-        success: false,
-        error: "Invalid Bingo ball format"
-      });
-    }
-
-    const letter = match[1];
-    const number = parseInt(match[2], 10);
-
-    /*
-     * Validate BINGO ranges.
-     */
-    const validRange =
-      (letter === "B" && number >= 1 && number <= 15) ||
-      (letter === "I" && number >= 16 && number <= 30) ||
-      (letter === "N" && number >= 31 && number <= 45) ||
-      (letter === "G" && number >= 46 && number <= 60) ||
-      (letter === "O" && number >= 61 && number <= 75);
-
-    if (!validRange) {
-      await client.query("ROLLBACK");
-
-      return res.status(400).json({
-        success: false,
-        error: `Invalid Bingo number for ${letter}`
-      });
-    }
-
-    /*
-     * Insert the new number.
-     */
-    const insertResult = await client.query(
-      `
-      INSERT INTO called_balls (game_id, ball)
-      VALUES ($1, $2)
-      RETURNING id, ball
-      `,
-      [gameId, ball.trim()]
-    );
-
-    const newCalledNumbers = [
-      ...existingBalls,
-      insertResult.rows[0].ball
-    ];
-
-    await client.query("COMMIT");
-
-    console.log(
-      `CALL NUMBER | Game: ${gameId} | Ball: ${ball}`
-    );
-
-    res.json({
-      success: true,
-      duplicate: false,
-      ball: insertResult.rows[0].ball,
-      calledNumbers: newCalledNumbers
-    });
-
-  } catch (err) {
-    try {
-      await client.query("ROLLBACK");
-    } catch (_) {}
-
-    console.error("Error calling Bingo number:", err);
-
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
-
-  } finally {
-    client.release();
   }
 });
 
