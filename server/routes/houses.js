@@ -158,9 +158,18 @@ router.put("/:id/package", async (req, res) => {
 router.get("/:id/performance", async (req, res) => {
   try {
     const { id } = req.params;
+    const period = req.query.period || "daily"; // optional: handle different tabs
+
+    let timeFilter = "NOW() - INTERVAL '24 hours'";
+    if (period === "weekly") timeFilter = "NOW() - INTERVAL '7 days'";
+    if (period === "monthly") timeFilter = "NOW() - INTERVAL '30 days'";
+    if (period === "yearly") timeFilter = "NOW() - INTERVAL '365 days'";
 
     const result = await pool.query(
-      `SELECT * FROM game_logs WHERE house_id = $1 ORDER BY created_at DESC`,
+      `SELECT * FROM game_logs 
+       WHERE house_id = $1 
+       AND created_at >= ${timeFilter} 
+       ORDER BY created_at DESC`,
       [Number(id)]
     );
 
@@ -186,7 +195,6 @@ router.get("/:id/performance", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
 // ==========================================================================
 // DELETE RECORDS BY PERIOD TYPE (DAILY, WEEKLY, MONTHLY, YEARLY)
 // ==========================================================================

@@ -63,7 +63,7 @@ export default function HouseDashboard() {
         if (Array.isArray(gamesData)) setHouseGames(gamesData);
       }
 
-      // 4. Fetch house package information (Robustly parses both naming conventions)
+      // 4. Fetch house package information
       const packageRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${id}/package`);
       if (packageRes.ok) {
         const pkgData = await packageRes.json();
@@ -105,7 +105,7 @@ export default function HouseDashboard() {
   useEffect(() => {
     async function loadPerformance() {
       try {
-        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`);
+        const response = await fetch(`http://localhost:5000/api/games/house/${id}/performance`)
         const data = await response.json();
 
         if (data.success && data.performance) {
@@ -208,7 +208,9 @@ export default function HouseDashboard() {
     const betAmount = Number(game.bet) || 50;
     const grossPool = betAmount * cartelasCount;
     const commissionRate = Number(game.commission) || 15;
-    const calculatedCommission = grossPool * (commissionRate / 100);
+    
+    // Utilize stored database commission if present, avoiding row calculation discrepancies
+    const calculatedCommission = Number(game.house_commission ?? game.commission_earned ?? (grossPool * (commissionRate / 100)));
 
     if (!acc[dateKey]) {
       acc[dateKey] = { date: dateKey, totalCardsSold: 0, totalCommission: 0, totalRoundsPlayed: 0 };
@@ -228,16 +230,10 @@ export default function HouseDashboard() {
     const cashierUsername = cashier.username || cashier.name || cashier.cashier_name || "";
     const cashierPhone = cashier.phone || cashier.telephone || cashier.mobile || "";
 
-    console.log("Before:", username, password, phone);
-
     setEditingCashierId(cashier.id);
     setUsername(cashierUsername);
-    setPassword(""); // keep password empty for safety
+    setPassword(""); 
     setPhone(cashierPhone);
-
-    setTimeout(() => {
-      console.log("After click:", cashierUsername, cashierPhone);
-    }, 100);
   }
 
   async function handleCreateCashier(e) {
@@ -252,7 +248,6 @@ export default function HouseDashboard() {
       let response;
 
       if (editingCashierId) {
-        // UPDATE CASHIER
         response = await fetch(
           `https://bingo-backend-ccn6.onrender.com/api/cashiers/${editingCashierId}`,
           {
@@ -267,7 +262,6 @@ export default function HouseDashboard() {
           }
         );
       } else {
-        // CREATE CASHIER
         response = await fetch("https://bingo-backend-ccn6.onrender.com/api/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -306,7 +300,7 @@ export default function HouseDashboard() {
     }
   }
 
-  // Modern UI Inline Styles - Blue Black Lightened (Midnight Dark Theme)
+  // Modern UI Inline Styles - Midnight Dark Theme
   const colors = {
     background: "#0b0f19",
     cardBg: "rgba(30, 41, 59, 0.45)",
@@ -527,11 +521,9 @@ export default function HouseDashboard() {
     return (
       <div style={{ width: "100%", overflowX: "auto" }}>
         <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: "100%", height: "260px", overflow: "visible" }}>
-          {/* Axis lines */}
           <line x1={padding} y1={padding} x2={padding} y2={svgHeight - padding} stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
           <line x1={padding} y1={svgHeight - padding} x2={svgWidth - padding} y2={svgHeight - padding} stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
 
-          {/* Grid lines */}
           {[0.25, 0.5, 0.75, 1].map((ratio, idx) => {
             const y = svgHeight - padding - ratio * (svgHeight - 2 * padding);
             return (
@@ -539,24 +531,18 @@ export default function HouseDashboard() {
             );
           })}
 
-          {/* Lines */}
           <polyline fill="none" stroke={colors.accentSky} strokeWidth="3" points={cardsPoints} />
           <polyline fill="none" stroke={colors.accentCyan} strokeWidth="3" points={commPoints} />
           <polyline fill="none" stroke={colors.accentPurple} strokeWidth="3" points={roundsPoints} />
 
-          {/* XY Data Points */}
           {sortedDailyGraph.map((d, i) => {
             const x = getX(i);
             return (
               <g key={i}>
-                {/* Cards point */}
                 <circle cx={x} cy={getYCards(d.totalCardsSold)} r="5" fill={colors.accentSky} />
-                {/* Commission point */}
                 <circle cx={x} cy={getYComm(d.totalCommission)} r="5" fill={colors.accentCyan} />
-                {/* Rounds point */}
                 <circle cx={x} cy={getYRounds(d.totalRoundsPlayed)} r="5" fill={colors.accentPurple} />
                 
-                {/* Date Label on X Axis */}
                 <text x={x} y={svgHeight - 12} fill={colors.textMuted} fontSize="11" textAnchor="middle">
                   {new Date(d.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </text>
@@ -590,7 +576,6 @@ export default function HouseDashboard() {
             <h2 style={{ margin: 0, fontSize: "28px", color: colors.accentCyan, fontWeight: "700" }}>{packageInfo.remainingAmount.toFixed(2)} ETB</h2>
           </div>
 
-          {/* BUY PACKAGE BUTTON */}
           <button 
             style={styles.buyPackageBtn}
             onClick={() => alert("Redirecting to Buy Package requested from Super Admin...")}
@@ -598,7 +583,6 @@ export default function HouseDashboard() {
             Buy Package
           </button>
 
-          {/* SILVER, GOLD, DIAMOND DISPLAY (SET BY SUPER ADMIN) */}
           <div style={styles.tierDisplayContainer}>
             <div style={styles.tierBadge}>
               <div style={{ fontSize: "11px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
@@ -625,7 +609,7 @@ export default function HouseDashboard() {
         </div>
       </div>
 
-      {/* DETAILED HOUSE GAME HISTORY LOG (VISIBLE FROM NEWEST TO OLDEST) */}
+      {/* DETAILED HOUSE GAME HISTORY LOG */}
       <h2 style={styles.sectionTitle}>Detailed Game History Logs</h2>
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
@@ -646,7 +630,9 @@ export default function HouseDashboard() {
                 const betAmount = Number(game.bet) || 50;
                 const grossPool = betAmount * cartelasCount;
                 const commissionRate = Number(game.commission) || 15; 
-                const houseEarned = (grossPool * (commissionRate / 100)).toFixed(2);
+                
+                // FIXED: Uses stored database commission field if available, aligning table row values with backend summaries
+                const houseEarned = Number(game.house_commission ?? game.commission_earned ?? (grossPool * (commissionRate / 100))).toFixed(2);
 
                 const formattedDate = new Date(
                   game.created_at || game.finished_at || game.started_at || game.date
@@ -701,7 +687,6 @@ export default function HouseDashboard() {
       {/* Cashier Passwords and Details Section */}
       <h2 style={styles.sectionTitle}>Cashier Passwords & Roster</h2>
       
-      {/* Compact Creating Cashier Form */}
       <form onSubmit={handleCreateCashier} style={{
         display: "flex",
         gap: "12px",
@@ -744,7 +729,6 @@ export default function HouseDashboard() {
           {editingCashierId ? "Update Cashier" : "Create Cashier"}
         </button>
 
-        {/* CANCEL / RESET BUTTON */}
         <button
           type="button"
           onClick={() => {
@@ -796,11 +780,7 @@ export default function HouseDashboard() {
                     <td style={{ ...styles.td, textAlign: "center" }}>
                       <button
                         type="button"
-                        onClick={() => {
-                          console.log("Edit clicked");
-                          console.log(cashier);
-                          editCashier(cashier);
-                        }}
+                        onClick={() => editCashier(cashier)}
                         style={{
                           padding: "6px 14px",
                           backgroundColor: "rgba(56, 189, 248, 0.15)",
@@ -853,9 +833,7 @@ export default function HouseDashboard() {
         </table>
       </div>
 
-      {/* ========================================================================== */}
-      {/* PERIODIC PERFORMANCE SUMMARY CARDS & DELETE BUTTON */}
-      {/* ========================================================================== */}
+      {/* PERFORMANCE SUMMARY SECTION */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px", marginTop: "45px", marginBottom: "15px" }}>
         <h2 style={{ ...styles.sectionTitle, marginTop: 0, marginBottom: 0 }}>
           Performance Summary (Select Tab to Filter/Delete)
@@ -981,7 +959,6 @@ export default function HouseDashboard() {
       {/* DAILY PERFORMANCE XY GRAPH COMPONENT */}
       <h2 style={{ ...styles.sectionTitle, marginTop: "25px" }}>Daily Performance Analytics (XY Plot)</h2>
       <div style={{ ...styles.card, marginBottom: "40px" }}>
-        {/* Legend */}
         <div style={{ display: "flex", gap: "20px", marginBottom: "20px", fontSize: "13px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <div style={{ width: "12px", height: "12px", backgroundColor: colors.accentSky, borderRadius: "50%" }}></div>

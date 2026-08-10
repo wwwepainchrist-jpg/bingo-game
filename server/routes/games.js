@@ -15,28 +15,33 @@ router.post("/", async (req, res) => {
     // 1. Insert Game
     const gameResult = await client.query(
       `INSERT INTO games
-      (
-        game_id,
-        house_id,
-        cashier_id,
-        bet,
-        prize,
-        commission,
-        cards_sold,
-        voice_mode
-      )
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+(
+  game_id,
+  house_id,
+  cashier_id,
+  bet,
+  prize,
+  commission,
+  cards_sold,
+  house_commission,
+  voice_mode
+)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *`,
-      [
-        game.id,
-        game.house,
-        game.cashier,
-        game.bet,
-        game.prize,
-        game.commission,
-        game.cardsSold,
-        game.voiceMode,
-      ]
+     [
+  game.id,
+  game.house,
+  game.cashier,
+  game.bet,
+  game.prize,
+  game.commission,
+  game.cardsSold,
+
+  // House Commission Earned
+  (Number(game.bet) * Number(game.cardsSold) * Number(game.commission)) / 100,
+
+  game.voiceMode,
+]
     );
 
     // 2. Deduct House Package
@@ -527,22 +532,62 @@ router.get("/house/:id/performance", async (req, res) => {
     const { id } = req.params;
 
     const query = `
-      SELECT 
-        COALESCE(SUM(CASE WHEN created_at::date = CURRENT_DATE THEN cards_sold ELSE 0 END), 0) AS daily_cards,
-        COALESCE(SUM(CASE WHEN created_at::date = CURRENT_DATE THEN (prize * commission / 100) ELSE 0 END), 0) AS daily_commission,
-        COUNT(CASE WHEN created_at::date = CURRENT_DATE THEN 1 END) AS daily_games,
+      SELECT
+        COALESCE(SUM(CASE
+          WHEN created_at::date = CURRENT_DATE
+          THEN cards_sold ELSE 0
+        END), 0) AS daily_cards,
 
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN cards_sold ELSE 0 END), 0) AS weekly_cards,
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN (prize * commission / 100) ELSE 0 END), 0) AS weekly_commission,
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '7 days' THEN 1 END) AS weekly_games,
+        COALESCE(SUM(CASE
+          WHEN created_at::date = CURRENT_DATE
+          THEN house_commission ELSE 0
+        END), 0) AS daily_commission,
 
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN cards_sold ELSE 0 END), 0) AS monthly_cards,
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN (prize * commission / 100) ELSE 0 END), 0) AS monthly_commission,
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '30 days' THEN 1 END) AS monthly_games,
+        COUNT(CASE
+          WHEN created_at::date = CURRENT_DATE THEN 1
+        END) AS daily_games,
 
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '365 days' THEN cards_sold ELSE 0 END), 0) AS yearly_cards,
-        COALESCE(SUM(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '365 days' THEN (prize * commission / 100) ELSE 0 END), 0) AS yearly_commission,
-        COUNT(CASE WHEN created_at >= CURRENT_DATE - INTERVAL '365 days' THEN 1 END) AS yearly_games
+        COALESCE(SUM(CASE
+          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days'
+          THEN cards_sold ELSE 0
+        END), 0) AS weekly_cards,
+
+        COALESCE(SUM(CASE
+          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days'
+          THEN house_commission ELSE 0
+        END), 0) AS weekly_commission,
+
+        COUNT(CASE
+          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days' THEN 1
+        END) AS weekly_games,
+
+        COALESCE(SUM(CASE
+          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE)
+          THEN cards_sold ELSE 0
+        END), 0) AS monthly_cards,
+
+        COALESCE(SUM(CASE
+          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE)
+          THEN house_commission ELSE 0
+        END), 0) AS monthly_commission,
+
+        COUNT(CASE
+          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN 1
+        END) AS monthly_games,
+
+        COALESCE(SUM(CASE
+          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE)
+          THEN cards_sold ELSE 0
+        END), 0) AS yearly_cards,
+
+        COALESCE(SUM(CASE
+          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE)
+          THEN house_commission ELSE 0
+        END), 0) AS yearly_commission,
+
+        COUNT(CASE
+          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE) THEN 1
+        END) AS yearly_games
 
       FROM games
       WHERE house_id = $1::text;
@@ -552,16 +597,39 @@ router.get("/house/:id/performance", async (req, res) => {
 
     res.json({
       success: true,
-      performance: result.rows[0]
+      performance: result.rows[0],
     });
 
   } catch (err) {
-    console.error("Error fetching house performance summary:", err);
+    console.error("Error fetching house performance:", err);
+
     res.status(500).json({
       success: false,
-      error: err.message
+      error: err.message,
     });
   }
 });
+router.get("/test-db", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) AS total_games,
+        COALESCE(SUM(cards_sold), 0) AS total_cards,
+        COALESCE(SUM(house_commission), 0) AS total_commission
+      FROM games
+    `);
 
+    res.json({
+      success: true,
+      database: result.rows[0],
+    });
+  } catch (err) {
+    console.error("TEST DB ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
 module.exports = router;
