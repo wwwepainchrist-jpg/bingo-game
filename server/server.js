@@ -1,4 +1,6 @@
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
 require("dotenv").config();
 const cron = require("node-cron");
@@ -17,7 +19,43 @@ const salesRoutes = require("./routes/sales");
 const notificationRoutes = require("./routes/notifications");
 
 const app = express();
+const server = http.createServer(app);
 
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+  },
+});
+
+gameRoutes.setSocketIO(io);
+io.on("connection", (socket) => {
+  console.log("🔌 Socket connected:", socket.id);
+
+  socket.on("join-game", (gameId) => {
+    if (!gameId) return;
+
+    socket.join(`game:${gameId}`);
+
+    console.log(
+      `🎱 Socket ${socket.id} joined game ${gameId}`
+    );
+  });
+
+  socket.on("leave-game", (gameId) => {
+    if (!gameId) return;
+
+    socket.leave(`game:${gameId}`);
+
+    console.log(
+      `🚪 Socket ${socket.id} left game ${gameId}`
+    );
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔌 Socket disconnected:", socket.id);
+  });
+});
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -76,6 +114,6 @@ app.get("/", async (req, res) => {
 // 3. START SERVER
 // ==========================================================================
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
