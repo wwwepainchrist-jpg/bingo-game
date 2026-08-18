@@ -2,87 +2,177 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+let io;
+
+function setSocketIO(socketIO) {
+  io = socketIO;
+}
+// =======================
+// SAVE NEW GAME & SOLD CARTELAS
+// =======================
+// =======================
+// SAVE NEW GAME & SOLD CARTELAS
+// =======================
 // =======================
 // SAVE NEW GAME & SOLD CARTELAS
 // =======================
 router.post("/", async (req, res) => {
-  const client = await pool.connect();
+  console.time("TOTAL GAME SAVE");
+
+  const { game, cashierId, soldCartelas } = req.body;
+
   try {
-    await client.query("BEGIN");
-    const { game, cashierId, soldCartelas } = req.body;
-    console.log("Received game:", game);
-
-    // 1. Insert Game
-    const gameResult = await client.query(
-      `INSERT INTO games
-(
-  game_id,
-  house_id,
-  cashier_id,
-  bet,
-  prize,
-  commission,
-  cards_sold,
-  house_commission,
-  voice_mode
-)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      RETURNING *`,
-     [
-  game.id,
-  game.house,
-  game.cashier,
-  game.bet,
-  game.prize,
-  game.commission,
-  game.cardsSold,
-
-  // House Commission Earned
-  (Number(game.bet) * Number(game.cardsSold) * Number(game.commission)) / 100,
-
-  game.voiceMode,
-]
+    // -----------------------
+    // Prepare cartela IDs
+    // -----------------------
+    const cartelaIds = (soldCartelas || []).map((cartela) =>
+      String(
+        typeof cartela === "object"
+          ? cartela.id
+          : cartela
+      )
     );
 
-    // 2. Deduct House Package
-    await client.query(
-      `UPDATE houses
-       SET remaining_package = remaining_package - $1
-       WHERE id = $2`,
-      [game.commissionDeducted, game.house]
+    // -----------------------
+    // Calculate house commission
+    // -----------------------
+    const houseCommission =
+      (Number(game.bet) *
+        Number(game.cardsSold) *
+        Number(game.commission)) /
+      100;
+
+    console.time("GAME SAVE QUERY");
+
+    // -----------------------
+    // ONE DATABASE QUERY
+    // -----------------------
+    const result = await pool.query(
+      `
+      WITH inserted_game AS (
+
+        INSERT INTO games
+        (
+          game_id,
+          house_id,
+          cashier_id,
+          bet,
+          prize,
+          commission,
+          cards_sold,
+          house_commission,
+          voice_mode
+        )
+        VALUES
+        (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          $8,
+          $9
+        )
+        RETURNING *
+
+      ),
+
+      updated_house AS (
+
+        UPDATE houses
+        SET remaining_package =
+            remaining_package - $10
+
+        WHERE id = $2::integer
+          AND remaining_package >= $10
+
+        RETURNING remaining_package
+
+      ),
+
+      inserted_cartelas AS (
+
+        INSERT INTO sold_cartelas
+        (
+          game_id,
+          cartela_id
+        )
+
+        SELECT
+          $1,
+          unnest($11::text[])
+
+        WHERE EXISTS (
+          SELECT 1
+          FROM updated_house
+        )
+
+      )
+
+      SELECT *
+      FROM inserted_game
+      WHERE EXISTS (
+        SELECT 1
+        FROM updated_house
+      );
+      `,
+      [
+        String(game.id),                    // $1 game_id
+        String(game.house),                 // $2 house_id
+        String(game.cashier),               // $3 cashier_id
+        Number(game.bet),                   // $4 bet
+        Number(game.prize),                 // $5 prize
+        Number(game.commission),             // $6 commission
+        Number(game.cardsSold),              // $7 cards_sold
+        Number(houseCommission),             // $8 house_commission
+        game.voiceMode || "recorded",        // $9 voice_mode
+        Number(game.commissionDeducted),     // $10 package deduction
+        cartelaIds                           // $11 cartela IDs
+      ]
     );
 
-    // 3. Insert Sold Cartelas securely within the same transaction
-    if (soldCartelas && soldCartelas.length > 0) {
-      for (const cartela of soldCartelas) {
-        const cartelaId = typeof cartela === 'object' ? cartela.id : cartela;
-        await client.query(
-          `INSERT INTO sold_cartelas (game_id, cashier_id, cartela_id)
-           VALUES ($1, $2, $3)`,
-          [game.id, cashierId || game.cashier, cartelaId]
-        );
-      }
+    console.timeEnd("GAME SAVE QUERY");
+
+    // -----------------------
+    // Check transaction result
+    // -----------------------
+    if (result.rows.length === 0) {
+      throw new Error("Not enough remaining package");
     }
 
-    await client.query("COMMIT");
+    console.log(
+      "✅ GAME SAVED:",
+      result.rows[0].game_id
+    );
 
+    // -----------------------
+    // Send response
+    // -----------------------
     res.json({
       success: true,
-      game: gameResult.rows[0],
+      game: result.rows[0]
     });
 
   } catch (err) {
-    await client.query("ROLLBACK");
-    console.error("Error saving game and cartelas:", err);
+
+    console.error(
+      "❌ ERROR SAVING GAME:",
+      err
+    );
+
     res.status(500).json({
       success: false,
-      error: err.message,
+      error: err.message
     });
+
   } finally {
-    client.release();
+
+    console.timeEnd("TOTAL GAME SAVE");
+
   }
 });
-
 // =======================
 // GET ALL GAMES
 // =======================
@@ -134,90 +224,189 @@ router.get("/house/:id", async (req, res) => {
 // =======================
 // GET ACTIVE GAME BY CASHIER
 // =======================
-router.get("/active/:id", async (req, res) => {
+router.get("/active/:gameId", async (req, res) => {
   try {
-    const { id } = req.params;
+    const { gameId } = req.params;
+
+    console.log("🔥 ACTIVE GAME REQUEST:", gameId);
 
     const result = await pool.query(
-      `SELECT *
-       FROM games
-       WHERE cashier_id = $1
-       ORDER BY id DESC
-       LIMIT 1`,
-      [id]
+      `
+      SELECT *
+      FROM games
+      WHERE game_id = $1
+      LIMIT 1
+      `,
+      [gameId]
     );
 
     if (result.rows.length === 0) {
+      console.log("❌ GAME NOT FOUND:", gameId);
+
       return res.status(404).json({
-        error: "No active game found"
+        error: "Game not found",
+        gameId
       });
     }
 
-    res.json(result.rows[0]);
+    const game = result.rows[0];
+
+    console.log("✅ EXACT GAME FOUND:", game.game_id);
+
+    const calledResult = await pool.query(
+      `
+      SELECT ball
+      FROM called_balls
+      WHERE game_id = $1
+      ORDER BY id ASC
+      `,
+    [game.id]
+    );
+
+    const calledNumbers = calledResult.rows.map(row => row.ball);
+
+    console.log(
+      "🎱 CALLED BALLS FOR:",
+      game.game_id,
+      calledNumbers
+    );
+
+    res.json({
+      ...game,
+      calledNumbers
+    });
 
   } catch (err) {
-    console.error(err);
+    console.error("ACTIVE GAME ERROR:", err);
+
     res.status(500).json({
       error: err.message
     });
   }
 });
-
 router.post("/:gameId/call-number", async (req, res) => {
   try {
     const { gameId } = req.params;
     const { ball } = req.body;
-    console.log("CALL NUMBER");
-    console.log("Game ID:", gameId);
-    console.log("Ball:", ball);
-    
+
+    console.log("BACKEND CALL NUMBER:", gameId);
+    console.log("BACKEND BALL:", ball);
+
+    // Find the database game ID
+    const gameResult = await pool.query(
+      `
+      SELECT id
+      FROM games
+      WHERE game_id = $1
+      `,
+      [gameId]
+    );
+
+    if (gameResult.rows.length === 0) {
+      return res.status(404).json({
+        error: "Game not found",
+        gameId
+      });
+    }
+
+    const gameDbId = gameResult.rows[0].id;
+
+    console.log("DATABASE GAME ID:", gameDbId);
+
     await pool.query(
       `
       INSERT INTO called_balls (game_id, ball)
       VALUES ($1, $2)
+      ON CONFLICT (game_id, ball) DO NOTHING
       `,
-      [gameId, ball]
+      [gameDbId, ball]
     );
 
+    // 🔥 SEND NEW BALL TO EVERY PLAYER IN THIS GAME
+    if (io) {
+      io.to(`game:${gameId}`).emit("number-called", {
+        gameId,
+        ball
+      });
+
+      console.log(
+        "📡 SOCKET SENT:",
+        `game:${gameId}`,
+        ball
+      );
+    }
+
     res.json({
-      success: true,
+      success: true
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("CALL NUMBER ERROR:", err);
+
     res.status(500).json({
-      error: err.message,
+      error: err.message
     });
   }
 });
-
 router.post("/:gameId/verify-cartela", async (req, res) => {
   try {
     const { gameId } = req.params;
     const { cartelaId } = req.body;
-    console.log("Game ID:", gameId);
-    console.log("Cartela ID:", cartelaId);
-    console.log("Cartela ID type =", typeof cartelaId);   
+
+    console.log("VERIFY GAME ID:", gameId);
+    console.log("CARTELA ID:", cartelaId);
+    console.log("CARTELA ID TYPE:", typeof cartelaId);
 
     // ============================
-    // 1. CHECK IF CARTELA WAS SOLD
+    // 1. FIND GAME DATABASE ID
     // ============================
-    const soldResult = await pool.query(
+
+    const gameResult = await pool.query(
       `
-      SELECT *
-      FROM sold_cartelas
+      SELECT id, game_id
+      FROM games
       WHERE game_id = $1
-      AND cartela_id = $2
       `,
-      [gameId, cartelaId]
+      [gameId]
     );
-    console.log("Sold rows:", soldResult.rows);
+
+    if (gameResult.rows.length === 0) {
+      console.log("❌ GAME NOT FOUND:", gameId);
+
+      return res.status(404).json({
+        error: "Game not found",
+        gameId
+      });
+    }
+
+    const gameDbId = gameResult.rows[0].id;
+
+    console.log("GAME STRING ID:", gameResult.rows[0].game_id);
+    console.log("GAME DATABASE ID:", gameDbId);
+   // ============================
+    // 2. CHECK IF CARTELA WAS SOLD
+    // ============================
+
+ const soldResult = await pool.query(
+  `
+  SELECT *
+  FROM sold_cartelas
+  WHERE game_id = $1
+  AND cartela_id = $2
+  `,
+  [gameId, cartelaId]
+);
+
+    console.log("SOLD ROWS:", soldResult.rows);
+
     if (soldResult.rows.length === 0) {
       return res.json({
         sold: false,
         isWinner: false
       });
     }
+
+    console.log("✅ CARTELA IS SOLD");
 
     // ============================
     // 2. LOAD CARTELA
@@ -250,18 +439,26 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     // ============================
     // 3. LOAD CALLED BALLS
     // ============================
-    const calledResult = await pool.query(
-      `
-      SELECT ball
-      FROM called_balls
-      WHERE game_id = $1
-      `,
-      [gameId]
-    );
+  const calledResult = await pool.query(
+  `
+  SELECT ball
+  FROM called_balls
+  WHERE game_id = $1
+  ORDER BY id ASC
+  `,
+  [gameDbId]
+);
 
-    const calledBalls = calledResult.rows.map(r => r.ball);
-    const calledSet = new Set(calledBalls);
+const calledBalls = calledResult.rows.map(r => r.ball);
 
+const calledSet = new Set(
+  calledBalls.map(ball =>
+    parseInt(String(ball).trim().split(/\s+/).pop(), 10)
+  )
+);
+
+console.log("DATABASE GAME ID FOR VERIFICATION:", gameDbId);
+console.log("CALLED BALLS FOR VERIFICATION:", calledBalls);
     // ============================
     // 4. BUILD CARD MATRIX (FIXED)
     // ============================
@@ -278,23 +475,26 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     // ============================
     // 5. HELPER
     // ============================
-    function marked(cell) {
-      if (cell === "FREE") return true;
+ function marked(cell) {
+  if (cell === "FREE") return true;
 
-      const result = [...calledSet].some(ball => ball.trim() === cell.trim());
+  const cellNumber = parseInt(
+    String(cell).trim().split(/\s+/).pop(),
+    10
+  );
 
-      console.log(
-        "Checking:",
-        cell,
-        "Called:",
-        [...calledSet],
-        "Result:",
-        result
-      );
+  if (Number.isNaN(cellNumber)) {
+    return false;
+  }
 
-      return result;
-    }
+  const result = calledSet.has(cellNumber);
 
+  console.log(
+    `MARK CHECK | Cell: ${cell} | Number: ${cellNumber} | Marked: ${result}`
+  );
+
+  return result;
+}
     // ============================
     // 6. CHECK HORIZONTAL LINES
     // ============================
@@ -313,8 +513,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
         break;
       }
     }
-
-    // ============================
+   // ============================
     // 7. CHECK VERTICAL LINES
     // ============================
     let verticalWinner = false;
@@ -633,3 +832,4 @@ router.get("/test-db", async (req, res) => {
   }
 });
 module.exports = router;
+module.exports.setSocketIO = setSocketIO;
