@@ -19,12 +19,20 @@ function setSocketIO(socketIO) {
 router.post("/", async (req, res) => {
   console.time("TOTAL GAME SAVE");
 
+  console.log("🔥 /api/games ROUTE ENTERED");
+
   const { game, cashierId, soldCartelas } = req.body;
 
+  console.log("🔥 BODY RECEIVED");
+  console.log("game:", game);
+  console.log("cashierId:", cashierId);
+  console.log("soldCartelas count:", soldCartelas?.length);
+
+  const client = await pool.connect();
+
   try {
-    // -----------------------
-    // Prepare cartela IDs
-    // -----------------------
+    console.log("🔥 ENTERED TRY");
+
     const cartelaIds = (soldCartelas || []).map((cartela) =>
       String(
         typeof cartela === "object"
@@ -33,129 +41,198 @@ router.post("/", async (req, res) => {
       )
     );
 
-    // -----------------------
-    // Calculate house commission
-    // -----------------------
+    console.log(
+      "🔥 CARTELA IDS PREPARED:",
+      cartelaIds.length
+    );
+
     const houseCommission =
-      (Number(game.bet) *
+      (
+        Number(game.bet) *
         Number(game.cardsSold) *
-        Number(game.commission)) /
-      100;
+        Number(game.commission)
+      ) / 100;
 
-    console.time("GAME SAVE QUERY");
+    console.log(
+      "🔥 HOUSE COMMISSION CALCULATED:",
+      houseCommission
+    );
 
-    // -----------------------
-    // ONE DATABASE QUERY
-    // -----------------------
-    const result = await pool.query(
+    // =====================================================
+    // START TRANSACTION
+    // =====================================================
+
+    await client.query("BEGIN");
+
+    console.log("🔥 TRANSACTION STARTED");
+
+    // =====================================================
+    // 1. DEDUCT HOUSE PACKAGE FIRST
+    // =====================================================
+
+    console.time("HOUSE UPDATE");
+
+    const houseResult = await client.query(
       `
-      WITH inserted_game AS (
+      UPDATE houses
+      SET remaining_package =
+          remaining_package - $1
+      WHERE id = $2::integer
+        AND remaining_package >= $1
+      RETURNING id, remaining_package
+      `,
+      [
+        Number(game.commissionDeducted),
+        Number(game.house)
+      ]
+    );
 
-        INSERT INTO games
-        (
-          game_id,
-          house_id,
-          cashier_id,
-          bet,
-          prize,
-          commission,
-          cards_sold,
-          house_commission,
-          voice_mode
-        )
-        VALUES
-        (
-          $1,
-          $2,
-          $3,
-          $4,
-          $5,
-          $6,
-          $7,
-          $8,
-          $9
-        )
-        RETURNING *
+    console.timeEnd("HOUSE UPDATE");
 
-      ),
+    if (houseResult.rows.length === 0) {
+      throw new Error(
+        "Not enough remaining package"
+      );
+    }
 
-      updated_house AS (
+    console.log(
+      "✅ HOUSE PACKAGE UPDATED:",
+      houseResult.rows[0]
+    );
 
-        UPDATE houses
-        SET remaining_package =
-            remaining_package - $10
+    // =====================================================
+    // 2. INSERT GAME
+    // =====================================================
 
-        WHERE id = $2::integer
-          AND remaining_package >= $10
+    console.time("GAME INSERT");
 
-        RETURNING remaining_package
+    const gameResult = await client.query(
+      `
+      INSERT INTO games
+      (
+        game_id,
+        house_id,
+        cashier_id,
+        bet,
+        prize,
+        commission,
+        cards_sold,
+        house_commission,
+        voice_mode
+      )
+      VALUES
+      (
+        $1,
+        $2,
+        $3,
+        $4,
+        $5,
+        $6,
+        $7,
+        $8,
+        $9
+      )
+      RETURNING
+        id,
+        game_id,
+        house_id,
+        cashier_id,
+        bet,
+        prize,
+        commission,
+        cards_sold,
+        house_commission,
+        voice_mode,
+        status
+      `,
+      [
+        String(game.id),
+        String(game.house),
+        String(game.cashier),
+        Number(game.bet),
+        Number(game.prize),
+        Number(game.commission),
+        Number(game.cardsSold),
+        Number(houseCommission),
+        game.voiceMode || "recorded"
+      ]
+    );
 
-      ),
+    console.timeEnd("GAME INSERT");
 
-      inserted_cartelas AS (
+    const savedGame = gameResult.rows[0];
 
+    console.log(
+      "✅ GAME INSERTED:",
+      savedGame.game_id
+    );
+
+    // =====================================================
+    // 3. INSERT SOLD CARTELAS
+    // =====================================================
+
+    if (cartelaIds.length > 0) {
+
+      console.time("CARTELA INSERT");
+
+      await client.query(
+        `
         INSERT INTO sold_cartelas
         (
           game_id,
           cartela_id
         )
-
         SELECT
           $1,
-          unnest($11::text[])
-
-        WHERE EXISTS (
-          SELECT 1
-          FROM updated_house
-        )
-
-      )
-
-      SELECT *
-      FROM inserted_game
-      WHERE EXISTS (
-        SELECT 1
-        FROM updated_house
+          unnest($2::text[])
+        `,
+        [
+          String(game.id),
+          cartelaIds
+        ]
       );
-      `,
-      [
-        String(game.id),                    // $1 game_id
-        String(game.house),                 // $2 house_id
-        String(game.cashier),               // $3 cashier_id
-        Number(game.bet),                   // $4 bet
-        Number(game.prize),                 // $5 prize
-        Number(game.commission),             // $6 commission
-        Number(game.cardsSold),              // $7 cards_sold
-        Number(houseCommission),             // $8 house_commission
-        game.voiceMode || "recorded",        // $9 voice_mode
-        Number(game.commissionDeducted),     // $10 package deduction
-        cartelaIds                           // $11 cartela IDs
-      ]
-    );
 
-    console.timeEnd("GAME SAVE QUERY");
+      console.timeEnd("CARTELA INSERT");
 
-    // -----------------------
-    // Check transaction result
-    // -----------------------
-    if (result.rows.length === 0) {
-      throw new Error("Not enough remaining package");
+      console.log(
+        "✅ CARTELAS INSERTED:",
+        cartelaIds.length
+      );
     }
+
+    // =====================================================
+    // COMMIT
+    // =====================================================
+
+    await client.query("COMMIT");
+
+    console.log("✅ TRANSACTION COMMITTED");
 
     console.log(
       "✅ GAME SAVED:",
-      result.rows[0].game_id
+      savedGame.game_id
     );
 
-    // -----------------------
-    // Send response
-    // -----------------------
     res.json({
       success: true,
-      game: result.rows[0]
+      game: savedGame
     });
 
   } catch (err) {
+
+    // =====================================================
+    // ROLLBACK
+    // =====================================================
+
+    try {
+      await client.query("ROLLBACK");
+      console.log("↩️ TRANSACTION ROLLED BACK");
+    } catch (rollbackErr) {
+      console.error(
+        "❌ ROLLBACK ERROR:",
+        rollbackErr.message
+      );
+    }
 
     console.error(
       "❌ ERROR SAVING GAME:",
@@ -169,8 +246,9 @@ router.post("/", async (req, res) => {
 
   } finally {
 
-    console.timeEnd("TOTAL GAME SAVE");
+    client.release();
 
+    console.timeEnd("TOTAL GAME SAVE");
   }
 });
 // =======================
@@ -224,52 +302,42 @@ router.get("/house/:id", async (req, res) => {
 // =======================
 // GET ACTIVE GAME BY CASHIER
 // =======================
+// GET ACTIVE GAME BY GAME ID (Lightweight)
+// =======================
 router.get("/active/:gameId", async (req, res) => {
   try {
     const { gameId } = req.params;
 
     console.log("🔥 ACTIVE GAME REQUEST:", gameId);
 
+    // ✅ SAFE: Use SELECT * so we don't break on column name mismatches
     const result = await pool.query(
-      `
-      SELECT *
-      FROM games
-      WHERE game_id = $1
-      LIMIT 1
-      `,
+      `SELECT * FROM games WHERE game_id = $1 LIMIT 1`,
       [gameId]
     );
 
     if (result.rows.length === 0) {
       console.log("❌ GAME NOT FOUND:", gameId);
-
-      return res.status(404).json({
-        error: "Game not found",
-        gameId
-      });
+      return res.status(404).json({ error: "Game not found", gameId });
     }
 
     const game = result.rows[0];
 
     console.log("✅ EXACT GAME FOUND:", game.game_id);
 
+    // ✅ STRIP heavy fields here (JavaScript side) — prevents sending cartela matrices
+    delete game.sold_cartelas;   // snake_case version
+    delete game.soldCartelas;    // camelCase version
+    delete game.called_numbers;  // if this also grows large
+
     const calledResult = await pool.query(
-      `
-      SELECT ball
-      FROM called_balls
-      WHERE game_id = $1
-      ORDER BY id ASC
-      `,
-    [game.id]
+      `SELECT ball FROM called_balls WHERE game_id = $1 ORDER BY id ASC`,
+      [game.id]
     );
 
     const calledNumbers = calledResult.rows.map(row => row.ball);
 
-    console.log(
-      "🎱 CALLED BALLS FOR:",
-      game.game_id,
-      calledNumbers
-    );
+    console.log("🎱 CALLED BALLS FOR:", game.game_id, calledNumbers);
 
     res.json({
       ...game,
@@ -278,72 +346,148 @@ router.get("/active/:gameId", async (req, res) => {
 
   } catch (err) {
     console.error("ACTIVE GAME ERROR:", err);
-
-    res.status(500).json({
-      error: err.message
-    });
+    res.status(500).json({ error: err.message });
   }
 });
 router.post("/:gameId/call-number", async (req, res) => {
+  const requestStart = performance.now();
+
   try {
     const { gameId } = req.params;
     const { ball } = req.body;
 
-    console.log("BACKEND CALL NUMBER:", gameId);
-    console.log("BACKEND BALL:", ball);
+    if (!gameId || !ball) {
+      return res.status(400).json({
+        success: false,
+        error: "gameId and ball are required"
+      });
+    }
 
-    // Find the database game ID
-    const gameResult = await pool.query(
+    console.log("➡️ REQUEST: POST /call-number", {
+      gameId,
+      ball
+    });
+
+    // =========================================================
+    // FIND GAME + INSERT BALL — ONE DATABASE QUERY
+    // =========================================================
+
+    const dbStart = performance.now();
+
+    const result = await pool.query(
       `
-      SELECT id
-      FROM games
-      WHERE game_id = $1
+      WITH target_game AS (
+        SELECT id
+        FROM games
+        WHERE game_id = $1
+        LIMIT 1
+      ),
+
+      inserted AS (
+        INSERT INTO called_balls (game_id, ball)
+        SELECT id, $2
+        FROM target_game
+        ON CONFLICT (game_id, ball)
+        DO NOTHING
+        RETURNING id, game_id, ball
+      )
+
+      SELECT
+        target_game.id AS database_game_id,
+        inserted.id AS called_ball_id,
+        inserted.game_id,
+        inserted.ball
+      FROM target_game
+      LEFT JOIN inserted ON true
       `,
-      [gameId]
+      [gameId, ball]
     );
 
-    if (gameResult.rows.length === 0) {
+    const dbTime = performance.now() - dbStart;
+
+    // =========================================================
+    // GAME NOT FOUND
+    // =========================================================
+
+    if (result.rows.length === 0) {
+      console.error("❌ GAME NOT FOUND:", gameId);
+
       return res.status(404).json({
+        success: false,
         error: "Game not found",
         gameId
       });
     }
 
-    const gameDbId = gameResult.rows[0].id;
+    const row = result.rows[0];
 
-    console.log("DATABASE GAME ID:", gameDbId);
+    // =========================================================
+    // DUPLICATE BALL
+    // =========================================================
 
-    await pool.query(
-      `
-      INSERT INTO called_balls (game_id, ball)
-      VALUES ($1, $2)
-      ON CONFLICT (game_id, ball) DO NOTHING
-      `,
-      [gameDbId, ball]
-    );
+    if (!row.called_ball_id) {
+      console.log(
+        `⚠️ DUPLICATE BALL: ${ball} | GAME: ${gameId}`
+      );
 
-    // 🔥 SEND NEW BALL TO EVERY PLAYER IN THIS GAME
-    if (io) {
-      io.to(`game:${gameId}`).emit("number-called", {
+      return res.json({
+        success: true,
+        duplicate: true,
         gameId,
         ball
       });
-
-      console.log(
-        "📡 SOCKET SENT:",
-        `game:${gameId}`,
-        ball
-      );
     }
 
-    res.json({
-      success: true
+    // =========================================================
+    // DATABASE SUCCESS
+    // =========================================================
+
+    console.log(
+      `✅ BALL SAVED: ${ball} | GAME: ${gameId} | DB: ${dbTime.toFixed(2)}ms`
+    );
+
+    // =========================================================
+    // BROADCAST TO EVERY CLIENT IN THIS GAME
+    // =========================================================
+
+   io.to(`game:${gameId}`).emit("number-called", {
+  gameId,
+  ball: row.ball
+});
+
+    console.log(
+      `📡 NUMBER BROADCAST: ${ball} | GAME: ${gameId}`
+    );
+
+    // =========================================================
+    // RESPONSE TO CALLER
+    // =========================================================
+
+    const totalTime = (
+      performance.now() - requestStart
+    ).toFixed(2);
+
+    console.log(
+      `🚀 CALL-NUMBER COMPLETE: ${ball} | ${totalTime}ms`
+    );
+
+    return res.json({
+      success: true,
+      duplicate: false,
+      gameId,
+      ball: row.ball,
+      calledBallId: row.called_ball_id
     });
 
   } catch (err) {
-    console.error("CALL NUMBER ERROR:", err);
 
-    res.status(500).json({
+    console.error(
+      "❌ CALL-NUMBER ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
       error: err.message
     });
   }
@@ -387,7 +531,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     // 2. CHECK IF CARTELA WAS SOLD
     // ============================
 
- const soldResult = await pool.query(
+const soldResult = await pool.query(
   `
   SELECT *
   FROM sold_cartelas
@@ -489,10 +633,11 @@ console.log("CALLED BALLS FOR VERIFICATION:", calledBalls);
 
   const result = calledSet.has(cellNumber);
 
+ if (process.env.DEBUG_BINGO === "true") {
   console.log(
     `MARK CHECK | Cell: ${cell} | Number: ${cellNumber} | Marked: ${result}`
   );
-
+}
   return result;
 }
     // ============================
@@ -831,5 +976,6 @@ router.get("/test-db", async (req, res) => {
     });
   }
 });
+
 module.exports = router;
 module.exports.setSocketIO = setSocketIO;

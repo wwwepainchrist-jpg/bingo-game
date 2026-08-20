@@ -28,6 +28,9 @@ const io = new Server(server, {
   },
 });
 
+console.log("GAME ROUTES EXPORT:", gameRoutes);
+console.log("SET SOCKET IO TYPE:", typeof gameRoutes.setSocketIO);
+
 gameRoutes.setSocketIO(io);
 io.on("connection", (socket) => {
   console.log("🔌 Socket connected:", socket.id);
@@ -79,12 +82,17 @@ cron.schedule("0 0 * * *", async () => {
     console.error("Error during automated background clearance:", err);
   }
 });
-
+app.use((req, res, next) => {
+  console.log("➡️ REQUEST:", req.method, req.url);
+  next();
+});
 // ==========================================================================
 // 2. API ROUTES
 // ==========================================================================
 app.use("/api", authRoutes);
-app.use("/api/houses", houseRoutes);       // Handles manual period deletions like DELETE /api/houses/:id/period
+app.use("/api/houses", houseRoutes); 
+ // In your main server file where other routes are defined
+
 app.use("/api/games", gameRoutes);
 app.use("/api/cashiers", cashierRoutes);
 app.use("/api/sold-cartelas", soldCartelasRoutes);
@@ -92,6 +100,7 @@ app.use("/api/cartelas", cartelasRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/sales", salesRoutes);
 app.use("/api/notifications", notificationRoutes);
+
 
 // Health check route
 app.get("/", async (req, res) => {

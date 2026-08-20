@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import "./CashierDashboard.css";
 import { useLanguage } from "../context/LanguageContext";
-
+import { API_URL } from "../config";
 function generateMockMatrixForId(id) {
   const seed = Number(id) || 1;
   const columns = { B: [], I: [], N: [], G: [], O: [] };
@@ -66,7 +66,8 @@ export default function CashierDashboard() {
   const [currentCashier, setCurrentCashier] = useState({});
   const [rawPackageInfo, setRawPackageInfo] = useState({ totalAmount: 3642, remainingAmount: 1755 });
   const [loading, setLoading] = useState(true);
-
+const location = useLocation();
+const passedGame = location.state?.game;
   // Fetch initial cashier data, settings, package info, and sold cartelas from PostgreSQL backend
   useEffect(() => {
     async function fetchDashboardData() {
@@ -94,25 +95,22 @@ export default function CashierDashboard() {
   const commissionAmount = grossIncome * (Number(commission) / 100);
   const netIncome = grossIncome - commissionAmount;
   
-  const houseId = Number(currentCashier.house_id) || Number(id);
-  console.log("Cashier:", id);
-  console.log("House:", houseId);
-  
-  const realRemainingPackageAmount = Number(
-    rawPackageInfo.remaining_package ??
-    rawPackageInfo.remainingAmount ??
-    rawPackageInfo.remainingBalance ??
-    rawPackageInfo.remaining ??
-    0
-  );
+ const houseId =
+  Number(currentCashier.house_id) || Number(id);
 
-  const totalAmount = Number(
-    rawPackageInfo.total_package ??
-    rawPackageInfo.totalAmount ??
-    1
-  );
-  console.log("rawPackageInfo:", rawPackageInfo);
-  console.log("Remaining Package:", realRemainingPackageAmount);
+const realRemainingPackageAmount = Number(
+  rawPackageInfo.remaining_package ??
+  rawPackageInfo.remainingAmount ??
+  rawPackageInfo.remainingBalance ??
+  rawPackageInfo.remaining ??
+  0
+);
+
+const totalAmount = Number(
+  rawPackageInfo.total_package ??
+  rawPackageInfo.totalAmount ??
+  1
+);
   
   const upcomingGameCommission = Number(grossIncome) * (Number(commission) / 100);
   const isInsufficientPackage = realRemainingPackageAmount < upcomingGameCommission || realRemainingPackageAmount <= 0;
@@ -179,7 +177,35 @@ export default function CashierDashboard() {
     setSelectedCartela(null);
     await syncSoldCartelas(updated);
   };
+const syncSoldCartelas = async (cartelas) => {
+  try {
+    if (!game?.id) {
+      console.warn("Cannot sync sold cartelas: game ID is missing");
+      return;
+    }
 
+    const response = await fetch(`${API_URL}/sold-cartelas`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        gameId: game.id,
+        soldCartelas: cartelas,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || "Failed to sync sold cartelas");
+    }
+
+    console.log("✅ Sold cartelas synced:", cartelas);
+  } catch (error) {
+    console.error("❌ Error syncing sold cartelas:", error);
+  }
+};
   async function toggleSoldCartela(num) {
     let updated;
     if (soldCartelas.includes(num)) {
@@ -193,98 +219,158 @@ export default function CashierDashboard() {
   }
 
   
-  async function startGame() {
-    if (soldCartelas.length === 0) return alert("Sell a cartela first!");
-    
-    // Calculate the commission that this game will cost
-    const commissionAmount = Number(grossIncome) * (Number(commission) / 100);
+async function startGame() {
+  const startGameStart = performance.now();
 
-    // Get the house's remaining package
-    const remaining_package = realRemainingPackageAmount;
+  if (soldCartelas.length === 0) {
+    return alert("Sell a cartela first!");
+  }
 
-    // If remaining_package < commissionAmount, do not start the game and show insufficient balance alert
-    if (remaining_package < commissionAmount) {
-      return alert("insufficient balance");
-    }
+  // ==========================================
+  // 1. CALCULATE COMMISSION
+  // ==========================================
 
-    const newRemaining = Math.max(0, remaining_package - commissionAmount);
-    const updatedPackage = {
-      ...rawPackageInfo,
-      remainingAmount: newRemaining,
-      remainingBalance: newRemaining,
-      remaining: newRemaining
-    };
+  const commissionAmount =
+    Number(grossIncome) * (Number(commission) / 100);
 
-    setRawPackageInfo(updatedPackage);
+  const remaining_package =
+    realRemainingPackageAmount;
 
-    const structuralSoldCartelas = soldCartelas.map(num => ({ id: String(num), matrix: generateMockMatrixForId(num) }));
-    console.log("Cashier ID:", id);
-    console.log("House ID:", houseId);
-    
-    const game = { 
-      id: `G-${Date.now()}`,
-      date: new Date().toISOString(),
-      cashier: id, 
-      house: houseId,
-      bet: Number(bet), 
-      prize: Number(netIncome.toFixed(0)),
-      commission: Number(commission), 
-      commissionDeducted: commissionAmount,
-      soldCartelas: structuralSoldCartelas, 
-      cardsSold: structuralSoldCartelas.length,
-      selectedPatterns, 
-      voiceMode: voiceMode 
-    };
-    
-    alert(`Cashier=${game.cashier}\nHouse=${game.house}\nBet=${game.bet}`);
+  if (remaining_package < commissionAmount) {
+    return alert("insufficient balance");
+  }
 
-    console.log("Sending game:", JSON.stringify(game, null, 2));
-    try {
-      await fetch("https://bingo-backend-ccn6.onrender.com/api/games", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game, remainingPackage: updatedPackage, cashierId: id })
-      });
-      await fetch("https://bingo-backend-ccn6.onrender.com/api/sold-cartelas", {
+  const newRemaining = Math.max(
+    0,
+    remaining_package - commissionAmount
+  );
+
+  const updatedPackage = {
+    ...rawPackageInfo,
+    remainingAmount: newRemaining,
+    remainingBalance: newRemaining,
+    remaining: newRemaining,
+  };
+
+  setRawPackageInfo(updatedPackage);
+
+  // ==========================================
+  // 2. PREPARE CARTELAS
+  // ==========================================
+
+  const structuralSoldCartelas = soldCartelas.map((num) => ({
+    id: String(num),
+    matrix: generateMockMatrixForId(num),
+  }));
+
+  console.log("Cashier ID:", id);
+  console.log("House ID:", houseId);
+  console.log("House ID type:", typeof houseId);
+
+  // ==========================================
+  // 3. CREATE GAME
+  // ==========================================
+
+  const game = {
+    id: `G-${Date.now()}`,
+    date: new Date().toISOString(),
+    cashier: id,
+    house: houseId,
+    bet: Number(bet),
+    prize: Number(netIncome.toFixed(0)),
+    commission: Number(commission),
+    commissionDeducted: commissionAmount,
+    soldCartelas: structuralSoldCartelas,
+    cardsSold: structuralSoldCartelas.length,
+    selectedPatterns,
+    voiceMode,
+  };
+
+  console.log(
+    "🎮 STARTING GAME:",
+    game.id
+  );
+
+  // ==========================================
+  // 4. SAVE GAME
+  // ==========================================
+
+  try {
+    const response = await fetch(
+      `${API_URL}/games`,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          gameId: game.id,
+          game,
           cashierId: id,
-          soldCartelas
+          soldCartelas,
         }),
-      });
-      await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${houseId}/package`, {
-  method: "PUT",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    remaining_package: newRemaining,
-  }),
-});
-    } catch (err) {
-      console.error("Error starting game on server:", err);
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      throw new Error(
+        `Backend error ${response.status}: ${errorText}`
+      );
     }
 
+    const result = await response.json();
+
+    const savedGame = result.game;
+
+    console.log(
+      "✅ GAME SAVED:",
+      savedGame?.game_id
+    );
+
+    // ==========================================
+    // 5. CLEAR SOLD CARTELAS
+    // ==========================================
+
     setSoldCartelas([]);
-    navigate(`/bingo-game/${id}`);
-  }
 
-  const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
-  const port = typeof window !== "undefined" && window.location.port ? `:${window.location.port}` : ":5173";
-  const protocol = typeof window !== "undefined" ? window.location.protocol : "http:";
-  const playerQrUrl = `${protocol}//${host}${port}/select-cartela`;
+    // ==========================================
+    // 6. NAVIGATE ONCE
+    // ==========================================
 
-  if (loading) {
-    return (
-      <div style={{ padding: "20px", color: "#fff", textAlign: "center", ...localeFontStyle }}>
-        Loading cashier dashboard...
-      </div>
+    navigate(
+      `/bingo-game/${savedGame.game_id}`,
+      {
+        state: {
+          game: savedGame,
+          saving: false,
+        },
+      }
+    );
+
+    console.log(
+      "🚀 START GAME TOTAL:",
+      (performance.now() - startGameStart).toFixed(2),
+      "ms"
+    );
+
+  } catch (err) {
+
+    console.error(
+      "❌ ERROR STARTING GAME:",
+      err
+    );
+
+    alert(
+      `Could not start game:\n${err.message}`
     );
   }
+}
+ const playerQrUrl =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/select-cartela`
+    : "http://localhost:5173/select-cartela";
+  
 
   return (
     <div className="dashboard-container" style={{ ...localeFontStyle, display: "flex", flexDirection: "column", minHeight: "100vh", padding: "4px", boxSizing: "border-box" }}>
@@ -394,30 +480,6 @@ export default function CashierDashboard() {
               📱 {t?.qr || "PLAYER QR CODE"}
             </button>
 
-            <select
-  value={voiceMode}
-  onChange={async (e) => {
-    const val = e.target.value;
-    setVoiceMode(val);
-    await updateSetting("bingo_voice_mode", val);
-  }}
-  style={{
-    ...localeFontStyle,
-    background: "rgba(255, 255, 255, 0.08)",
-    border: "1px solid rgba(255, 255, 255, 0.15)",
-    color: "#ffffff",
-    borderRadius: "12px",
-    padding: "2px 8px",
-    fontSize: "11px",
-    fontWeight: "600",
-    outline: "none",
-    cursor: "pointer",
-    minHeight: "26px"
-  }}
->
-  <option value="robot" style={{ background: "#1a202c" }}>🎤 {t?.robotVoice || "Robot Voice"}</option>
-  <option value="recorded" style={{ background: "#1a202c" }}>🎙️ {t?.amharicVoice || "Amharic Voice"}</option>
-</select>
           </div> 
 
           {showFinance && (
@@ -518,22 +580,22 @@ export default function CashierDashboard() {
 
                 if (sold) {
                   btnClass = "grid-cell-btn sold";
-                  cellGlassStyle = {
-                    ...cellGlassStyle,
-                    background: "rgba(239, 68, 68, 0.45)",
-                    borderColor: "rgba(239, 68, 68, 0.6)",
-                    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
-                    color: "#ffffff"
-                  };
+                 cellGlassStyle = {
+  ...cellGlassStyle,
+  background: "rgba(239, 68, 68, 0.45)",
+  border: "1px solid rgba(239, 68, 68, 0.6)",
+  boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
+  color: "#ffffff"
+};
                 } else if (selected) {
                   btnClass = "grid-cell-btn selected";
-                  cellGlassStyle = {
-                    ...cellGlassStyle,
-                    background: "rgba(56, 189, 248, 0.45)",
-                    borderColor: "rgba(56, 189, 248, 0.8)",
-                    boxShadow: "0 0 12px rgba(56, 189, 248, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
-                    color: "#ffffff"
-                  };
+                 cellGlassStyle = {
+  ...cellGlassStyle,
+  background: "rgba(56, 189, 248, 0.45)",
+  border: "1px solid rgba(56, 189, 248, 0.8)",
+  boxShadow: "0 0 12px rgba(56, 189, 248, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
+  color: "#ffffff"
+};
                 }
 
                 return (

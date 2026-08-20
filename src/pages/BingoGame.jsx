@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
+import { API_URL } from "../config";
 import "./BingoGame.css";
-
+import { io } from "socket.io-client";
+  // Add this if not already imported
 // --- Phonetic & Legend Data ---
 const amharicPhoneticNumbers = {
   1: "Ond", 2: "Hoo-let", 3: "Sost", 4: "Ah-raht", 5: "Ah-mist",
@@ -93,7 +95,7 @@ const INITIAL_BALLS = [
 export default function BingoGame() {
   const { id } = useParams();
   const navigate = useNavigate();
-
+ 
   const [game, setGame] = useState({ 
     prize: "1500 Birr", 
     id: id || "101", 
@@ -108,6 +110,7 @@ export default function BingoGame() {
 
   const [current, setCurrent] = useState("");
   const [called, setCalled] = useState([]);
+
   const [paused, setPaused] = useState(true);
   const [speed, setSpeed] = useState(5);
   const [cartelaId, setCartelaId] = useState("");
@@ -119,7 +122,7 @@ export default function BingoGame() {
   const [tvMode, setTvMode] = useState(false);
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
   const [voices, setVoices] = useState([]);
-  
+ 
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
@@ -129,225 +132,532 @@ export default function BingoGame() {
   const remainingNumbersRef = useRef(Array.from({ length: 75 }, (_, i) => i + 1));
   const activeUtteranceRef = useRef(null);
   const activeAudioRef = useRef(null);
+  const pausedAudioRef = useRef(null);
   const audioTimeoutRef = useRef(null);
   
   const calledRef = useRef(called);
   const stateRef = useRef({ called, paused, speed, current, game });
+  const [volume, setVolume] = useState(0.7);
+  const volumeRef = useRef(0.7);
+  const location = useLocation();
+  const passedGame = location.state?.game;
+const [voiceSpeed, setVoiceSpeed] = useState(1.0);
+const voiceSpeedRef = useRef(1.0);
+const TARGET_GENERATION_INTERVAL_MS = 400;
+const nextGenerationTimeRef = useRef(null);
+  // ============================================
+  // CALL NUMBER API (prevents spam)
+  // ============================================
+ 
 
+  
+  // ============================================
+  // VOICE SPEED
+  // ============================================
+  const decreaseVoiceSpeed = () => {
+    setVoiceSpeed(prev => Math.max(0.5, +(prev - 0.1).toFixed(1)));
+  };
+
+  const increaseVoiceSpeed = () => {
+    setVoiceSpeed(prev => Math.min(2.0, +(prev + 0.1).toFixed(1)));
+  };
+
+  // ============================================
+  // RETURN JSX
+  // ============================================
+ 
   useEffect(() => {
     stateRef.current = { called, paused, speed, current, game };
   }, [called, paused, speed, current, game]);
-
-  // --- Fetch Active Game from Backend ---
   useEffect(() => {
-    async function fetchGameData() {
-      try {
-        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/active/${id}`);
+  voiceSpeedRef.current = voiceSpeed;
+
+  if (activeAudioRef.current) {
+    activeAudioRef.current.playbackRate = voiceSpeed;
+  }
+}, [voiceSpeed]);
+useEffect(() => {
+  if (activeAudioRef.current) {
+    activeAudioRef.current.playbackRate = voiceSpeed;
+  }
+}, [voiceSpeed]);
+  // --- Fetch Active Game from Backend ---
+// Add with your other refs at the top of the component
+const fetchingGameRef = useRef(false);
+
+// --- Fetch Active Game from Backend ---
+useEffect(() => {
+  async function fetchGameData() {
+    if (fetchingGameRef.current) return;
+
+    fetchingGameRef.current = true;
+
+    const maxAttempts = 10;
+    const retryDelay = 150;
+
+    try {
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+
+        console.log(
+          `🔥 FETCH ACTIVE GAME: ${id} (attempt ${attempt}/${maxAttempts})`
+        );
+
+        const response = await fetch(
+          `${API_URL}/games/active/${id}`
+        );
+
+        // ✅ Game found
         if (response.ok) {
           const data = await response.json();
-          setGame(prev => ({
-            ...prev,
-            ...data,
-            voiceMode: data.voice_mode || "recorded",
-            speechLang: prev.speechLang || "en-US"
-          }));
-          
-          if (data.calledNumbers && Array.isArray(data.calledNumbers)) {
-            setCalled(data.calledNumbers);
-            if (data.calledNumbers.length > 0) {
-              setCurrent(data.calledNumbers[data.calledNumbers.length - 1]);
-              const calledNumsSet = new Set(data.calledNumbers.map(item => parseInt(item.split(" ")[1], 10)));
-              remainingNumbersRef.current = Array.from({ length: 75 }, (_, i) => i + 1).filter(n => !calledNumsSet.has(n));
-            }
-          }
+
+          console.log("✅ ACTIVE GAME FROM BACKEND:", data);
+          console.log(
+            "🎱 CALLED NUMBERS FROM BACKEND:",
+            data.calledNumbers
+          );
+
+          setGame(prev => {
+            const restoredVoiceMode =
+              data.voice_mode ||
+              data.voiceMode ||
+              prev.voiceMode ||
+              "recorded";
+
+            const restoredSpeechLang =
+              data.speech_lang ||
+              data.speechLang ||
+              prev.speechLang ||
+              "en-US";
+
+            const restoredVoiceSpeed =
+              data.voice_speed ||
+              data.voiceSpeed ||
+              prev.voiceSpeed ||
+              1;
+
+            return {
+              ...prev,
+              id: data.game_id,
+              date: data.date,
+              cashier: data.cashier,
+              house: data.house,
+              bet: data.bet,
+              prize: data.prize,
+              commission: data.commission,
+              commissionDeducted: data.commission_deducted,
+              status: data.status,
+              voiceMode: restoredVoiceMode,
+              speechLang: restoredSpeechLang,
+              voiceSpeed: restoredVoiceSpeed,
+            };
+          });
+
+          // ==========================================
+// RESTORE CALLED NUMBERS AFTER REFRESH
+// ==========================================
+
+const restoredCalled = Array.isArray(data.calledNumbers)
+  ? data.calledNumbers
+  : [];
+
+// Restore React state
+setCalled(restoredCalled);
+
+// Restore refs used by generateNumber()
+calledRef.current = restoredCalled;
+
+// Restore last called number
+if (restoredCalled.length > 0) {
+  setCurrent(
+    restoredCalled[restoredCalled.length - 1]
+  );
+} else {
+  setCurrent(null);
+}
+
+// ==========================================
+// REBUILD REMAINING NUMBERS
+// ==========================================
+
+const calledNumberValues = new Set(
+  restoredCalled.map(ball => {
+    const parts = ball.trim().split(/\s+/);
+    return Number(parts[1]);
+  })
+);
+
+const allNumbers = Array.from(
+  { length: 75 },
+  (_, index) => index + 1
+);
+
+const remainingNumbers = allNumbers.filter(
+  number => !calledNumberValues.has(number)
+);
+
+remainingNumbersRef.current = remainingNumbers;
+
+// ==========================================
+// LOG RESTORE
+// ==========================================
+
+console.log(
+  "📦 RESTORED CALLED COUNT:",
+  restoredCalled.length
+);
+
+console.log(
+  "📦 RESTORED LAST BALL:",
+  restoredCalled.length > 0
+    ? restoredCalled[restoredCalled.length - 1]
+    : null
+);
+
+console.log(
+  "📦 REMAINING NUMBERS:",
+  remainingNumbers.length
+);
+          // ✅ SUCCESS — stop retrying
+          return;
         }
-      } catch (error) {
-        console.error("Error connecting to backend API:", error);
-      } finally {
-        setLoading(false);
+
+        // ⏳ Game hasn't been saved yet
+        if (response.status === 404) {
+          console.log(
+            `⏳ GAME NOT READY — retrying in ${retryDelay}ms...`
+          );
+
+          if (attempt < maxAttempts) {
+            await new Promise(resolve =>
+              setTimeout(resolve, retryDelay)
+            );
+          }
+
+          continue;
+        }
+
+        // ❌ Other server error
+        console.error(
+          "❌ ACTIVE GAME REQUEST FAILED:",
+          response.status
+        );
+
+        return;
       }
+
+      console.error(
+        `❌ GAME ${id} NOT FOUND AFTER ${maxAttempts} ATTEMPTS`
+      );
+
+    } catch (err) {
+      console.error(
+        "ACTIVE GAME FETCH ERROR:",
+        err
+      );
+
+    } finally {
+      fetchingGameRef.current = false;
     }
-    fetchGameData();
-  }, [id]);
+  }
 
-  // --- Cleanup on Unmount ---
-  useEffect(() => {
-    return () => {
-      stopAllActiveAudio();
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
-      if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
-    };
-  }, []);
-
- // --- Audio & Voice Initialization ---
+  fetchGameData();
+}, [id]);
+// --- Cleanup on Unmount ---
 useEffect(() => {
-  const updateVoices = () => {
+  return () => {
+    stopAllActiveAudio();
+    if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
+    if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
+  };
+}, []);
+
+// ============================
+// SOCKET.IO REAL-TIME NUMBERS
+// ============================
+const socketRef = useRef(null);
+const seenBallsRef = useRef(new Set());
+
+useEffect(() => {
+  if (!id) return;
+
+  seenBallsRef.current.clear();
+
+  if (!socketRef.current) {
+    socketRef.current = io(
+      "https://bingo-backend-ccn6.onrender.com",
+      {
+        transports: ["websocket"],
+        reconnection: true,
+      }
+    );
+  }
+
+  const socket = socketRef.current;
+
+  const handleConnect = () => {
+    console.log("🔌 CONNECTED:", socket.id);
+
+    socket.emit("join-game", id);
+
+    console.log(
+      "🎱 JOINED GAME:",
+      id
+    );
+  };
+
+ const handleNumberCalled = ({ gameId, ball }) => {
+
+  if (gameId !== id) {
+    console.log(
+      "⚠️ WRONG GAME IGNORED:",
+      gameId
+    );
+    return;
+  }
+
+  if (seenBallsRef.current.has(ball)) {
+    console.log(
+      "⚠️ DUPLICATE IGNORED:",
+      ball
+    );
+    return;
+  }
+
+  seenBallsRef.current.add(ball);
+
+  console.log(
+    "📡 SOCKET NUMBER RECEIVED:",
+    {
+      socket: socket.id,
+      game: gameId,
+      ball
+    }
+  );
+
+  setCalled(prev => {
+
+    if (prev.includes(ball)) {
+      return prev;
+    }
+
+    return [...prev, ball];
+  });
+
+  setCurrent(ball);
+};
+  socket.on("connect", handleConnect);
+  socket.on(
+    "number-called",
+    handleNumberCalled
+  );
+
+  if (socket.connected) {
+    handleConnect();
+  }
+
+  return () => {
+    console.log(
+      "🧹 CLEANING GAME SOCKET:",
+      id
+    );
+
+    socket.off(
+      "connect",
+      handleConnect
+    );
+
+    socket.off(
+      "number-called",
+      handleNumberCalled
+    );
+
+    if (socket.connected) {
+      socket.emit(
+        "leave-game",
+        id
+      );
+    }
+  };
+}, [id]);
+  // --- Audio & Voice Initialization ---
+  useEffect(() => {
+    const updateVoices = () => {
+      if (
+        typeof window !== "undefined" &&
+        window.speechSynthesis
+      ) {
+        setVoices(window.speechSynthesis.getVoices());
+      }
+    };
+
+    updateVoices();
+
     if (
       typeof window !== "undefined" &&
       window.speechSynthesis
     ) {
-      setVoices(window.speechSynthesis.getVoices());
+      window.speechSynthesis.onvoiceschanged = updateVoices;
     }
-  };
 
-  updateVoices();
-
-  if (
-    typeof window !== "undefined" &&
-    window.speechSynthesis
-  ) {
-    window.speechSynthesis.onvoiceschanged = updateVoices;
-  }
-
- let audioCtx = null;
-
-try {
-  const AudioContext =
-    window.AudioContext || window.webkitAudioContext;
-
-  if (AudioContext) {
-    const ctx = new AudioContext();
-    audioCtx = ctx;
-
-      shuffleAudioRef.current = {
-        play: () => {
-          if (ctx.state === "suspended") {
-            ctx.resume();
-          }
-
-          const bufferSize = Math.floor(ctx.sampleRate * 1.5);
-
-          const buffer = ctx.createBuffer(
-            1,
-            bufferSize,
-            ctx.sampleRate
-          );
-
-          const data = buffer.getChannelData(0);
-
-          for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
-          }
-
-          const noise = ctx.createBufferSource();
-          noise.buffer = buffer;
-
-          const filter = ctx.createBiquadFilter();
-          filter.type = "bandpass";
-          filter.frequency.value = 1000;
-          filter.Q.value = 3;
-
-          const gain = ctx.createGain();
-
-          gain.gain.setValueAtTime(
-            0.5,
-            ctx.currentTime
-          );
-
-          gain.gain.exponentialRampToValueAtTime(
-            0.01,
-            ctx.currentTime + 1.5
-          );
-
-          noise.connect(filter);
-          filter.connect(gain);
-          gain.connect(ctx.destination);
-
-          noise.start();
-
-          return new Promise((resolve) => {
-            setTimeout(() => {
-              if (
-                typeof shuffleAudioRef.current?.onended ===
-                "function"
-              ) {
-                shuffleAudioRef.current.onended();
-              }
-
-              resolve();
-            }, 1500);
-          });
-        },
-
-        pause: () => {},
-
-        currentTime: 0,
-
-        onended: null
-      };
-    }
-  } catch (e) {
-    console.error(
-      "Audio initialization failed:",
-      e
-    );
-
-    shuffleAudioRef.current = null;
-  }
-
-  return () => {
-  // Stop browser speech immediately
-  if (
-    typeof window !== "undefined" &&
-    window.speechSynthesis
-  ) {
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.onvoiceschanged = null;
-  }
-
-  // Stop recorded audio immediately
-  if (activeAudioRef.current) {
     try {
-      activeAudioRef.current.pause();
-      activeAudioRef.current.currentTime = 0;
-      activeAudioRef.current.onended = null;
-      activeAudioRef.current.onerror = null;
+      const AudioContext =
+        window.AudioContext || window.webkitAudioContext;
+
+      if (AudioContext) {
+        const ctx = new AudioContext();
+
+        shuffleAudioRef.current = {
+          play: () => {
+            if (ctx.state === "suspended") {
+              ctx.resume();
+            }
+
+            const bufferSize = Math.floor(ctx.sampleRate * 1.5);
+
+            const buffer = ctx.createBuffer(
+              1,
+              bufferSize,
+              ctx.sampleRate
+            );
+
+            const data = buffer.getChannelData(0);
+
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = Math.random() * 2 - 1;
+            }
+
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = ctx.createBiquadFilter();
+            filter.type = "bandpass";
+            filter.frequency.value = 1000;
+            filter.Q.value = 3;
+
+            const gain = ctx.createGain();
+
+            gain.gain.setValueAtTime(
+              0.5,
+              ctx.currentTime
+            );
+
+            gain.gain.exponentialRampToValueAtTime(
+              0.01,
+              ctx.currentTime + 1.5
+            );
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(ctx.destination);
+
+            noise.start();
+
+            return new Promise((resolve) => {
+              setTimeout(() => {
+                if (
+                  typeof shuffleAudioRef.current?.onended ===
+                  "function"
+                ) {
+                  shuffleAudioRef.current.onended();
+                }
+
+                resolve();
+              }, 1500);
+            });
+          },
+
+          pause: () => {},
+
+          currentTime: 0,
+
+          onended: null
+        };
+      }
     } catch (e) {
-      console.error("Audio cleanup error:", e);
+      console.error(
+        "Audio initialization failed:",
+        e
+      );
+
+      shuffleAudioRef.current = null;
     }
 
-    activeAudioRef.current = null;
-  }
+    return () => {
+      // Stop browser speech immediately
+      if (
+        typeof window !== "undefined" &&
+        window.speechSynthesis
+      ) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.onvoiceschanged = null;
+      }
 
-  // Stop shuffle audio
-  if (shuffleAudioRef.current) {
-    try {
-      shuffleAudioRef.current.pause?.();
-      shuffleAudioRef.current.onended = null;
-    } catch (e) {
-      console.error("Shuffle cleanup error:", e);
-    }
+      // Stop recorded audio immediately
+      if (activeAudioRef.current) {
+        try {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.currentTime = 0;
+          activeAudioRef.current.onended = null;
+          activeAudioRef.current.onerror = null;
+        } catch (e) {
+          console.error("Audio cleanup error:", e);
+        }
 
-    shuffleAudioRef.current = null;
-  }
+        activeAudioRef.current = null;
+      }
 
-  // Stop the Web Audio API context
-  try {
-    ctx?.close?.();
-  } catch (e) {
-    console.error("AudioContext cleanup error:", e);
-  }
-};
-}, []);
+      // Stop shuffle audio
+      if (shuffleAudioRef.current) {
+        try {
+          shuffleAudioRef.current.pause?.();
+          shuffleAudioRef.current.onended = null;
+        } catch (e) {
+          console.error("Shuffle cleanup error:", e);
+        }
 
-function playRecordedAudio(
-  fileName,
-  onComplete = () => {}
-) {
+        shuffleAudioRef.current = null;
+      }
+    };
+  }, []);
+
+
+function playRecordedAudio(fileName, onComplete = () => {}) {
+  const currentGame = stateRef.current.game || game;
+
+  console.log("🎤 CURRENT VOICE MODE:", currentGame.voiceMode);
+  console.log("🌍 CURRENT SPEECH LANG:", currentGame.speechLang);
+  console.log("⚡ CURRENT VOICE SPEED:", voiceSpeedRef.current);
+
+  const isOromo = currentGame.voiceMode === "recorded-oromo";
+  const folder = isOromo ? "oromo" : "amharic";
+
   const cleanName = String(fileName)
     .trim()
     .toLowerCase();
 
   const possiblePaths = [
-    `/${cleanName}.mp3`,
-    `/${cleanName}.wav`
+    `/${folder}/${cleanName}.mp3`,
+    `/${folder}/${cleanName}.wav`
   ];
+
+  console.log("🔊 RECORDED VOICE:", folder);
+  console.log("🎵 FILE:", cleanName);
+  console.log("📁 TRYING:", possiblePaths);
 
   const tryPaths = async () => {
     for (const audioPath of possiblePaths) {
       try {
         await new Promise((resolve, reject) => {
           const audio = new Audio(audioPath);
+
+          // 🔊 Volume
+          audio.volume = volumeRef.current;
+
+          // ⚡ Selected voice speed
+          audio.playbackRate = voiceSpeedRef.current;
+
+          // Keep voice pitch natural
+          audio.preservesPitch = true;
 
           activeAudioRef.current = audio;
 
@@ -357,30 +667,30 @@ function playRecordedAudio(
           };
 
           audio.onerror = () => {
-            audio.pause();
             activeAudioRef.current = null;
             reject();
           };
 
-          const playPromise = audio.play();
-
-          if (playPromise) {
-            playPromise.catch(() => {
-              activeAudioRef.current = null;
-              reject();
-            });
-          }
+          audio.play().catch(() => {
+            activeAudioRef.current = null;
+            reject();
+          });
         });
+
+        console.log("✅ PLAYED:", audioPath);
 
         onComplete();
         return;
-      } catch (e) {
-        // Try the next audio format
+
+      } catch (error) {
+        console.log("❌ Audio not found:", audioPath);
       }
     }
 
-    // No audio file worked
-    activeAudioRef.current = null;
+    console.error(
+      `❌ Could not find recorded audio for ${folder}/${cleanName}`
+    );
+
     onComplete();
   };
 
@@ -487,25 +797,35 @@ function playRecordedAudio(
   }
 
   // --- Dynamic Arena Announcer Sequence ---
- function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
-  if (stateRef.current.paused) return;
+  function speakBallSequence(letter, number, onSequenceFinished = () => {}) {
+    if (stateRef.current.paused) return;
 
     const currentGame = stateRef.current.game || game;
     const activeVoiceMode = currentGame.voiceMode || currentGame.voice_mode;
     const activeSpeechLang = currentGame.speechLang || "en-US";
 
-    if (activeVoiceMode === "recorded") {
-      playRecordedAudio(letter, () => {
-        if (stateRef.current.paused) return;
+ if (activeVoiceMode === "recorded-oromo") {
+  // Oromo recorded voice: letter + number
+  playRecordedAudio(letter, () => {
+    if (stateRef.current.paused) return;
 
-        playRecordedAudio(String(number), () => {
-          if (!stateRef.current.paused) {
-            onSequenceFinished();
-          }
-        });
-      });
-      return;
-    }
+    playRecordedAudio(String(number), onSequenceFinished);
+  }, "oromo");
+
+  return;
+}
+
+if (activeVoiceMode === "recorded") {
+  // Bulchaa recorded voice: letter + number
+  playRecordedAudio(letter, () => {
+    if (stateRef.current.paused) return;
+
+    playRecordedAudio(String(number), onSequenceFinished);
+  });
+
+  return;
+}
+    
 
     const playerName = footballLegends[number] || "";
     const isTwoDigit = number >= 10 && number <= 75;
@@ -573,7 +893,8 @@ function playRecordedAudio(
 
   function announceLetsGo(callback) {
     const currentGame = stateRef.current.game;
-    if (currentGame.voiceMode === "recorded") {
+    if (currentGame.voiceMode === "recorded" ||
+  currentGame.voiceMode === "recorded-oromo") {
       playRecordedAudio("letsgo", callback);
       return;
     }
@@ -584,8 +905,13 @@ function playRecordedAudio(
     }
     window.speechSynthesis.resume();
     
-    const greetingText = currentGame.speechLang === "om-ET" ? "let's play bingo!" : "Alright everyone, let's play bingo!";
-    const speech = new SpeechSynthesisUtterance(greetingText);
+   if (currentGame.voiceMode === "recorded-oromo") {
+  playRecordedAudio("letsgo");
+  return;
+}
+
+const greetingText = "Alright everyone, let's play bingo!";
+const speech = new SpeechSynthesisUtterance(greetingText);
     const selectedVoice = getSelectedVoice(currentGame.speechLang || "en-US");
     if (selectedVoice) speech.voice = selectedVoice;
     speech.rate = 0.8;
@@ -600,43 +926,93 @@ function playRecordedAudio(
   }
 
   const togglePlayPause = () => {
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.resume(); 
+    if (
+      typeof window !== "undefined" &&
+      window.speechSynthesis
+    ) {
+      window.speechSynthesis.resume();
     }
 
     if (paused) {
+      // Prevent multiple timers from existing
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
+      }
+
       setPaused(false);
 
+      // ⭐ RESUME CURRENT NUMBER FIRST
+      if (pausedAudioRef.current) {
+        const audio = pausedAudioRef.current.audio;
+
+        pausedAudioRef.current = null;
+        activeAudioRef.current = audio;
+
+        audio.play().catch((err) => {
+          console.error("RESUME AUDIO ERROR:", err);
+          activeAudioRef.current = null;
+        });
+
+        return;
+      }
+
+      // ⭐ NORMAL PLAY — only when there is no paused number
       if (!hasAnnouncedLetsGo.current) {
         hasAnnouncedLetsGo.current = true;
 
         const startShuffleSequence = () => {
+          if (stateRef.current.paused) return;
+
           playShuffleSound(() => {
             if (stateRef.current.paused) return;
+
             generateNumber();
           });
         };
 
         announceLetsGo(startShuffleSequence);
+
       } else {
+
         playShuffleSound(() => {
           if (stateRef.current.paused) return;
+
           generateNumber();
         });
+
       }
+
     } else {
+
+      // ⭐ PAUSE
       setPaused(true);
-      stopAllActiveAudio();
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
+isDrawingBallRef.current = false; // ← ADD THIS
+      // Pause current recorded audio instead of destroying it
+      if (activeAudioRef.current) {
+        const audio = activeAudioRef.current;
+
+        pausedAudioRef.current = {
+          audio: audio,
+          fileName: audio.src
+            .split("/")
+            .pop()
+            .split(".")[0]
+            .toLowerCase()
+        };
+
+        audio.pause();
+        activeAudioRef.current = null;
+      }
+
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
+      }
     }
   };
 
   useEffect(() => {
-    if (paused) {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      return;
-    }
-
     const updatePhysics = () => {
       setCageBalls(prev => prev.map(ball => {
         let newX = ball.x + ball.dx * 3.2;
@@ -667,75 +1043,189 @@ function playRecordedAudio(
     };
   }, [paused]);
 
-  async function generateNumber() {
-    if (isDrawingBallRef.current || stateRef.current.paused) return;
+async function generateNumber() {
+  const generationStart = Date.now();
 
-    if (!game?.game_id) {
-      return;
+  console.log(
+    "🔥 GENERATE ENTERED",
+    generationStart,
+    "LOCK:",
+    isDrawingBallRef.current,
+    "GAME:",
+    stateRef.current.game?.game_id || stateRef.current.game?.id
+  );
+
+  // Never allow two generations at the same time
+ if (isDrawingBallRef.current || stateRef.current.paused) {
+  console.log(
+    ">>> GENERATE BLOCKED",
+    {
+      locked: isDrawingBallRef.current,
+      paused: stateRef.current.paused
     }
+  );
+  return;
+}
 
-    const currentRemaining = remainingNumbersRef.current;
+if (loopTimeoutRef.current) {
+  console.log(">>> GENERATE BLOCKED - LOOP ALREADY EXISTS");
+  return;
+}
 
-    if (!currentRemaining.length) {
-      setPaused(true);
-      return;
-    }
+  const currentGame = stateRef.current.game;
+  const gameId = currentGame?.game_id || currentGame?.id;
 
-    isDrawingBallRef.current = true;
+  if (!gameId) {
+    console.error("No game_id found:", currentGame);
+    return;
+  }
 
-    const randomIndex = Math.floor(Math.random() * currentRemaining.length);
+  const currentRemaining = remainingNumbersRef.current;
+
+  if (!currentRemaining.length) {
+    console.log(">>> NO NUMBERS REMAINING");
+    setPaused(true);
+    return;
+  }
+
+  // LOCK immediately
+  isDrawingBallRef.current = true;
+
+  try {
+    // Pick random number
+    const randomIndex = Math.floor(
+      Math.random() * currentRemaining.length
+    );
+
     const number = currentRemaining[randomIndex];
 
-    remainingNumbersRef.current = currentRemaining.filter(n => n !== number);
+    remainingNumbersRef.current =
+      currentRemaining.filter(n => n !== number);
 
+    // Determine Bingo letter
     let letter = "B";
+
     if (number >= 16) letter = "I";
     if (number >= 31) letter = "N";
     if (number >= 46) letter = "G";
     if (number >= 61) letter = "O";
 
     const result = `${letter} ${number}`;
+seenBallsRef.current.add(result);
+    // Update frontend state
+    const updatedCalled = [
+      ...calledRef.current,
+      result
+    ];
 
+    calledRef.current = updatedCalled;
+
+    setCalled(updatedCalled);
     setCurrent(result);
 
-    const updatedCalled = [...calledRef.current, result];
-    calledRef.current = updatedCalled;
-    setCalled(updatedCalled);
+    console.log(
+      "🎯 CALLING NUMBER:",
+      result,
+      "FOR GAME:",
+      gameId
+    );
+
+    // =========================================================
+    // SAVE NUMBER TO BACKEND
+    // =========================================================
+    // =========================================================
+// SAVE NUMBER TO BACKEND — BACKGROUND
+// =========================================================
+
+fetch(
+  `${API_URL}/games/${gameId}/call-number`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      ball: result
+    })
+  }
+)
+  .then(async (response) => {
+
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      throw new Error(
+        `Call-number API failed: ${response.status} ${errorText}`
+      );
+    }
+
+    console.log(
+      "✅ NUMBER SAVED IN BACKGROUND:",
+      result
+    );
+
+  })
+  .catch((err) => {
+
+    console.error(
+      "❌ BACKGROUND NUMBER SAVE FAILED:",
+      result,
+      err
+    );
+
+  });
+
+// =========================================================
+// PLAY VOICE IMMEDIATELY
+// =========================================================
+
+speakBallSequence(letter, number, () => {
+      if (stateRef.current.paused) {
+        isDrawingBallRef.current = false;
+        return;
+      }
+
+      // Never create a second timer
+      if (loopTimeoutRef.current !== null) {
+        console.log(">>> LOOP ALREADY SCHEDULED");
+        return;
+      }
+
+      console.log(">>> SCHEDULING NEXT GENERATION");
+
+      loopTimeoutRef.current = setTimeout(() => {
+
+        console.log(">>> TIMEOUT FIRED");
+
+        // Clear timer reference FIRST
+        loopTimeoutRef.current = null;
+
+        if (stateRef.current.paused) {
+          isDrawingBallRef.current = false;
+          return;
+        }
+
+        // Release lock immediately before starting next generation
+        isDrawingBallRef.current = false;
+
+        generateNumber();
+
+      }, TARGET_GENERATION_INTERVAL_MS);
+
+    }); // <-- closes speakBallSequence
+
+  } catch (err) {
+
+    console.error(
+      "❌ GENERATE NUMBER FAILED:",
+      err
+    );
 
     isDrawingBallRef.current = false;
 
-    try {
-      await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/${game.game_id}/call-number`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ball: result,
-        }),
-      });
-    } catch (err) {
-      console.error(err);
-    }
-
-    speakBallSequence(letter, number, () => {
-      if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
-
-      const currentGame = stateRef.current.game || game;
-      const activeVoiceMode = currentGame.voiceMode || currentGame.voice_mode;
-
-      const delay = activeVoiceMode === "recorded" 
-        ? 80
-        : stateRef.current.speed * 1000;
-  
-      loopTimeoutRef.current = setTimeout(() => {
-        if (!stateRef.current.paused) {
-          generateNumber();
-        }   
-      }, delay);
-    });
+    // Do NOT schedule another call here.
   }
-
+}
   const checkWinner = async () => {
     if (!cartelaId.trim()) {
       alert("Please enter a Cartela ID first.");
@@ -754,41 +1244,58 @@ function playRecordedAudio(
         return;
       }
 
-      const verifyGameId = currentGame.game_id || currentGame.id;
+  const verifyGameId = currentGame?.game_id || currentGame?.id;
 
-      const response = await fetch(
-        `https://bingo-backend-ccn6.onrender.com/api/games/${verifyGameId}/verify-cartela`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            cartelaId: cartelaId.trim(),
-          }),
-        }
-      );
+console.log("🔥 VERIFY GAME OBJECT:", currentGame);
+console.log("🔥 VERIFY GAME ID:", verifyGameId);
 
-      const verificationData = await response.json();
+if (!verifyGameId) {
+  console.error("❌ MISSING game_id/id:", currentGame);
+  setWinnerMessage("Game ID missing");
+  return;
+}
 
-      if (!verificationData.sold) {
-        setWinnerMessage(`ID ${cartelaId} NOT SOLD!`);
-        setVerificationStatus("NOT_SOLD");
+const response = await fetch(
+  `${API_URL}/games/${verifyGameId}/verify-cartela`,
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      cartelaId: cartelaId.trim(),
+    }),
+  }
+);
 
-        if (currentGame.voiceMode === "recorded") {
-          playRecordedAudio("notsold");
-        } else {
-          stopAllActiveAudio();
-          const speech = new SpeechSynthesisUtterance(`Cartela ${cartelaId} not sold.`);
-          speech.pitch = 0.65;
-          speech.rate = 1.15;
-          window.speechSynthesis.speak(speech);
-        }
+const verificationData = await response.json();
 
-        return;
-      }
+if (!verificationData.sold) {
+  setWinnerMessage(`ID ${cartelaId} NOT SOLD!`);
+  setVerificationStatus("NOT_SOLD");
 
-      setCheckedCartela(verificationData.cartela);
+  if (
+    currentGame.voiceMode === "recorded" ||
+    currentGame.voiceMode === "recorded-oromo"
+  ) {
+    playRecordedAudio("notsold");
+  } else {
+    stopAllActiveAudio();
+
+    const speech = new SpeechSynthesisUtterance(
+      `Cartela ${cartelaId} not sold.`
+    );
+
+    speech.pitch = 0.65;
+    speech.rate = 1.15;
+
+    window.speechSynthesis.speak(speech);
+  }
+
+  return;
+}
+
+setCheckedCartela(verificationData.cartela);
 
       if (verificationData.isWinner) {
         let patternName = "🎉 LINE BINGO!";
@@ -802,11 +1309,12 @@ function playRecordedAudio(
         setWinnerMessage(patternName);
         setVerificationStatus("WINNER");
 
-        if (currentGame.voiceMode === "recorded") {
+        if (currentGame.voiceMode === "recorded" ||
+  currentGame.voiceMode === "recorded-oromo") {
           playRecordedAudio("winner");
         } else {
           stopAllActiveAudio();
-         const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
+          const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
           speech.pitch = 0.6;
           speech.rate = 1.2; 
           window.speechSynthesis.speak(speech);
@@ -815,7 +1323,8 @@ function playRecordedAudio(
         setWinnerMessage("❌ No Bingo");
         setVerificationStatus("NOT_WINNER");
 
-        if (currentGame.voiceMode === "recorded") {
+        if (currentGame.voiceMode === "recorded" ||
+  currentGame.voiceMode === "recorded-oromo") {
           playRecordedAudio("notwinner");
         } else {
           stopAllActiveAudio();
@@ -869,14 +1378,16 @@ function playRecordedAudio(
   };
 
   const incomingHistoryBalls = called.length > 1 ? [...called].reverse().slice(1, 6) : [];
+  // ============================================
+  // AUTO CALL NUMBER API
+  // ============================================
+ 
 
-  if (loading) {
-    return (
-      <div className="bingo-wrapper" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#fff' }}>
-        Loading Bingo Game...
-      </div>
-    );
-  }
+  
+  // Auto-call every 6 seconds when NOT paused
+
+
+  
 
   return (
     <div className={`bingo-wrapper ${tvMode ? 'tv-viewport' : ''}`}>
@@ -1055,7 +1566,6 @@ function playRecordedAudio(
               )}
             </div>
           </div>
-
           {/* 3. Right Wing: High-Visibility Current Called Display */}
           <div 
             className="ball-column" 
@@ -1130,8 +1640,27 @@ function playRecordedAudio(
               {checkedCartela.matrix.map((row, rIdx) =>
                 row.map((cell, cIdx) => {
                   const isFree = cell === "FREE";
-                  const isCalled = !isFree && called.includes(cell);
-                  let num = cell;
+
+let num = cell;
+
+if (!isFree) {
+  if (typeof cell === "string") {
+    const parts = cell.trim().split(/\s+/);
+    num = parts[1] || cell;
+  }
+
+  num = Number(num);
+}
+
+const isCalled =
+  !isFree &&
+  called.some(item => {
+    const calledNumber = Number(
+      String(item).trim().split(/\s+/)[1]
+    );
+
+    return calledNumber === num;
+  });
                   if (!isFree && typeof cell === "string") {
                     const parts = cell.trim().split(/\s+/);
                     num = parts[1] || cell;
@@ -1247,39 +1776,124 @@ function playRecordedAudio(
             {t.dashboardBtn}
           </button>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {/* Voice Mode Selector */}
-            <select
-              value={game.voiceMode === "recorded" ? "recorded" : game.speechLang === "om-ET" ? "oromo" : "synthetic"}
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}>
+            <span>🔊 Volume</span>
+
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={Math.round(volume * 100)}
               onChange={(e) => {
-                const val = e.target.value;
-                if (val === "recorded") {
-                  setGame(prev => ({ ...prev, voiceMode: "recorded", speechLang: "en-US" }));
-                } else if (val === "oromo") {
-                  setGame(prev => ({ ...prev, voiceMode: "synthetic", speechLang: "om-ET" }));
-                } else {
-                  setGame(prev => ({ ...prev, voiceMode: "synthetic", speechLang: "en-US" }));
+                const newVolume = Number(e.target.value) / 100;
+
+                // Update both state and ref
+                setVolume(newVolume);
+                volumeRef.current = newVolume;
+
+                // Change currently playing recorded voice immediately
+                if (activeAudioRef.current) {
+                  activeAudioRef.current.volume = newVolume;
                 }
               }}
               style={{
-                background: '#0c162d',
-                border: '1px solid #00c8ff',
-                color: '#fff',
-                borderRadius: '4px',
-                padding: '2px 4px',
-                fontSize: '9px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                outline: 'none'
+                width: "130px",
+                cursor: "pointer",
               }}
-            >
-              <option value="recorded">🎙️ bulchaa voice</option>
-              
-              
-            </select>
-            
+            />
 
-            
+            <span style={{ minWidth: "45px" }}>
+              {Math.round(volume * 100)}%
+            </span>
+          </div>
+          <div style={{
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  marginTop: "10px"
+}}>
+  <span style={{ color: "#fff", fontWeight: "600" }}>
+    Voice Speed
+  </span>
+
+  <button
+    onClick={decreaseVoiceSpeed}
+    style={{
+      padding: "6px 12px",
+      fontSize: "18px",
+      fontWeight: "bold",
+      cursor: "pointer"
+    }}
+  >
+    −
+  </button>
+
+  <span style={{
+    minWidth: "50px",
+    textAlign: "center",
+    color: "#fff",
+    fontWeight: "bold"
+  }}>
+    {voiceSpeed.toFixed(1)}×
+  </span>
+
+  <button
+    onClick={increaseVoiceSpeed}
+    style={{
+      padding: "6px 12px",
+      fontSize: "18px",
+      fontWeight: "bold",
+      cursor: "pointer"
+    }}
+  >
+    +
+  </button>
+</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+           {/* Voice Mode Selector */}
+<select
+  value={
+    game.voiceMode === "recorded-oromo"
+      ? "recorded-oromo"
+      : "recorded"
+  }
+  onChange={(e) => {
+    const val = e.target.value;
+
+    if (val === "recorded-oromo") {
+      setGame(prev => ({
+        ...prev,
+        voiceMode: "recorded-oromo",
+        speechLang: "oromo"
+      }));
+    } else {
+      setGame(prev => ({
+        ...prev,
+        voiceMode: "recorded",
+        speechLang: "en-US"
+      }));
+    }
+  }}
+  style={{
+    background: '#0c162d',
+    border: '1px solid #00c8ff',
+    color: '#fff',
+    borderRadius: '4px',
+    padding: '2px 4px',
+    fontSize: '9px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    outline: 'none'
+  }}
+>
+  <option value="recorded">🎙️ Bulchaa Voice</option>
+  <option value="recorded-oromo">🟢 Afaan Oromo Voice</option>
+</select>
             <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#0c162d', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '4px', fontSize: '9px' }}>
               <span style={{ color: '#8c9cb3', fontWeight: 'bold' }}>⏱️ {speed}s</span>
               <button style={{ background: '#122042', border: '1px solid #00c8ff', color: '#fff', borderRadius: '2px', width: '12px', height: '12px', fontSize: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => speed > 1 && setSpeed(speed - 1)}>-</button>

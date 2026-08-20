@@ -105,7 +105,7 @@ export default function HouseDashboard() {
   useEffect(() => {
     async function loadPerformance() {
       try {
-        const response = await fetch(`http://localhost:5000/api/games/house/${id}/performance`)
+        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`);
         const data = await response.json();
 
         if (data.success && data.performance) {

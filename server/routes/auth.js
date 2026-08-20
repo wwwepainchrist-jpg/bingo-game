@@ -117,6 +117,13 @@ router.post("/login", async (req, res) => {
       "SELECT * FROM users WHERE username=$1 AND password=$2",
       [username, password]
     );
+    console.log("LOGIN DEBUG:", {
+  username,
+  found: result.rows.length > 0,
+  role: result.rows[0]?.role,
+  passwordLength: result.rows[0]?.password?.length,
+  passwordPrefix: result.rows[0]?.password?.substring(0, 4)
+});
     console.log(result.rows[0]);
 
     if (result.rows.length === 0) {
