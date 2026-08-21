@@ -25,7 +25,11 @@ export default function Login() {
   }, []);
 
  async function login() {
-  try {
+  try {console.log("LOGIN SENDING:", {
+  username,
+  passwordLength: password.length,
+  password
+});
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: {
