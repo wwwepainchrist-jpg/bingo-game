@@ -142,7 +142,8 @@ console.log("Role:", user.role);
           boxSizing: "border-box",
         }}
       >
-        <h1 style={{ marginTop: 0 }}>🎱 BINGO LOGIN</h1>
+        <h1 style={{ marginTop: 0 }}>BULCHA 
+          LOGIN</h1>
 
         {/* LANGUAGE SELECTOR */}
         <div style={{ marginBottom: "18px" }}>
@@ -168,7 +169,7 @@ console.log("Role:", user.role);
             }}
           >
             <option value="en">🇺🇸 English</option>
-            <option value="am">🇪🇹 አማርኛ</option>
+          
             <option value="om">🇪🇹 Afaan Oromoo</option>
           </select>
         </div>
