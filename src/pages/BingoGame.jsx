@@ -1772,9 +1772,7 @@ const isCalled =
 
         {/* --- Bottom Footer Console Bar --- */}
         <footer className="game-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)' }}>
-          <button className="back-button" style={{ padding: "2px 6px", fontSize: "9px", minHeight: "auto", fontWeight: 'bold', cursor: 'pointer' }} onClick={() => navigate("/cashier-dashboard/" + id)}>
-            {t.dashboardBtn}
-          </button>
+          
           
           <div style={{
             display: "flex",
