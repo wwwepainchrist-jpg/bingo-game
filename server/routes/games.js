@@ -497,13 +497,36 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     const { gameId } = req.params;
     const { cartelaId } = req.body;
 
-    console.log("VERIFY GAME ID:", gameId);
+    console.log("=================================");
+    console.log("VERIFY CARTELA");
+    console.log("GAME ID:", gameId);
     console.log("CARTELA ID:", cartelaId);
     console.log("CARTELA ID TYPE:", typeof cartelaId);
+    console.log("=================================");
 
-    // ============================
-    // 1. FIND GAME DATABASE ID
-    // ============================
+    if (!gameId) {
+      return res.status(400).json({
+        sold: false,
+        isWinner: false,
+        error: "Game ID is required",
+      });
+    }
+
+    if (
+      cartelaId === undefined ||
+      cartelaId === null ||
+      String(cartelaId).trim() === ""
+    ) {
+      return res.status(400).json({
+        sold: false,
+        isWinner: false,
+        error: "Cartela ID is required",
+      });
+    }
+
+    // ============================================================
+    // 1. FIND GAME
+    // ============================================================
 
     const gameResult = await pool.query(
       `
@@ -518,8 +541,10 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
       console.log("❌ GAME NOT FOUND:", gameId);
 
       return res.status(404).json({
+        sold: false,
+        isWinner: false,
         error: "Game not found",
-        gameId
+        gameId,
       });
     }
 
@@ -527,34 +552,38 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
 
     console.log("GAME STRING ID:", gameResult.rows[0].game_id);
     console.log("GAME DATABASE ID:", gameDbId);
-   // ============================
-    // 2. CHECK IF CARTELA WAS SOLD
-    // ============================
 
-const soldResult = await pool.query(
-  `
-  SELECT *
-  FROM sold_cartelas
-  WHERE game_id = $1
-  AND cartela_id = $2
-  `,
-  [gameId, cartelaId]
-);
+    // ============================================================
+    // 2. CHECK THAT CARTELA WAS SOLD IN THIS GAME
+    // ============================================================
 
-    console.log("SOLD ROWS:", soldResult.rows);
+    const soldResult = await pool.query(
+      `
+      SELECT *
+      FROM sold_cartelas
+      WHERE game_id = $1
+      AND cartela_id = $2
+      `,
+      [gameId, cartelaId]
+    );
+
+    console.log("SOLD ROWS:", soldResult.rows.length);
 
     if (soldResult.rows.length === 0) {
+      console.log("❌ CARTELA WAS NOT SOLD IN THIS GAME");
+
       return res.json({
         sold: false,
-        isWinner: false
+        isWinner: false,
       });
     }
 
     console.log("✅ CARTELA IS SOLD");
 
-    // ============================
-    // 2. LOAD CARTELA
-    // ============================
+    // ============================================================
+    // 3. LOAD CARTELA
+    // ============================================================
+
     const cartelaResult = await pool.query(
       `
       SELECT *
@@ -565,123 +594,211 @@ const soldResult = await pool.query(
     );
 
     if (cartelaResult.rows.length === 0) {
+      console.log("❌ CARTELA NOT FOUND:", cartelaId);
+
       return res.status(404).json({
-        error: "Cartela not found"
+        sold: true,
+        isWinner: false,
+        error: "Cartela not found",
       });
     }
 
     const cartela = cartelaResult.rows[0];
-    console.log("Checking cartela:", cartelaId);
-    console.log("Cartela from database:", cartela);
 
-    // numbers is stored as JSON text
+    console.log("CARTELA ID:", cartela.id);
+    console.log("CARTELA SERIAL:", cartela.serial);
+
+    // ============================================================
+    // 4. READ PDF CARTELA FORMAT
+    //
+    // Database format:
+    //
+    // {
+    //   B: [5 values],
+    //   I: [5 values],
+    //   N: [5 values],
+    //   G: [5 values],
+    //   O: [5 values]
+    // }
+    //
+    // The center N[2] is ★ / FREE.
+    // ============================================================
+
     const numbers =
       typeof cartela.numbers === "string"
         ? JSON.parse(cartela.numbers)
         : cartela.numbers;
 
-    // ============================
-    // 3. LOAD CALLED BALLS
-    // ============================
-  const calledResult = await pool.query(
-  `
-  SELECT ball
-  FROM called_balls
-  WHERE game_id = $1
-  ORDER BY id ASC
-  `,
-  [gameDbId]
-);
+    if (!numbers || typeof numbers !== "object") {
+      return res.status(500).json({
+        sold: true,
+        isWinner: false,
+        error: "Invalid cartela numbers format",
+      });
+    }
 
-const calledBalls = calledResult.rows.map(r => r.ball);
+    const letters = ["B", "I", "N", "G", "O"];
 
-const calledSet = new Set(
-  calledBalls.map(ball =>
-    parseInt(String(ball).trim().split(/\s+/).pop(), 10)
-  )
-);
+    for (const letter of letters) {
+      if (!Array.isArray(numbers[letter])) {
+        return res.status(500).json({
+          sold: true,
+          isWinner: false,
+          error: `Invalid cartela format: missing ${letter} column`,
+        });
+      }
 
-console.log("DATABASE GAME ID FOR VERIFICATION:", gameDbId);
-console.log("CALLED BALLS FOR VERIFICATION:", calledBalls);
-    // ============================
-    // 4. BUILD CARD MATRIX (FIXED)
-    // ============================
-    const matrixRows = numbers.rows || numbers; 
+      if (numbers[letter].length !== 5) {
+        return res.status(500).json({
+          sold: true,
+          isWinner: false,
+          error: `Invalid cartela format: ${letter} must contain 5 values`,
+        });
+      }
+    }
 
-    const board = matrixRows.map((row, rowIndex) =>
-      row.map((cell, colIndex) => {
-        if (rowIndex === 2 && colIndex === 2) return "FREE";
-        const letters = ["B", "I", "N", "G", "O"];
-        return `${letters[colIndex]} ${cell}`;
-      })
+    // ============================================================
+    // 5. BUILD 5x5 BOARD FROM B/I/N/G/O COLUMNS
+    // ============================================================
+
+    const board = [];
+
+    for (let row = 0; row < 5; row++) {
+      const boardRow = [];
+
+      for (let col = 0; col < 5; col++) {
+        const letter = letters[col];
+        const value = numbers[letter][row];
+
+        // Center position is FREE
+        if (row === 2 && col === 2) {
+          boardRow.push("FREE");
+        } else {
+          boardRow.push(`${letter} ${value}`);
+        }
+      }
+
+      board.push(boardRow);
+    }
+
+    console.log("=================================");
+    console.log("CARTELA BOARD");
+    console.log(JSON.stringify(board, null, 2));
+    console.log("=================================");
+
+    // ============================================================
+    // 6. LOAD CALLED BALLS
+    // ============================================================
+
+    const calledResult = await pool.query(
+      `
+      SELECT ball
+      FROM called_balls
+      WHERE game_id = $1
+      ORDER BY id ASC
+      `,
+      [gameDbId]
     );
 
-    // ============================
-    // 5. HELPER
-    // ============================
- function marked(cell) {
-  if (cell === "FREE") return true;
+    const calledBalls = calledResult.rows.map((row) => row.ball);
 
-  const cellNumber = parseInt(
-    String(cell).trim().split(/\s+/).pop(),
-    10
-  );
+    const calledSet = new Set();
 
-  if (Number.isNaN(cellNumber)) {
-    return false;
-  }
+    for (const ball of calledBalls) {
+      const number = parseInt(
+        String(ball).trim().split(/\s+/).pop(),
+        10
+      );
 
-  const result = calledSet.has(cellNumber);
+      if (!Number.isNaN(number)) {
+        calledSet.add(number);
+      }
+    }
 
- if (process.env.DEBUG_BINGO === "true") {
-  console.log(
-    `MARK CHECK | Cell: ${cell} | Number: ${cellNumber} | Marked: ${result}`
-  );
-}
-  return result;
-}
-    // ============================
-    // 6. CHECK HORIZONTAL LINES
-    // ============================
+    console.log("CALLED BALLS:", calledBalls);
+    console.log(
+      "CALLED NUMBERS:",
+      Array.from(calledSet)
+    );
+
+    // ============================================================
+    // 7. CHECK WHETHER A CELL IS MARKED
+    // ============================================================
+
+    function marked(cell) {
+      if (cell === "FREE") {
+        return true;
+      }
+
+      const cellNumber = parseInt(
+        String(cell).trim().split(/\s+/).pop(),
+        10
+      );
+
+      if (Number.isNaN(cellNumber)) {
+        return false;
+      }
+
+      const result = calledSet.has(cellNumber);
+
+      if (process.env.DEBUG_BINGO === "true") {
+        console.log(
+          `MARK CHECK | ${cell} | number=${cellNumber} | marked=${result}`
+        );
+      }
+
+      return result;
+    }
+
+    // ============================================================
+    // 8. HORIZONTAL LINES
+    // ============================================================
+
     let horizontalWinner = false;
 
-    for (let r = 0; r < 5; r++) {
+    for (let row = 0; row < 5; row++) {
       let complete = true;
-      for (let c = 0; c < 5; c++) {
-        if (!marked(board[r][c])) {
+
+      for (let col = 0; col < 5; col++) {
+        if (!marked(board[row][col])) {
           complete = false;
           break;
         }
       }
+
       if (complete) {
         horizontalWinner = true;
         break;
       }
     }
-   // ============================
-    // 7. CHECK VERTICAL LINES
-    // ============================
+
+    // ============================================================
+    // 9. VERTICAL LINES
+    // ============================================================
+
     let verticalWinner = false;
 
-    for (let c = 0; c < 5; c++) {
+    for (let col = 0; col < 5; col++) {
       let complete = true;
-      for (let r = 0; r < 5; r++) {
-        if (!marked(board[r][c])) {
+
+      for (let row = 0; row < 5; row++) {
+        if (!marked(board[row][col])) {
           complete = false;
           break;
         }
       }
+
       if (complete) {
         verticalWinner = true;
         break;
       }
     }
 
-    // ============================
-    // 8. CHECK DIAGONALS
-    // ============================
+    // ============================================================
+    // 10. DIAGONALS
+    // ============================================================
+
     let diag1Winner = true;
-    let diag2Winner = true;
 
     for (let i = 0; i < 5; i++) {
       if (!marked(board[i][i])) {
@@ -690,6 +807,8 @@ console.log("CALLED BALLS FOR VERIFICATION:", calledBalls);
       }
     }
 
+    let diag2Winner = true;
+
     for (let i = 0; i < 5; i++) {
       if (!marked(board[i][4 - i])) {
         diag2Winner = false;
@@ -697,65 +816,101 @@ console.log("CALLED BALLS FOR VERIFICATION:", calledBalls);
       }
     }
 
-    const diagonalWinner = diag1Winner || diag2Winner;
+    const diagonalWinner =
+      diag1Winner || diag2Winner;
 
-    // ============================
-    // 9. CHECK FOUR CORNERS
-    // ============================
+    // ============================================================
+    // 11. FOUR CORNERS
+    // ============================================================
+
     const fourCornersWinner =
       marked(board[0][0]) &&
       marked(board[0][4]) &&
       marked(board[4][0]) &&
       marked(board[4][4]);
 
-    // ============================
-    // 10. CHECK FULL HOUSE
-    // ============================
+    // ============================================================
+    // 12. FULL HOUSE
+    // ============================================================
+
     let fullHouseWinner = true;
 
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        if (!marked(board[r][c])) {
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        if (!marked(board[row][col])) {
           fullHouseWinner = false;
           break;
         }
       }
-      if (!fullHouseWinner) break;
+
+      if (!fullHouseWinner) {
+        break;
+      }
     }
+
+    // ============================================================
+    // 13. FINAL WINNER
+    // ============================================================
 
     const lineWinner =
       horizontalWinner ||
       verticalWinner ||
       diagonalWinner;
 
+    const isWinner =
+      lineWinner ||
+      fourCornersWinner ||
+      fullHouseWinner;
+
+    // ============================================================
+    // 14. LOG RESULT
+    // ============================================================
+
     console.log("=================================");
-    console.log("Called Balls:", calledBalls);
-    console.log("Board:", board);
-    console.log("Horizontal Winner:", horizontalWinner);
-    console.log("Vertical Winner:", verticalWinner);
-    console.log("Diagonal Winner:", diagonalWinner);
-    console.log("Four Corners Winner:", fourCornersWinner);
-    console.log("Full House Winner:", fullHouseWinner);
+    console.log("BINGO VERIFICATION RESULT");
+    console.log("Cartela:", cartelaId);
+    console.log("Horizontal:", horizontalWinner);
+    console.log("Vertical:", verticalWinner);
+    console.log("Diagonal:", diagonalWinner);
+    console.log("Four Corners:", fourCornersWinner);
+    console.log("Full House:", fullHouseWinner);
+    console.log("FINAL WINNER:", isWinner);
     console.log("=================================");
+
+    // ============================================================
+    // 15. RESPONSE
+    // ============================================================
 
     return res.json({
       sold: true,
-      isWinner:
-        lineWinner ||
-        fourCornersWinner ||
-        fullHouseWinner,
+
+      isWinner,
+
       isLine: lineWinner,
+
+      isHorizontal: horizontalWinner,
+
+      isVertical: verticalWinner,
+
+      isDiagonal: diagonalWinner,
+
       isFourCorners: fourCornersWinner,
+
       isFullHouse: fullHouseWinner,
+
       cartela: {
         ...cartela,
-        matrix: board
-      }
+        matrix: board,
+      },
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: err.message
+    console.error("❌ VERIFY CARTELA ERROR:", err);
+
+    return res.status(500).json({
+      sold: false,
+      isWinner: false,
+      error: err.message,
     });
   }
 });
