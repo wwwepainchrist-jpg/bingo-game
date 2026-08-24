@@ -1042,6 +1042,32 @@ isDrawingBallRef.current = false; // ← ADD THIS
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, [paused]);
+  useEffect(() => {
+  const handleOffline = () => {
+    console.log("❌ OFFLINE");
+
+    setPaused(true);
+
+    if (loopTimeoutRef.current) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
+    }
+
+    isDrawingBallRef.current = false;
+  };
+
+  const handleOnline = () => {
+    console.log("✅ INTERNET RESTORED");
+  };
+
+  window.addEventListener("offline", handleOffline);
+  window.addEventListener("online", handleOnline);
+
+  return () => {
+    window.removeEventListener("offline", handleOffline);
+    window.removeEventListener("online", handleOnline);
+  };
+}, []);
 
 async function generateNumber() {
   const generationStart = Date.now();
@@ -1074,6 +1100,22 @@ if (loopTimeoutRef.current) {
 
   const currentGame = stateRef.current.game;
   const gameId = currentGame?.game_id || currentGame?.id;
+  if (!navigator.onLine) {
+  console.log("❌ INTERNET LOST - GAME PAUSED");
+
+  setPaused(true);
+
+  if (loopTimeoutRef.current) {
+    clearTimeout(loopTimeoutRef.current);
+    loopTimeoutRef.current = null;
+  }
+
+  isDrawingBallRef.current = false;
+
+  alert("Internet disconnected. Game paused.");
+
+  return;
+}
 
   if (!gameId) {
     console.error("No game_id found:", currentGame);
@@ -1165,15 +1207,24 @@ fetch(
     );
 
   })
-  .catch((err) => {
+ .catch((err) => {
+  console.error(
+    "❌ BACKGROUND NUMBER SAVE FAILED:",
+    result,
+    err
+  );
 
-    console.error(
-      "❌ BACKGROUND NUMBER SAVE FAILED:",
-      result,
-      err
-    );
+  setPaused(true);
 
-  });
+  if (loopTimeoutRef.current) {
+    clearTimeout(loopTimeoutRef.current);
+    loopTimeoutRef.current = null;
+  }
+
+  isDrawingBallRef.current = false;
+
+  alert("Connection lost. Game paused.");
+});
 
 // =========================================================
 // PLAY VOICE IMMEDIATELY
