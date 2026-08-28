@@ -10,38 +10,54 @@ export default function Login() {
   const { language, changeLanguage, t } = useLanguage();
 
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+const [password, setPassword] = useState("");
+const [loggingIn, setLoggingIn] = useState(false);
 
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [changeUsername, setChangeUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
- const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
+const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
 
   useEffect(() => {
     setUsername("");
     setPassword("");
   }, []);
 
- async function login() {
-  try {console.log("LOGIN SENDING:", {
-  username,
-  passwordLength: password.length,
-  password
-});
+async function login() {
+  if (loggingIn) return;
+
+  if (!username.trim() || !password) {
+    alert("Please enter username and password.");
+    return;
+  }
+
+  setLoggingIn(true);
+
+  try {
+    console.log("⚡ LOGIN START");
+
+    const startTime = performance.now();
+
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        username,
+        username: username.trim(),
         password,
       }),
     });
 
     const data = await response.json();
+
+    console.log(
+      `⚡ LOGIN RESPONSE: ${(
+        performance.now() - startTime
+      ).toFixed(0)} ms`
+    );
 
     if (!response.ok || !data.success) {
       alert(data.message || "Wrong username or password");
@@ -49,32 +65,68 @@ export default function Login() {
     }
 
     const user = data.user;
-console.log("Logged in user:", user);
-console.log("Role:", user.role);
 
-    localStorage.setItem("currentUser", JSON.stringify(user));
+    console.log("✅ LOGIN SUCCESS:", user);
+    console.log("👤 ROLE:", user.role);
 
-   if (user.role === "Super Admin") {
-  navigate("/super-admin");
+    /*
+     * Save immediately.
+     */
+    localStorage.setItem(
+      "currentUser",
+      JSON.stringify(user)
+    );
 
-} else if (user.role === "House Admin") {
+    /*
+     * Navigate immediately after authentication.
+     */
+    if (user.role === "Super Admin") {
 
-  console.log("Logged in user:", user);
-  console.log("house_id =", user.house_id);
+      navigate("/super-admin", {
+        replace: true,
+      });
 
-  navigate("/house-dashboard/" + user.house_id);
+    } else if (user.role === "House Admin") {
 
-} else if (user.role === "Agent") {
-  navigate("/agent-dashboard/" + user.username);
-} else if (user.role === "Cashier") {
-  navigate("/cashier-dashboard/" + user.username);
-} else {
-  alert("Unknown role: " + user.role);
-}
+      navigate(
+        "/house-dashboard/" + user.house_id,
+        {
+          replace: true,
+        }
+      );
+
+    } else if (user.role === "Agent") {
+
+      navigate(
+        "/agent-dashboard/" + user.username,
+        {
+          replace: true,
+        }
+      );
+
+    } else if (user.role === "Cashier") {
+
+      navigate(
+        "/cashier-dashboard/" + user.username,
+        {
+          replace: true,
+        }
+      );
+
+    } else {
+
+      alert("Unknown role: " + user.role);
+    }
 
   } catch (err) {
-    console.error(err);
+
+    console.error("❌ LOGIN ERROR:", err);
+
     alert("Cannot connect to server.");
+
+  } finally {
+
+    setLoggingIn(false);
   }
 }
 
@@ -189,8 +241,14 @@ console.log("Role:", user.role);
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        <button onClick={login}>{t?.login || "LOGIN"}</button>
-
+      <button
+  onClick={login}
+  disabled={loggingIn}
+>
+  {loggingIn
+    ? "LOGGING IN..."
+    : (t?.login || "LOGIN")}
+</button>
         <div
           style={{
             marginTop: "15px",

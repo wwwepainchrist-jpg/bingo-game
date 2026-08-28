@@ -67,6 +67,8 @@ export default function CashierDashboard() {
   const [rawPackageInfo, setRawPackageInfo] = useState({ totalAmount: 3642, remainingAmount: 1755 });
   const [loading, setLoading] = useState(true);
 const location = useLocation();
+const [startClicked, setStartClicked] = useState(false);
+const [gameStarted, setGameStarted] = useState(false);
 const passedGame = location.state?.game;
   // Fetch initial cashier data, settings, package info, and sold cartelas from PostgreSQL backend
   useEffect(() => {
@@ -327,7 +329,8 @@ async function startGame() {
       "✅ GAME SAVED:",
       savedGame?.game_id
     );
-
+// Game successfully created
+setGameStarted(true);
     // ==========================================
     // 5. CLEAR SOLD CARTELAS
     // ==========================================
@@ -459,14 +462,39 @@ async function startGame() {
               {t?.resetGame || "Reset Game"}
             </button>
             
-            <button 
-              onClick={startGame} 
-              className="btn btn-success"
-              disabled={isInsufficientPackage}
-              style={{ opacity: isInsufficientPackage ? 0.4 : 1, cursor: isInsufficientPackage ? "not-allowed" : "pointer", padding: "3px 8px", fontSize: "11px", lineHeight: 1.2, textTransform: "none" }}
-            >
-              {isInsufficientPackage ? `⛔ ${t?.insufficient || "Insufficient"}` : (t?.start || "START GAME")}
-            </button>
+          <button
+  onClick={() => {
+    setStartClicked(true);
+    startGame();
+  }}
+  className="btn btn-success"
+  disabled={isInsufficientPackage}
+  style={{
+    opacity: isInsufficientPackage ? 0.4 : 1,
+    cursor: isInsufficientPackage
+      ? "not-allowed"
+      : "pointer",
+
+    padding: "3px 8px",
+    fontSize: "11px",
+    lineHeight: 1.2,
+    textTransform: "none",
+
+    backgroundColor: startClicked
+      ? "#dc2626"
+      : undefined,
+
+    borderColor: startClicked
+      ? "#dc2626"
+      : undefined,
+  }}
+>
+  {isInsufficientPackage
+    ? `⛔ ${t?.insufficient || "Insufficient"}`
+    : startClicked
+      ? "🔴 STARTED"
+      : (t?.start || "START GAME")}
+</button>
             
             <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "3px 8px", fontSize: "11px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.finance || "FINANCE"}
@@ -559,7 +587,7 @@ async function startGame() {
             
             {/* CARTELA GRID */}
             <div className="cartela-scroll-grid" style={{ flex: 1, maxHeight: "calc(100vh - 110px)" }}>
-              {Array.from({ length: 150 }, (_, i) => i + 1).map(num => {
+              {Array.from({ length: 152 }, (_, i) => i + 1).map(num => {
                 const sold = soldCartelas.includes(num);
                 const selected = selectedCartela === num;
                 
@@ -646,7 +674,7 @@ async function startGame() {
               📱 {t?.scanToChooseCards || "SCAN TO CHOOSE CARDS"}
             </h2>
             <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "12px", lineHeight: 1.4 }}>
-              {t?.qrInstructions || "Players scan this QR code on their mobile phones to choose 1 or more Cartela numbers (1–150)."}
+              {t?.qrInstructions || "Players scan this QR code on their mobile phones to choose 1 or more Cartela numbers (1–152)."}
             </p>
 
             <div style={{

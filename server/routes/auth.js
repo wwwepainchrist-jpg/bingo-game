@@ -108,40 +108,167 @@ router.post("/register", async (req, res) => {
 });
 
 // =======================
-// LOGIN USER
+// FAST LOGIN USER
+// =======================
+// =======================
+// FAST LOGIN USER
 // =======================
 router.post("/login", async (req, res) => {
+
+  const totalStart = Date.now();
+
   try {
+
     const { username, password } = req.body;
 
-    const result = await pool.query(
-      "SELECT * FROM users WHERE username=$1 AND password=$2",
-      [username, password]
-    );
-    
-    console.log(result.rows[0]);
+    console.log("🚀 LOCAL LOGIN START");
 
-    if (result.rows.length === 0) {
-      return res.status(401).json({
+    // --------------------------------
+    // Validate input
+    // --------------------------------
+    if (!username || !password) {
+
+      return res.status(400).json({
         success: false,
-        message: "Wrong username or password",
+        message: "Username and password are required",
       });
+
     }
 
-    res.json({
-      success: true,
-      user: result.rows[0],
-    });
+    // --------------------------------
+    // Get PostgreSQL connection
+    // --------------------------------
+    const connectionStart = Date.now();
+
+    const client = await pool.connect();
+
+    console.log(
+      "🔌 POOL CONNECTION TIME:",
+      Date.now() - connectionStart,
+      "ms"
+    );
+
+    try {
+
+      // --------------------------------
+      // Database query
+      // --------------------------------
+      const dbStart = Date.now();
+
+     const queryStart = process.hrtime.bigint();
+
+const result = await client.query(
+  `
+  SELECT
+    id,
+    full_name,
+    username,
+    role,
+    house_id,
+    password
+  FROM users
+  WHERE username = $1
+  LIMIT 1
+  `,
+  [username.trim()]
+);
+
+const queryEnd = process.hrtime.bigint();
+
+const queryMs =
+  Number(queryEnd - queryStart) / 1_000_000;
+
+console.log(
+  "🧪 EXACT CLIENT.QUERY TIME:",
+  queryMs.toFixed(3),
+  "ms"
+);
+      // --------------------------------
+      // User doesn't exist
+      // --------------------------------
+      if (result.rows.length === 0) {
+
+        console.log(
+          "❌ LOGIN FAILED: USER NOT FOUND"
+        );
+
+        return res.status(401).json({
+          success: false,
+          message: "Wrong username or password",
+        });
+
+      }
+
+      // --------------------------------
+      // Get user
+      // --------------------------------
+      const user = result.rows[0];
+
+      // --------------------------------
+      // Check password
+      //
+      // Current system uses plain-text
+      // passwords in the database.
+      // --------------------------------
+      if (user.password !== password) {
+
+        console.log(
+          "❌ LOGIN FAILED: WRONG PASSWORD"
+        );
+
+        return res.status(401).json({
+          success: false,
+          message: "Wrong username or password",
+        });
+
+      }
+
+      // --------------------------------
+      // NEVER send password to browser
+      // --------------------------------
+      delete user.password;
+
+      // --------------------------------
+      // Total backend time
+      // --------------------------------
+      console.log(
+        "⚡ TOTAL BACKEND LOGIN TIME:",
+        Date.now() - totalStart,
+        "ms"
+      );
+
+      // --------------------------------
+      // Send successful login
+      // --------------------------------
+      return res.json({
+        success: true,
+        user: user,
+      });
+
+    } finally {
+
+      // --------------------------------
+      // ALWAYS release connection
+      // --------------------------------
+      client.release();
+
+    }
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
-  }
-});
 
+    console.error(
+      "❌ LOGIN ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: "Login failed",
+    });
+
+  }
+
+});
 // =======================
 // GET ALL USERS
 // =======================

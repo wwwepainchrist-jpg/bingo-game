@@ -829,6 +829,15 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
       marked(board[4][0]) &&
       marked(board[4][4]);
 
+// ============================================================
+// 11B. FOUR CORNERS NEAR STAR
+// ============================================================
+
+const fourCornersNearStarWinner =
+  marked(board[1][1]) &&
+  marked(board[1][3]) &&
+  marked(board[3][1]) &&
+  marked(board[3][3]);
     // ============================================================
     // 12. FULL HOUSE
     // ============================================================
@@ -860,6 +869,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     const isWinner =
       lineWinner ||
       fourCornersWinner ||
+        fourCornersNearStarWinner ||
       fullHouseWinner;
 
     // ============================================================
@@ -873,6 +883,10 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     console.log("Vertical:", verticalWinner);
     console.log("Diagonal:", diagonalWinner);
     console.log("Four Corners:", fourCornersWinner);
+    console.log(
+  "Four Corners Near Star:",
+  fourCornersNearStarWinner
+);
     console.log("Full House:", fullHouseWinner);
     console.log("FINAL WINNER:", isWinner);
     console.log("=================================");
@@ -895,6 +909,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
       isDiagonal: diagonalWinner,
 
       isFourCorners: fourCornersWinner,
+      isFourCornersNearStar: fourCornersNearStarWinner,
 
       isFullHouse: fullHouseWinner,
 

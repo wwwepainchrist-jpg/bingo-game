@@ -7,23 +7,124 @@ import { io } from "socket.io-client";
   // Add this if not already imported
 // --- Phonetic & Legend Data ---
 const amharicPhoneticNumbers = {
-  1: "Ond", 2: "Hoo-let", 3: "Sost", 4: "Ah-raht", 5: "Ah-mist",
-  6: "Sid-ist", 7: "Suh-baht", 8: "Sim-int", 9: "Zeh-tegn", 10: "Ah-sir",
-  11: "Ah-sir-ah Ond", 12: "Ah-sir-ah Hoo-let", 13: "Ah-sir-ah Sost", 14: "Ah-sir-ah Ah-raht", 15: "Ah-sir-ah Ah-mist",
-  16: "Ah-sir-ah Sid-ist", 17: "Ah-sir-ah Suh-baht", 18: "Ah-sir-ah Sim-int", 19: "Ah-sir-ah Zeh-tegn", 20: "Hah-yah",
-  21: "Hah-yah Ond", 22: "Hah-yah Hoo-let", 23: "Hah-yah Sost", 24: "Hah-yah Ah-raht", 25: "Hah-yah Ah-mist",
-  26: "Hah-yah Sid-ist", 27: "Hah-yah Suh-baht", 28: "Hah-yah Sim-int", 29: "Hah-yah Zeh-tegn", 30: "Slah-sah", 
-  31: "Slah-sah Ond", 32: "Slah-sah Hoo-let", 33: "Slah-sah Sost", 34: "Slah-sah Ah-raht", 35: "Slah-sah Ah-mist",
-  36: "Slah-sah Sid-ist", 37: "Slah-sah Suh-baht", 38: "Slah-sah Sim-int", 39: "Slah-sah Zeh-tegn", 40: "Are-bah", 
-  41: "Are-bah Ond", 42: "Are-bah Hoo-let", 43: "Are-bah Sost", 44: "Are-bah Ah-raht", 45: "Are-bah Ah-mist",
-  46: "Are-bah Sid-ist", 47: "Are-bah Suh-baht", 48: "Are-bah Sim-int", 49: "Are-bah Zeh-tegn", 50: "Hahm-sah",
-  51: "Hahm-sah Ond", 52: "Hahm-sah Hoo-let", 53: "Hahm-sah Sost", 54: "Hahm-sah Ah-raht", 55: "Hahm-sah Ah-mist",
-  56: "Hahm-sah Sid-ist", 57: "Hahm-sah Suh-baht", 58: "Hahm-sah Sim-int", 59: "Hahm-sah Zeh-tegn", 60: "Seel-sah",
-  61: "Seel-sah Ond", 62: "Seel-sah Hoo-let", 63: "Seel-sah Sost", 64: "Seel-sah Ah-raht", 65: "Seel-sah Ah-mist",
-  66: "Seel-sah Sid-ist", 67: "Seel-sah Suh-baht", 68: "Seel-sah Sim-int", 69: "Seel-sah Zeh-tegn", 70: "SEE-bah", 
-  71: "Suh-bah Ond", 72: "Suh-bah Hoo-let", 73: "Suh-bah Sost", 74: "Suh-bah Ah-raht", 75: "suh-bah Ah-mist"
-};
+  1: "Aaaand",
+  2: "Hoooo-let",
+  3: "Sooost",
+  4: "Araaat",
+  5: "Aaaamist",
+  6: "Siiidist",
+  7: "Seeebat",
+  8: "Siiiimint",
+  9: "Zaaateñ",
 
+  10: "Asir",
+
+  11: "Asra Aand",
+  12: "Asra Hoo-let",
+  13: "Asra Sost",
+  14: "Asra Arat",
+  15: "Asra Amist",
+  16: "Asra Sidist",
+  17: "Asra Sebat",
+  18: "Asra Simint",
+  19: "Asra Zateñ",
+
+  20: "Haya",
+  21: "Haya Aand",
+  22: "Haya Hoo-let",
+  23: "Haya Sost",
+  24: "Haya Arat",
+  25: "Haya Amist",
+  26: "Haya Sidist",
+  27: "Haya Sebat",
+  28: "Haya Simint",
+  29: "Haya Zateñ",
+
+  30: "Selasa",
+  31: "Selasa Aand",
+  32: "Selasa Hoo-let",
+  33: "Selasa Sost",
+  34: "Selasa Arat",
+  35: "Selasa Amist",
+  36: "Selasa Sidist",
+  37: "Selasa Sebat",
+  38: "Selasa Simint",
+  39: "Selasa Zateñ",
+
+  40: "Arrba",
+  41: "Arba Aand",
+  42: "Arba Hoo-let",
+  43: "Arba Sost",
+  44: "Arba Arat",
+  45: "Arba Amist",
+  46: "Arba Sidist",
+  47: "Arba Sebat",
+  48: "Arba Simint",
+  49: "Arba Zateñ",
+
+  50: "Hamsa",
+  51: "Hamsa Aand",
+  52: "Hamsa Hoo-let",
+  53: "Hamsa Sost",
+  54: "Hamsa Arat",
+  55: "Hamsa Amist",
+  56: "Hamsa Sidist",
+  57: "Hamsa Sebat",
+  58: "Hamsa Simint",
+  59: "Hamsa Zateñ",
+
+  60: "Silsa",
+  61: "Silsa Aand",
+  62: "Silsa Hoo-let",
+  63: "Silsa Sost",
+  64: "Silsa Arat",
+  65: "Silsa Amist",
+  66: "Silsa Sidist",
+  67: "Silsa Sebat",
+  68: "Silsa Simint",
+  69: "Silsa Zateñ",
+
+70: "Säba",
+71: "Säba Aand",
+72: "Säba Hoo-let",
+73: "Säba Sost",
+74: "Säba Arat",
+75: "Säba Amist",
+};// ==========================================================
+// 🎙️ DRAMATIC BINGO ANNOUNCER
+// Makes the existing pronunciation longer and more dramatic
+// ==========================================================
+
+// ==========================================================
+// 🎙️ FAST BINGO ANNOUNCER
+// Short vowel extension — energetic, NOT slow
+// ==========================================================
+const makeDramaticBingoText = (text) => {
+  if (!text) return text;
+
+  return text
+    // Main Amharic number words
+    .replace(/\bAand\b/g, "Aaaand")
+    .replace(/\bHoo-let\b/g, "Hoooo-let")
+    .replace(/\bSost\b/g, "Sooost")
+    .replace(/\bArat\b/g, "Araaat")
+    .replace(/\bAmist\b/g, "Aaaamist")
+    .replace(/\bSidist\b/g, "Siiidist")
+    .replace(/\bSebat\b/g, "Seeebat")
+    .replace(/\bSimint\b/g, "Siiiimint")
+    .replace(/\bZateñ\b/g, "Zaaateñ")
+
+    // Tens
+    .replace(/\bAsir\b/g, "Aaaasir")
+    .replace(/\bAsra\b/g, "Aaaasraaa")
+    .replace(/\bHaya\b/g, "Haaayaa")
+    .replace(/\bSelasa\b/g, "Selaaasa")
+    .replace(/\bArba\b/g, "Aaarba")
+    .replace(/\bArrba\b/g, "Aaarrba")
+    .replace(/\bHamsa\b/g, "Haaamsa")
+    .replace(/\bSilsa\b/g, "Siiilsa")
+    .replace(/\bSäba\b/g, "Säääba");
+};
 // --- Afaan Oromo Number Words ---
 const afaanOromoNumbers = {
   1: "Tookko", 2: "Lama", 3: "Sadii", 4: "Affuurr", 5: "Shaan",
@@ -70,7 +171,13 @@ const footballLegends = {
 };
 
 const digitWords = { "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine" };
-const spokenLetter = { B: "Bee", I: "Eye", N: "En", G: "Gee", O: "Oh" };
+const spokenLetter = {
+  B: "BEE",
+  I: "Iii",
+  N: "N",
+  G: "GE",
+  O: "OO"
+};
 
 const columnColorStyles = {
   B: { border: "2px solid #00c8ff", textShadow: "0 0 6px #00c8ff", labelBg: "#00c8ff" },
@@ -144,7 +251,16 @@ export default function BingoGame() {
 const [voiceSpeed, setVoiceSpeed] = useState(1.0);
 const voiceSpeedRef = useRef(1.0);
 const TARGET_GENERATION_INTERVAL_MS = 400;
+
+
 const nextGenerationTimeRef = useRef(null);
+const [callInterval, setCallInterval] = useState(5);
+const callIntervalRef = useRef(5);
+const callIntervalTimerRef = useRef(null);
+const playPauseGenerationRef = useRef(0);
+const gameRunIdRef = useRef(0);
+const hasPlayedShuffleRef = useRef(false);
+const callIntervalChangeRef = useRef(null);
   // ============================================
   // CALL NUMBER API (prevents spam)
   // ============================================
@@ -650,13 +766,8 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
         await new Promise((resolve, reject) => {
           const audio = new Audio(audioPath);
 
-          // 🔊 Volume
           audio.volume = volumeRef.current;
-
-          // ⚡ Selected voice speed
           audio.playbackRate = voiceSpeedRef.current;
-
-          // Keep voice pitch natural
           audio.preservesPitch = true;
 
           activeAudioRef.current = audio;
@@ -696,12 +807,184 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
 
   tryPaths();
 }
-  function playShuffleSound(onComplete = () => {}) {
-    playRecordedAudio("shuffle", () => {
-      onComplete();
+
+/*
+========================================================
+  CONTINUOUS RECORDED BINGO CALL
+  Example: B.mp3 + 12.mp3 -> B12
+========================================================
+*/
+
+async function playRecordedBingoCall(
+  letter,
+  number,
+  onComplete = () => {}
+) {
+  const currentGame =
+    stateRef.current.game || game;
+
+  const isOromo =
+    currentGame.voiceMode === "recorded-oromo";
+
+  const folder =
+    isOromo ? "oromo" : "amharic";
+
+  const letterName =
+    String(letter).trim().toLowerCase();
+
+  const numberName =
+    String(number).trim().toLowerCase();
+
+  const completeName =
+    `${letterName}${numberName}`;
+
+  const completePaths = [
+    `/${folder}/${completeName}.mp3`,
+    `/${folder}/${completeName}.wav`
+  ];
+
+  console.log("🎙️ BINGO CALL");
+  console.log("🔤 LETTER:", letterName);
+  console.log("🔢 NUMBER:", numberName);
+  console.log("🎯 COMPLETE RECORDING:", completeName);
+  console.log("📁 FOLDER:", folder);
+
+  // ==========================================================
+  // FIND COMPLETE RECORDING
+  // ==========================================================
+  async function findCompleteRecording() {
+    for (const path of completePaths) {
+      try {
+        const response = await fetch(path, {
+          method: "HEAD",
+          cache: "no-cache"
+        });
+
+        if (response.ok) {
+          console.log("✅ FOUND COMPLETE RECORDING:", path);
+          return path;
+        }
+      } catch (error) {
+        console.log("❌ COULD NOT CHECK:", path);
+      }
+    }
+    return null;
+  }
+
+  // ==========================================================
+  // PLAY COMPLETE RECORDING
+  // ==========================================================
+  function playCompleteRecording(path) {
+    return new Promise((resolve, reject) => {
+      const audio = new Audio(path);
+
+      audio.volume = Number(volumeRef.current) || 1;
+      audio.playbackRate = Number(voiceSpeedRef.current) || 1;
+      audio.preservesPitch = true;
+
+      activeAudioRef.current = audio;
+
+      audio.onended = () => {
+        if (activeAudioRef.current === audio) {
+          activeAudioRef.current = null;
+        }
+
+        if (
+          pausedAudioRef.current &&
+          pausedAudioRef.current.audio === audio
+        ) {
+          pausedAudioRef.current = null;
+        }
+
+        console.log("✅ COMPLETE CALL FINISHED:", path);
+        resolve();
+      };
+
+      audio.onerror = () => {
+        if (activeAudioRef.current === audio) {
+          activeAudioRef.current = null;
+        }
+
+        console.error("❌ AUDIO ERROR:", path);
+        reject(new Error(`Could not play ${path}`));
+      };
+
+      audio.play()
+        .then(() => {
+          console.log("▶️ AUDIO STARTED:", path);
+        })
+        .catch((error) => {
+          if (activeAudioRef.current === audio) {
+            activeAudioRef.current = null;
+          }
+
+          console.error("❌ AUDIO PLAY ERROR:", error);
+          reject(error);
+        });
     });
   }
 
+  // ==========================================================
+  // PLAYBACK CONTROL LOGIC
+  // ==========================================================
+  try {
+    const completePath = await findCompleteRecording();
+
+    if (completePath) {
+      console.log("🎯 PLAYING COMPLETE VOICE:", completePath);
+      await playCompleteRecording(completePath);
+
+      if (stateRef.current.paused) {
+        console.log("⏸️ CALL FINISHED WHILE PAUSED — WAITING");
+        return;
+      }
+
+      console.log("✅ CURRENT NUMBER COMPLETELY FINISHED");
+      onComplete();
+      return;
+    }
+
+    console.log("ℹ️ COMPLETE RECORDING NOT FOUND");
+    console.log("🔄 USING LETTER + NUMBER FALLBACK");
+
+    playRecordedAudio(letter, () => {
+      if (stateRef.current.paused) {
+        console.log("⏸️ FALLBACK PAUSED AFTER LETTER");
+        return;
+      }
+
+      playRecordedAudio(number, () => {
+        if (stateRef.current.paused) {
+          console.log("⏸️ FALLBACK PAUSED AFTER NUMBER");
+          return;
+        }
+
+        console.log(`✅ FALLBACK CALL FINISHED: ${letterName}${numberName}`);
+        onComplete();
+      });
+    });
+
+  } catch (error) {
+    console.error("❌ COMPLETE RECORDING PLAYBACK FAILED:", error);
+
+    playRecordedAudio(letter, () => {
+      if (stateRef.current.paused) return;
+
+      playRecordedAudio(number, () => {
+        if (stateRef.current.paused) return;
+
+        console.log(`✅ SAFE FALLBACK FINISHED: ${letterName}${numberName}`);
+        onComplete();
+      });
+    });
+  }
+}
+
+function playShuffleSound(onComplete = () => {}) {
+  playRecordedAudio("shuffle", () => {
+    onComplete();
+  });
+}
   // --- Optimized Native Voice Selection ---
   function getSelectedVoice(langCode) {
     const availableVoices = voices.length ? voices : window.speechSynthesis.getVoices();
@@ -805,28 +1088,99 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
     const activeSpeechLang = currentGame.speechLang || "en-US";
 
  if (activeVoiceMode === "recorded-oromo") {
-  // Oromo recorded voice: letter + number
-  playRecordedAudio(letter, () => {
-    if (stateRef.current.paused) return;
-
-    playRecordedAudio(String(number), onSequenceFinished);
-  }, "oromo");
+  // Oromo recorded voice: continuous LETTER + NUMBER
+  // Example: B12 instead of B ... 12
+  playRecordedBingoCall(
+    letter,
+    number,
+    onSequenceFinished
+  );
 
   return;
 }
 
 if (activeVoiceMode === "recorded") {
-  // Bulchaa recorded voice: letter + number
-  playRecordedAudio(letter, () => {
-    if (stateRef.current.paused) return;
-
-    playRecordedAudio(String(number), onSequenceFinished);
-  });
+  // Amharic/Bulchaa recorded voice:
+  // continuous LETTER + NUMBER
+  // Example: B12 instead of B ... 12
+  playRecordedBingoCall(
+    letter,
+    number,
+    onSequenceFinished
+  );
 
   return;
 }
-    
+if (activeVoiceMode === "computer-amharic") {
 
+  const amharicNumber =
+    amharicPhoneticNumbers[number] ||
+    String(number);
+
+  const letterWord =
+    spokenLetter[letter] || letter;
+
+  const dramaticLetter =
+    makeDramaticBingoText(letterWord);
+
+  const dramaticNumber =
+    makeDramaticBingoText(amharicNumber);
+
+  console.log(
+    `🎙️ DRAMATIC BINGO: ${letter} ${number}`
+  );
+
+  // LETTER
+  speakWithStyledVoice(
+    dramaticLetter,
+    () => {
+
+      if (stateRef.current.paused) {
+        return;
+      }
+
+      // Real announcer pause
+      setTimeout(() => {
+
+        if (stateRef.current.paused) {
+          return;
+        }
+
+        // NUMBER
+        speakWithStyledVoice(
+          dramaticNumber,
+          () => {
+
+            if (stateRef.current.paused) {
+              return;
+            }
+
+            console.log(
+              `🎯 DRAMATIC BINGO FINISHED: ${letter} ${number}`
+            );
+
+            onSequenceFinished();
+
+          },
+          {
+            rate: 1.3,
+            pitch: 0.50,
+            volume: 1.0
+          }
+        );
+
+      }, 450);
+
+    },
+    {
+      rate: 1.2,
+      pitch: 0.55,
+      volume: 1.0
+    }
+  );
+
+  return;
+}
     const playerName = footballLegends[number] || "";
     const isTwoDigit = number >= 10 && number <= 75;
 
@@ -890,7 +1244,138 @@ if (activeVoiceMode === "recorded") {
 
     }, { rate: 1.25, pitch: 0.7, volume: 1 });
   }
+function updateRunningCallInterval() {
+  const audio = activeAudioRef.current;
 
+  if (!audio || !(audio instanceof HTMLAudioElement)) {
+    return;
+  }
+
+  /*
+   * Cancel the old timer.
+   */
+  if (loopTimeoutRef.current !== null) {
+    clearTimeout(loopTimeoutRef.current);
+    loopTimeoutRef.current = null;
+  }
+
+  if (callIntervalTimerRef.current !== null) {
+    clearTimeout(callIntervalTimerRef.current);
+    callIntervalTimerRef.current = null;
+  }
+
+  /*
+   * Read the NEW value immediately.
+   */
+  const interval =
+    Number(callIntervalRef.current);
+
+  const duration =
+    Number(audio.duration || 0);
+
+  const currentTime =
+    Number(audio.currentTime || 0);
+
+  if (!duration) {
+    return;
+  }
+
+  /*
+   * How much voice is still playing.
+   */
+  const remainingMs =
+    Math.max(
+      0,
+      (duration - currentTime) * 1000
+    );
+
+  /*
+   * ============================================================
+   * CALCULATE NEW START TIME
+   * ============================================================
+   *
+   * +5
+   *   current voice finishes
+   *   +
+   *   5 seconds
+   *
+   * 0
+   *   current voice finishes
+   *
+   * -1
+   *   next number starts 1 second before finish
+   *
+   * -5
+   *   next number starts 5 seconds before finish
+   */
+
+  let delayMs;
+
+  if (interval >= 0) {
+
+    delayMs =
+      remainingMs +
+      (interval * 1000);
+
+  } else {
+
+    delayMs =
+      Math.max(
+        0,
+        remainingMs +
+        (interval * 1000)
+      );
+  }
+
+  console.log(
+    "🔄 INTERVAL CHANGED WHILE RUNNING:",
+    interval,
+    "SECONDS"
+  );
+
+  console.log(
+    "🎵 AUDIO REMAINING:",
+    (remainingMs / 1000).toFixed(2),
+    "SECONDS"
+  );
+
+  console.log(
+    "🚀 NEW NEXT-CALL DELAY:",
+    (delayMs / 1000).toFixed(2),
+    "SECONDS"
+  );
+
+  /*
+   * ============================================================
+   * SCHEDULE NEXT NUMBER
+   * ============================================================
+   */
+
+  loopTimeoutRef.current =
+    setTimeout(() => {
+
+      loopTimeoutRef.current =
+        null;
+
+      if (stateRef.current.paused) {
+
+        isDrawingBallRef.current =
+          false;
+
+        return;
+      }
+
+      console.log(
+        "🚀 UPDATED INTERVAL: STARTING NEXT NUMBER"
+      );
+
+      isDrawingBallRef.current =
+        false;
+
+      generateNumber();
+
+    }, delayMs);
+}
   function announceLetsGo(callback) {
     const currentGame = stateRef.current.game;
     if (currentGame.voiceMode === "recorded" ||
@@ -925,93 +1410,265 @@ const speech = new SpeechSynthesisUtterance(greetingText);
     window.speechSynthesis.speak(speech);
   }
 
-  const togglePlayPause = () => {
-    if (
-      typeof window !== "undefined" &&
-      window.speechSynthesis
-    ) {
-      window.speechSynthesis.resume();
+const togglePlayPause = () => {
+
+  // ==========================================
+  // PREVENT RAPID CLICK SPAM
+  // ==========================================
+
+  if (togglePlayPause.lock) {
+    console.log("⏳ PLAY/PAUSE CLICK IGNORED");
+    return;
+  }
+
+  togglePlayPause.lock = true;
+
+  setTimeout(() => {
+    togglePlayPause.lock = false;
+  }, 300);
+
+
+  // ==========================================
+  // PAUSE
+  // ==========================================
+
+  if (!paused) {
+
+    console.log("⏸️ PAUSE");
+
+    // Invalidate old game-loop callbacks
+    gameRunIdRef.current++;
+// Release number-generation lock so PLAY can start a fresh run
+isDrawingBallRef.current = false;
+
+console.log(
+  "🔓 GENERATION LOCK RELEASED ON PAUSE"
+);// 🔓 Release generation lock.
+// generateNumber() owns this lock, but PAUSE
+// must release it so PLAY can start again.
+isDrawingBallRef.current = false;
+
+console.log(
+  "🔓 GENERATION LOCK RELEASED ON PAUSE"
+);
+    console.log(
+      "🛑 GAME RUN INVALIDATED:",
+      gameRunIdRef.current
+    );
+
+    // Tell all async code that game is paused
+    stateRef.current.paused = true;
+
+    setPaused(true);
+
+
+    // ========================================
+    // CANCEL ONLY THE NEXT-NUMBER TIMER
+    // ========================================
+
+    if (loopTimeoutRef.current !== null) {
+
+      clearTimeout(
+        loopTimeoutRef.current
+      );
+
+      loopTimeoutRef.current = null;
+
+      console.log(
+        "⏹️ NEXT NUMBER TIMER CANCELLED"
+      );
     }
 
-    if (paused) {
-      // Prevent multiple timers from existing
-      if (loopTimeoutRef.current) {
-        clearTimeout(loopTimeoutRef.current);
-        loopTimeoutRef.current = null;
-      }
 
-      setPaused(false);
+    // ========================================
+    // PAUSE CURRENT AUDIO
+    // ========================================
 
-      // ⭐ RESUME CURRENT NUMBER FIRST
-      if (pausedAudioRef.current) {
-        const audio = pausedAudioRef.current.audio;
+    const audio =
+      activeAudioRef.current;
 
-        pausedAudioRef.current = null;
-        activeAudioRef.current = audio;
+    if (audio && !audio.ended) {
 
-        audio.play().catch((err) => {
-          console.error("RESUME AUDIO ERROR:", err);
-          activeAudioRef.current = null;
-        });
+      console.log(
+        "⏸️ SAVING EXACT CURRENT AUDIO:",
+        audio.src,
+        "TIME:",
+        audio.currentTime
+      );
 
-        return;
-      }
+      pausedAudioRef.current = {
+        audio: audio,
+        fileName: audio.src
+          .split("/")
+          .pop()
+          .split(".")[0]
+          .toLowerCase()
+      };
 
-      // ⭐ NORMAL PLAY — only when there is no paused number
-      if (!hasAnnouncedLetsGo.current) {
-        hasAnnouncedLetsGo.current = true;
+      audio.pause();
 
-        const startShuffleSequence = () => {
-          if (stateRef.current.paused) return;
+      // IMPORTANT:
+      // Do not destroy the audio object.
+      activeAudioRef.current = null;
 
-          playShuffleSound(() => {
-            if (stateRef.current.paused) return;
+      return;
+    }
 
-            generateNumber();
-          });
-        };
 
-        announceLetsGo(startShuffleSequence);
+    // ========================================
+    // NO AUDIO CURRENTLY PLAYING
+    // ========================================
 
-      } else {
+    console.log(
+      "⏸️ GAME PAUSED — NO ACTIVE AUDIO"
+    );
 
-        playShuffleSound(() => {
-          if (stateRef.current.paused) return;
+    return;
+  }
 
-          generateNumber();
-        });
 
-      }
+  // ==========================================
+  // PLAY / RESUME
+  // ==========================================
 
-    } else {
+  console.log("▶️ PLAY");
 
-      // ⭐ PAUSE
-      setPaused(true);
-isDrawingBallRef.current = false; // ← ADD THIS
-      // Pause current recorded audio instead of destroying it
-      if (activeAudioRef.current) {
-        const audio = activeAudioRef.current;
+  // ========================================
+  // FIRST: RESUME EXACT PAUSED AUDIO
+  // ========================================
 
-        pausedAudioRef.current = {
-          audio: audio,
-          fileName: audio.src
-            .split("/")
-            .pop()
-            .split(".")[0]
-            .toLowerCase()
-        };
+  const pausedData =
+    pausedAudioRef.current;
 
-        audio.pause();
+  if (
+    pausedData &&
+    pausedData.audio &&
+    !pausedData.audio.ended
+  ) {
+
+    const audio =
+      pausedData.audio;
+
+    console.log(
+      "▶️ RESUMING EXACT CURRENT NUMBER:",
+      audio.src,
+      "TIME:",
+      audio.currentTime
+    );
+
+    // Clear paused reference
+    pausedAudioRef.current = null;
+
+    // Restore active audio
+    activeAudioRef.current = audio;
+
+    // Resume game state
+    stateRef.current.paused = false;
+
+    setPaused(false);
+
+
+    audio.play()
+      .then(() => {
+
+        console.log(
+          "✅ EXACT AUDIO RESUMED:",
+          audio.src,
+          "TIME:",
+          audio.currentTime
+        );
+
+      })
+      .catch((err) => {
+
+        console.error(
+          "❌ RESUME AUDIO ERROR:",
+          err
+        );
+
         activeAudioRef.current = null;
-      }
 
-      if (loopTimeoutRef.current) {
-        clearTimeout(loopTimeoutRef.current);
-        loopTimeoutRef.current = null;
-      }
+        // Keep game paused if audio cannot resume
+        stateRef.current.paused = true;
+
+        setPaused(true);
+
+      });
+
+    // VERY IMPORTANT:
+    // DO NOT call generateNumber() here.
+
+    return;
+  }
+
+
+  // ==========================================
+  // NO PAUSED AUDIO
+  // ==========================================
+
+  stateRef.current.paused = false;
+
+  setPaused(false);
+
+
+  // ========================================
+  // IF AUDIO IS ALREADY ACTIVE
+  // NEVER GENERATE ANOTHER NUMBER
+  // ========================================
+
+  if (
+    activeAudioRef.current &&
+    !activeAudioRef.current.ended
+  ) {
+
+    console.log(
+      "▶️ AUDIO ALREADY ACTIVE — NOT GENERATING NEW NUMBER"
+    );
+
+    return;
+  }
+
+
+  // ==========================================
+  // ONLY HERE CAN WE START A NEW NUMBER
+  // ==========================================
+
+ console.log(
+  "▶️ NO CURRENT AUDIO — STARTING GAME"
+);
+
+if (isDrawingBallRef.current) {
+  console.log(
+    "🛑 GENERATION ALREADY LOCKED"
+  );
+
+  return;
+}
+
+// Play shuffle only the first time PLAY starts this game
+if (!hasPlayedShuffleRef.current) {
+
+  hasPlayedShuffleRef.current = true;
+
+  console.log("🎵 PLAYING SHUFFLE");
+
+  playShuffleSound(() => {
+
+    if (stateRef.current.paused) {
+      console.log("⏸️ PAUSED DURING SHUFFLE");
+      return;
     }
-  };
 
+    console.log("🎵 SHUFFLE FINISHED");
+
+    generateNumber();
+  });
+
+  return;
+}
+
+generateNumber();
+};
   useEffect(() => {
     const updatePhysics = () => {
       setCageBalls(prev => prev.map(ball => {
@@ -1231,40 +1888,192 @@ fetch(
 // =========================================================
 
 speakBallSequence(letter, number, () => {
-      if (stateRef.current.paused) {
-        isDrawingBallRef.current = false;
-        return;
-      }
 
-      // Never create a second timer
-      if (loopTimeoutRef.current !== null) {
-        console.log(">>> LOOP ALREADY SCHEDULED");
-        return;
-      }
+  /*
+   * ============================================================
+   * CURRENT GAME STATUS
+   * ============================================================
+   */
 
-      console.log(">>> SCHEDULING NEXT GENERATION");
+  if (stateRef.current.paused) {
+    isDrawingBallRef.current = false;
+    return;
+  }
 
-      loopTimeoutRef.current = setTimeout(() => {
 
-        console.log(">>> TIMEOUT FIRED");
+  /*
+   * ============================================================
+   * READ CURRENT CALL INTERVAL
+   *
+   * Positive:
+   *   +5 = wait 5 seconds
+   *
+   * Zero:
+   *    0 = next call immediately
+   *
+   * Negative:
+   *   -1 = start next call 1 second early
+   *   -2 = start next call 2 seconds early
+   *   -20 = extremely fast
+   * ============================================================
+   */
 
-        // Clear timer reference FIRST
+  const selectedSeconds =
+    Number(callIntervalRef.current);
+
+  const safeSeconds =
+    Number.isFinite(selectedSeconds)
+      ? selectedSeconds
+      : 5;
+
+
+  /*
+   * ============================================================
+   * PREVENT DUPLICATE TIMERS
+   * ============================================================
+   */
+
+  if (loopTimeoutRef.current !== null) {
+
+    console.log(
+      ">>> LOOP ALREADY SCHEDULED"
+    );
+
+    return;
+  }
+
+
+  /*
+   * ============================================================
+   * NEGATIVE = FAST CALLING
+   *
+   * IMPORTANT:
+   *
+   * We DO NOT stop the game.
+   *
+   * We DO NOT return.
+   *
+   * We simply schedule the next number.
+   *
+   * The actual overlap amount is controlled
+   * by the negative value.
+   * ============================================================
+   */
+
+  if (safeSeconds < 0) {
+
+    const overlapSeconds =
+      Math.abs(safeSeconds);
+
+    /*
+     * Start the next number after the
+     * overlap amount.
+     *
+     * The current audio continues playing.
+     */
+
+    const fastDelayMs =
+      Math.max(
+        0,
+        (1 - overlapSeconds) * 1000
+      );
+
+
+    console.log(
+      `⚡ FAST CALL MODE: ${safeSeconds}s`
+    );
+
+    console.log(
+      `🚀 NEXT NUMBER STARTS IN: ${
+        fastDelayMs / 1000
+      } SECOND(S)`
+    );
+
+
+    loopTimeoutRef.current =
+      setTimeout(() => {
+
         loopTimeoutRef.current = null;
 
+
         if (stateRef.current.paused) {
-          isDrawingBallRef.current = false;
+
+          isDrawingBallRef.current =
+            false;
+
           return;
         }
 
-        // Release lock immediately before starting next generation
-        isDrawingBallRef.current = false;
+
+        /*
+         * Release lock before
+         * generating the next number.
+         */
+
+        isDrawingBallRef.current =
+          false;
+
+
+        console.log(
+          "⚡ FAST CALL: STARTING NEXT NUMBER"
+        );
+
 
         generateNumber();
 
-      }, TARGET_GENERATION_INTERVAL_MS);
+      }, fastDelayMs);
 
-    }); // <-- closes speakBallSequence
 
+    return;
+  }
+
+
+  /*
+   * ============================================================
+   * NORMAL POSITIVE / ZERO MODE
+   * ============================================================
+   */
+
+  const delayMs =
+    safeSeconds * 1000;
+
+
+  console.log(
+    `>>> NEXT NUMBER IN EXACTLY ${
+      safeSeconds
+    } SECOND(S)`
+  );
+
+
+  loopTimeoutRef.current =
+    setTimeout(() => {
+
+      loopTimeoutRef.current = null;
+
+
+      if (stateRef.current.paused) {
+
+        isDrawingBallRef.current =
+          false;
+
+        return;
+      }
+
+
+      isDrawingBallRef.current =
+        false;
+
+
+      console.log(
+        ">>> TIMEOUT FIRED"
+      );
+
+
+      generateNumber();
+
+    }, delayMs);
+
+});
   } catch (err) {
 
     console.error(
@@ -1441,8 +2250,70 @@ setCheckedCartela(verificationData.cartela);
   
 
   return (
-    <div className={`bingo-wrapper ${tvMode ? 'tv-viewport' : ''}`}>
-      <div className="bingo-container">
+   
+  <div className={`bingo-wrapper ${tvMode ? 'tv-viewport' : ''}`}>
+
+    {/* SMALL BACK BUTTON */}
+    <button
+      type="button"
+      onClick={() => {
+        // Stop the current game
+        setPaused(true);
+
+        // Stop any scheduled next-number timer
+        if (loopTimeoutRef.current) {
+          clearTimeout(loopTimeoutRef.current);
+          loopTimeoutRef.current = null;
+        }
+
+        // Stop active audio
+        if (activeAudioRef.current) {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.currentTime = 0;
+          activeAudioRef.current = null;
+        }
+
+        // Release drawing lock
+        isDrawingBallRef.current = false;
+
+        // Return to Cashier
+        navigate(-1);
+      }}
+      style={{
+        position: "absolute",
+        top: "6px",
+        left: "6px",
+        zIndex: 9999,
+
+        width: "28px",
+        height: "28px",
+
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.25)",
+
+        background: "rgba(10,20,35,0.85)",
+        color: "#ffffff",
+
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+
+        fontSize: "17px",
+        fontWeight: "bold",
+
+        cursor: "pointer",
+
+        padding: 0,
+        lineHeight: 1,
+
+        boxShadow: "0 2px 8px rgba(0,0,0,0.4)"
+      }}
+      title="Back to Cashier"
+    >
+      ←
+    </button>
+
+    <div className="bingo-container">
 
         {/* --- Bingo Board Grid --- */}
         <section className="board-section">
@@ -1823,7 +2694,86 @@ const isCalled =
 
         {/* --- Bottom Footer Console Bar --- */}
         <footer className="game-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)' }}>
-          
+    <div className="call-interval-control">
+
+  <div className="call-interval-header">
+
+    <span>CALL SPEED</span>
+
+    <div className="call-interval-adjust">
+
+      {/* MINUS */}
+      <button
+        type="button"
+        className="interval-minus"
+        onClick={() => {
+
+          const current =
+            Number(callIntervalRef.current);
+
+          const safeCurrent =
+            Number.isFinite(current)
+              ? current
+              : 5;
+
+          const newValue =
+            Math.max(0, safeCurrent - 1);
+
+          callIntervalRef.current =
+            newValue;
+
+          console.log(
+            "➖ CALL SPEED:",
+            newValue,
+            "SECONDS"
+          );
+        }}
+      >
+        −
+      </button>
+
+
+      {/* VALUE */}
+      <strong className="interval-value">
+        {Number(callIntervalRef.current)}s
+      </strong>
+
+
+      {/* PLUS */}
+      <button
+        type="button"
+        className="interval-plus"
+        onClick={() => {
+
+          const current =
+            Number(callIntervalRef.current);
+
+          const safeCurrent =
+            Number.isFinite(current)
+              ? current
+              : 5;
+
+          const newValue =
+            Math.min(15, safeCurrent + 1);
+
+          callIntervalRef.current =
+            newValue;
+
+          console.log(
+            "➕ CALL SPEED:",
+            newValue,
+            "SECONDS"
+          );
+        }}
+      >
+        +
+      </button>
+
+    </div>
+
+  </div>
+
+</div>
           
           <div style={{
             display: "flex",
@@ -1909,7 +2859,9 @@ const isCalled =
   value={
     game.voiceMode === "recorded-oromo"
       ? "recorded-oromo"
-      : "recorded"
+      : game.voiceMode === "computer-amharic"
+        ? "computer-amharic"
+        : "recorded"
   }
   onChange={(e) => {
     const val = e.target.value;
@@ -1920,7 +2872,15 @@ const isCalled =
         voiceMode: "recorded-oromo",
         speechLang: "oromo"
       }));
-    } else {
+    } 
+    else if (val === "computer-amharic") {
+      setGame(prev => ({
+        ...prev,
+        voiceMode: "computer-amharic",
+        speechLang: "en-US"
+      }));
+    } 
+    else {
       setGame(prev => ({
         ...prev,
         voiceMode: "recorded",
@@ -1940,14 +2900,19 @@ const isCalled =
     outline: 'none'
   }}
 >
-  <option value="recorded">🎙️ Bulchaa Voice</option>
-  <option value="recorded-oromo">🟢 Afaan Oromo Voice</option>
+  <option value="recorded">
+    🎙️ Bulchaa Voice
+  </option>
+
+  <option value="recorded-oromo">
+    🟢 Afaan Oromo Voice
+  </option>
+
+  <option value="computer-amharic">
+    💻 Computer Voice
+  </option>
 </select>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px', background: '#0c162d', border: '1px solid rgba(255,255,255,0.1)', padding: '2px 5px', borderRadius: '4px', fontSize: '9px' }}>
-              <span style={{ color: '#8c9cb3', fontWeight: 'bold' }}>⏱️ {speed}s</span>
-              <button style={{ background: '#122042', border: '1px solid #00c8ff', color: '#fff', borderRadius: '2px', width: '12px', height: '12px', fontSize: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => speed > 1 && setSpeed(speed - 1)}>-</button>
-              <button style={{ background: '#122042', border: '1px solid #00c8ff', color: '#fff', borderRadius: '2px', width: '12px', height: '12px', fontSize: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => speed + 1 <= 15 && setSpeed(speed + 1)}>+</button>
-            </div>
+           
           </div>
         </footer>
 

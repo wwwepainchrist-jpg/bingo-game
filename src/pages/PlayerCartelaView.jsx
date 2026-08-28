@@ -1,211 +1,418 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 export default function PlayerCartelaView() {
   const { id } = useParams();
-  
-  const [selectedCards, setSelectedCards] = useState(() => id ? [Number(id)] : []);
-  const [isConfirmed, setIsConfirmed] = useState(() => id ? true : false);
+
+  const [cartelaData, setCartelaData] = useState({});
+  const [selectedCards, setSelectedCards] = useState(
+    id ? [Number(id)] : []
+  );
+
+  const [confirmed, setConfirmed] = useState(
+    id ? true : false
+  );
+
   const [typedInput, setTypedInput] = useState("");
+  const [markedCells, setMarkedCells] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Track database-backed matrices for selected cards
-  const [cartelaMatrices, setCartelaMatrices] = useState({});
-
-  // Track dabbed/highlighted numbers across all cards on player's phone
-  // Format: { "cartelaNum-cellValue": true }
-  const [markedCells, setMarkedCells] = useState({});
-  const [allCartelas, setAllCartelas] = useState([]);
-useEffect(() => {
-  async function loadCartelas() {
-    try {
-      const res = await fetch(
-        "http://192.168.1.2:5000/api/cartelas"
-      );
-
-      const data = await res.json();
-      setAllCartelas(data);
-
-    } catch (err) {
-      console.error("Error loading cartelas:", err);
-    }
-  }
-
-  loadCartelas();
-}, []);
-  // Fetch cartela matrices and initial selections from PostgreSQL backend
+  // ---------------------------------------------------------
+  // LOAD CARTELA JSON
+  // ---------------------------------------------------------
   useEffect(() => {
-    async function fetchPlayerCartelaData() {
-      try {
-        const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/player-cartelas/${id || "default"}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.selectedCards && Array.isArray(data.selectedCards)) {
-            setSelectedCards(data.selectedCards);
-          }
-          if (data.matrices) {
-            setCartelaMatrices(data.matrices);
-          }
+    fetch("/cartela_patterns_1_to_152.json")
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Cartela JSON not found");
         }
-      } catch (err) {
-        console.error("Error fetching player cartela data from server:", err);
-      } finally {
+        return response.json();
+      })
+      .then(function (data) {
+        console.log("================================");
+        console.log("CARTELA JSON LOADED");
+        console.log("TOTAL:", Object.keys(data).length);
+        console.log("CARTELA 151:", data["151"]);
+        console.log("CARTELA 152:", data["152"]);
+        console.log("================================");
+
+        setCartelaData(data);
         setLoading(false);
-      }
-    }
-    fetchPlayerCartelaData();
-  }, [id]);
-
-  // Synchronize selected cartelas with backend database
-  async function syncSelectedCards(updatedCards) {
-    try {
-      await fetch("https://bingo-backend-ccn6.onrender.com/api/player-cartelas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerId: id, selectedCards: updatedCards })
+      })
+      .catch(function (error) {
+        console.error("ERROR LOADING CARTELA JSON:", error);
+        setLoading(false);
       });
-    } catch (err) {
-      console.error("Error syncing player cartela selection:", err);
-    }
-  }
+  }, []);
 
-  const toggleCellMark = (cartelaNum, cellVal) => {
-    if (cellVal === "FREE") return; // Keep FREE space permanently marked
-    const key = `${cartelaNum}-${cellVal}`;
-    setMarkedCells(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
-
-  const toggleNumberSelection = async (num) => {
-    let updated;
-    if (selectedCards.includes(num)) {
-      updated = selectedCards.filter(n => n !== num);
-    } else {
-      updated = [...selectedCards, num].sort((a, b) => a - b);
-    }
-    setSelectedCards(updated);
-    await syncSelectedCards(updated);
-  };
-
-  const handleManualAdd = async (e) => {
-    e.preventDefault();
-    if (!typedInput.trim()) return;
-    
-    const parsed = typedInput
-      .split(/[\s,]+/)
-      .map(n => Number(n))
-      .filter(n => !isNaN(n) && n >= 1 && n <= 150);
-
-    if (parsed.length === 0) {
-      alert("Please enter valid numbers between 1 and 150.");
+  // ---------------------------------------------------------
+  // LOAD SAVED PLAYER CARTELAS
+  // ---------------------------------------------------------
+  useEffect(() => {
+    if (!id) {
       return;
     }
 
-    const combined = Array.from(new Set([...selectedCards, ...parsed])).sort((a, b) => a - b);
-    setSelectedCards(combined);
-    setTypedInput("");
-    await syncSelectedCards(combined);
-  };
+    fetch(
+      "https://bingo-backend-ccn6.onrender.com/api/player-cartelas/" + id
+    )
+      .then(function (response) {
+        if (!response.ok) {
+          return null;
+        }
+        return response.json();
+      })
+      .then(function (data) {
+        if (!data) {
+          return;
+        }
 
-  // Helper generator fallback if backend matrix isn't pre-fetched for a given ID
-  const getMatrixForId = (cartelaId) => {
-    if (cartelaMatrices[cartelaId]) {
-      return cartelaMatrices[cartelaId];
-    }
-    // Fallback algorithmic generation matching server seed layout
-    const seed = Number(cartelaId) || 1;
-    const columns = { B: [], I: [], N: [], G: [], O: [] };
-    const getColNumbers = (min, max, count, seedVal) => {
-      const list = [];
-      for (let i = min; i <= max; i++) list.push(i);
-      let currentSeed = seedVal;
-      for (let i = list.length - 1; i > 0; i--) {
-        currentSeed = (currentSeed * 9301 + 49297) % 233280;
-        const j = Math.floor((currentSeed / 233280) * (i + 1));
-        const temp = list[i];
-        list[i] = list[j];
-        list[j] = temp;
+        if (Array.isArray(data.selectedCards)) {
+          const validCards = data.selectedCards
+            .map(Number)
+            .filter(function (number) {
+              return number >= 1 && number <= 152;
+            });
+
+          if (validCards.length > 0) {
+            setSelectedCards(validCards);
+          }
+        }
+      })
+      .catch(function (error) {
+        console.log("Could not load saved Cartelas:", error);
+      });
+  }, [id]);
+
+  // ---------------------------------------------------------
+  // SAVE SELECTED CARTELAS
+  // ---------------------------------------------------------
+  function saveSelectedCards(cards) {
+    fetch(
+      "https://bingo-backend-ccn6.onrender.com/api/player-cartelas",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          playerId: id || "default",
+          selectedCards: cards
+        })
       }
-      return list.slice(0, count).sort((a, b) => a - b);
-    };
+    ).catch(function (error) {
+      console.error("Could not save Cartelas:", error);
+    });
+  }
 
-    columns.B = getColNumbers(1, 15, 5, seed + 100);
-    columns.I = getColNumbers(16, 30, 5, seed + 200);
-    columns.N = getColNumbers(31, 45, 4, seed + 300);
-    columns.G = getColNumbers(46, 60, 5, seed + 400);
-    columns.O = getColNumbers(61, 75, 5, seed + 500);
+  // ---------------------------------------------------------
+  // SELECT CARTELA
+  // ---------------------------------------------------------
+  function toggleCartela(number) {
+    let newCards;
+
+    if (selectedCards.includes(number)) {
+      newCards = selectedCards.filter(function (n) {
+        return n !== number;
+      });
+    } else {
+      newCards = selectedCards.concat(number);
+    }
+
+    newCards.sort(function (a, b) {
+      return a - b;
+    });
+
+    setSelectedCards(newCards);
+    saveSelectedCards(newCards);
+  }
+
+  // ---------------------------------------------------------
+  // MANUAL CARTELA INPUT
+  // ---------------------------------------------------------
+  function handleManualAdd(event) {
+    event.preventDefault();
+
+    const input = typedInput.trim();
+
+    if (!input) {
+      return;
+    }
+
+    const numbers = input
+      .split(/[\s,]+/)
+      .map(function (value) {
+        return Number(value);
+      })
+      .filter(function (number) {
+        return (
+          number >= 1 &&
+          number <= 152 &&
+          cartelaData[String(number)]
+        );
+      });
+
+    if (numbers.length === 0) {
+      alert("Enter valid Cartela numbers from 1 to 152.");
+      return;
+    }
+
+    const newCards = Array.from(
+      new Set(selectedCards.concat(numbers))
+    );
+
+    newCards.sort(function (a, b) {
+      return a - b;
+    });
+
+    setSelectedCards(newCards);
+    setTypedInput("");
+    saveSelectedCards(newCards);
+  }
+
+  // ---------------------------------------------------------
+  // MARK NUMBER
+  // ---------------------------------------------------------
+  function toggleCell(cartelaNumber, value) {
+    if (value === "★" || value === "FREE") {
+      return;
+    }
+
+    const key = String(cartelaNumber) + "-" + String(value);
+
+    setMarkedCells(function (old) {
+      return {
+        ...old,
+        [key]: !old[key]
+      };
+    });
+  }
+
+  // ---------------------------------------------------------
+  // MAKE 5 x 5 CARTELA MATRIX (DIRECTLY FROM JSON)
+  // ---------------------------------------------------------
+  function getMatrix(number) {
+    const cartela = cartelaData[String(number)];
+
+    if (!cartela) {
+      return [];
+    }
 
     const matrix = [];
-    for (let r = 0; r < 5; r++) {
-      const row = [
-        columns.B[r],
-        columns.I[r],
-        r === 2 ? "FREE" : columns.N[r < 2 ? r : r - 1],
-        columns.G[r],
-        columns.O[r]
-      ];
-      matrix.push(row);
-    }
-    return matrix;
-  };
 
+    for (let row = 0; row < 5; row++) {
+      const currentRow = [
+        cartela.B[row],
+        cartela.I[row],
+        cartela.N[row],
+        cartela.G[row],
+        cartela.O[row]
+      ];
+      matrix.push(currentRow);
+    }
+
+    return matrix;
+  }
+
+  // ---------------------------------------------------------
+  // WINNER CHECK & PATTERN DETECTION LOGIC
+  // Returns: { patternName: string | null, winningCoords: Set<string> }
+  // ---------------------------------------------------------
+  function checkWinner(cartelaNumber) {
+    const matrix = getMatrix(cartelaNumber);
+    if (matrix.length === 0) return { patternName: null, winningCoords: new Set() };
+
+    function isMarked(row, col) {
+      const val = matrix[row][col];
+      if (val === "★" || val === "FREE") return true;
+      const key = String(cartelaNumber) + "-" + String(val);
+      return Boolean(markedCells[key]);
+    }
+
+    // 1. Full House
+    let isFullHouse = true;
+    const fullHouseCoords = new Set();
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        if (!isMarked(r, c)) {
+          isFullHouse = false;
+        } else {
+          fullHouseCoords.add(`${r}-${c}`);
+        }
+      }
+    }
+    if (isFullHouse) return { patternName: "FULL HOUSE", winningCoords: fullHouseCoords };
+
+    // 2. Four Corners Near Star
+    if (isMarked(1, 1) && isMarked(1, 3) && isMarked(3, 1) && isMarked(3, 3)) {
+      const coords = new Set(["1-1", "1-3", "3-1", "3-3"]);
+      return { patternName: "FOUR CORNERS NEAR STAR", winningCoords: coords };
+    }
+
+    // 3. Four Corners
+    if (isMarked(0, 0) && isMarked(0, 4) && isMarked(4, 0) && isMarked(4, 4)) {
+      const coords = new Set(["0-0", "0-4", "4-0", "4-4"]);
+      return { patternName: "FOUR CORNERS", winningCoords: coords };
+    }
+
+    // 4. Horizontal Line
+    for (let r = 0; r < 5; r++) {
+      if (
+        isMarked(r, 0) &&
+        isMarked(r, 1) &&
+        isMarked(r, 2) &&
+        isMarked(r, 3) &&
+        isMarked(r, 4)
+      ) {
+        const coords = new Set([`${r}-0`, `${r}-1`, `${r}-2`, `${r}-3`, `${r}-4`]);
+        return { patternName: "HORIZONTAL LINE", winningCoords: coords };
+      }
+    }
+
+    // 5. Vertical Line
+    for (let c = 0; c < 5; c++) {
+      if (
+        isMarked(0, c) &&
+        isMarked(1, c) &&
+        isMarked(2, c) &&
+        isMarked(3, c) &&
+        isMarked(4, c)
+      ) {
+        const coords = new Set([`0-${c}`, `1-${c}`, `2-${c}`, `3-${c}`, `4-${c}`]);
+        return { patternName: "VERTICAL LINE", winningCoords: coords };
+      }
+    }
+
+    // 6. Diagonals
+    const isDiagonalMain =
+      isMarked(0, 0) &&
+      isMarked(1, 1) &&
+      isMarked(2, 2) &&
+      isMarked(3, 3) &&
+      isMarked(4, 4);
+
+    if (isDiagonalMain) {
+      const coords = new Set(["0-0", "1-1", "2-2", "3-3", "4-4"]);
+      return { patternName: "DIAGONAL", winningCoords: coords };
+    }
+
+    const isDiagonalAnti =
+      isMarked(0, 4) &&
+      isMarked(1, 3) &&
+      isMarked(2, 2) &&
+      isMarked(3, 1) &&
+      isMarked(4, 0);
+
+    if (isDiagonalAnti) {
+      const coords = new Set(["0-4", "1-3", "2-2", "3-1", "4-0"]);
+      return { patternName: "DIAGONAL", winningCoords: coords };
+    }
+
+    return { patternName: null, winningCoords: new Set() };
+  }
+
+  // ---------------------------------------------------------
+  // LOADING SCREEN
+  // ---------------------------------------------------------
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f172a", color: "#ffffff", display: "flex", justifyContent: "center", alignItems: "center", fontFamily: "sans-serif" }}>
-        Loading player cards...
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          color: "#ffffff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "18px",
+          fontWeight: "bold"
+        }}
+      >
+        Loading Cartelas...
       </div>
     );
   }
 
-  // STEP 1: SELECT WHICH CARTELAS TO PLAY
-  if (!isConfirmed) {
+  // ---------------------------------------------------------
+  // SELECT SCREEN
+  // ---------------------------------------------------------
+  if (!confirmed) {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        color: "#ffffff",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "16px",
-        fontFamily: "sans-serif",
-        boxSizing: "border-box"
-      }}>
-        <div style={{
-          background: "#1e293b",
-          padding: "20px",
-          borderRadius: "16px",
-          maxWidth: "420px",
-          width: "100%",
-          boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
-          textAlign: "center"
-        }}>
-          <h1 style={{ color: "#38bdf8", fontSize: "22px", margin: "0 0 4px 0" }}>🎱 CHOOSE CARTELAS</h1>
-          <p style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "16px" }}>
-            Tap numbers below or type multiple (e.g. 5, 12):
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          color: "#ffffff",
+          padding: "16px",
+          boxSizing: "border-box",
+          fontFamily: "Arial, sans-serif"
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "500px",
+            margin: "0 auto",
+            background: "#1e293b",
+            borderRadius: "16px",
+            padding: "20px",
+            boxSizing: "border-box"
+          }}
+        >
+          <h1
+            style={{
+              textAlign: "center",
+              color: "#38bdf8",
+              fontSize: "22px",
+              margin: "0 0 5px 0"
+            }}
+          >
+            🎱 CHOOSE CARTELAS
+          </h1>
+
+          <p
+            style={{
+              textAlign: "center",
+              color: "#94a3b8",
+              fontSize: "13px",
+              marginBottom: "16px"
+            }}
+          >
+            Choose one or more Cartelas from 1 to 152.
           </p>
 
-          <form onSubmit={handleManualAdd} style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-            <input 
+          {/* MANUAL INPUT */}
+          <form
+            onSubmit={handleManualAdd}
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginBottom: "14px"
+            }}
+          >
+            <input
               type="text"
-              placeholder="e.g. 5, 12, 45"
               value={typedInput}
-              onChange={(e) => setTypedInput(e.target.value)}
+              onChange={function (event) {
+                setTypedInput(event.target.value);
+              }}
+              placeholder="Example: 1, 25, 151, 152"
               style={{
                 flex: 1,
-                padding: "10px",
+                minWidth: 0,
+                padding: "11px",
                 borderRadius: "8px",
                 border: "1px solid #38bdf8",
                 background: "#0f172a",
                 color: "#ffffff",
-                fontSize: "15px",
-                fontWeight: "bold",
-                outline: "none"
+                fontSize: "14px",
+                outline: "none",
+                boxSizing: "border-box"
               }}
             />
-            <button 
+
+            <button
               type="submit"
               style={{
                 padding: "10px 14px",
@@ -213,93 +420,125 @@ useEffect(() => {
                 color: "#ffffff",
                 border: "none",
                 borderRadius: "8px",
-                fontSize: "14px",
                 fontWeight: "bold",
                 cursor: "pointer"
               }}
             >
-              + Add
+              ADD
             </button>
           </form>
 
+          {/* SELECTED */}
           {selectedCards.length > 0 && (
-            <div style={{ marginBottom: "16px", textAlign: "left" }}>
-              <span style={{ fontSize: "12px", color: "#94a3b8" }}>Selected ({selectedCards.length}):</span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px" }}>
-                {selectedCards.map(num => (
-                  <span 
-                    key={num} 
-                    onClick={() => toggleNumberSelection(num)}
-                    style={{
-                      background: "#38bdf8",
-                      color: "#0f172a",
-                      fontWeight: "bold",
-                      padding: "4px 10px",
-                      borderRadius: "12px",
-                      fontSize: "13px",
-                      cursor: "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px"
-                    }}
-                  >
-                    #{num} <span style={{ fontSize: "11px" }}>✕</span>
-                  </span>
-                ))}
+            <div style={{ marginBottom: "12px" }}>
+              <div
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "12px",
+                  marginBottom: "6px"
+                }}
+              >
+                Selected ({selectedCards.length})
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "5px"
+                }}
+              >
+                {selectedCards.map(function (number) {
+                  return (
+                    <button
+                      key={number}
+                      onClick={function () {
+                        toggleCartela(number);
+                      }}
+                      style={{
+                        background: "#38bdf8",
+                        color: "#0f172a",
+                        border: "none",
+                        borderRadius: "12px",
+                        padding: "4px 9px",
+                        fontWeight: "bold",
+                        cursor: "pointer"
+                      }}
+                    >
+                      #{number} ×
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, 1fr)",
-            gap: "6px",
-            maxHeight: "260px",
-            overflowY: "auto",
-            padding: "8px",
-            background: "#0f172a",
-            borderRadius: "10px",
-            marginBottom: "16px",
-            border: "1px solid #334155"
-          }}>
-            {Array.from({ length: 150 }, (_, i) => i + 1).map(num => {
-              const selected = selectedCards.includes(num);
+          {/* NUMBER GRID */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, 1fr)",
+              gap: "6px",
+              maxHeight: "300px",
+              overflowY: "auto",
+              padding: "8px",
+              background: "#0f172a",
+              borderRadius: "10px",
+              boxSizing: "border-box"
+            }}
+          >
+            {Array.from(
+              { length: 152 },
+              function (_, index) {
+                return index + 1;
+              }
+            ).map(function (number) {
+              const selected = selectedCards.includes(number);
+
               return (
                 <button
-                  key={num}
-                  onClick={() => toggleNumberSelection(num)}
+                  key={number}
+                  onClick={function () {
+                    toggleCartela(number);
+                  }}
                   style={{
-                    padding: "8px 0",
-                    background: selected ? "#22c55e" : "#1e293b",
-                    color: selected ? "#ffffff" : "#cbd5e1",
-                    border: selected ? "2px solid #86efac" : "1px solid #334155",
+                    padding: "9px 0",
                     borderRadius: "6px",
+                    border: selected
+                      ? "2px solid #86efac"
+                      : "1px solid #334155",
+                    background: selected ? "#22c55e" : "#1e293b",
+                    color: "#ffffff",
                     fontWeight: "bold",
-                    fontSize: "13px",
                     cursor: "pointer"
                   }}
                 >
-                  {num}
+                  {number}
                 </button>
               );
             })}
           </div>
 
-          <button 
-            onClick={() => {
-              if (selectedCards.length === 0) return alert("Select at least one cartela number!");
-              setIsConfirmed(true);
+          {/* VIEW BUTTON */}
+          <button
+            onClick={function () {
+              if (selectedCards.length === 0) {
+                alert("Select at least one Cartela!");
+                return;
+              }
+              setConfirmed(true);
             }}
             style={{
               width: "100%",
+              marginTop: "15px",
               padding: "14px",
-              background: selectedCards.length > 0 ? "#22c55e" : "#475569",
-              color: "#ffffff",
               border: "none",
               borderRadius: "10px",
+              background: "#22c55e",
+              color: "#ffffff",
               fontSize: "16px",
               fontWeight: "bold",
-              cursor: selectedCards.length > 0 ? "pointer" : "not-allowed"
+              cursor: "pointer"
             }}
           >
             ✓ VIEW MY BINGO CARDS ({selectedCards.length})
@@ -308,50 +547,60 @@ useEffect(() => {
       </div>
     );
   }
-console.log("ALL SELECTED:", selectedCards);
-console.log("ALL DATABASE IDS:", allCartelas.map(c => c.id));
-  // STEP 2: DISPLAY CARDS WITH INTERACTIVE NUMBER HIGHLIGHTING
-return (
-  <div style={{
-    minHeight: "100vh",
-    height: "100vh",
-    overflowY: "auto",
-    WebkitOverflowScrolling: "touch",
-    background: "#0f172a",
-    color: "#ffffff",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    padding: "16px",
-    paddingBottom: "100px",
-    fontFamily: "sans-serif",
-    boxSizing: "border-box"
-  }}>
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+
+  // ---------------------------------------------------------
+  // DISPLAY CARTELAS
+  // ---------------------------------------------------------
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
         width: "100%",
-        maxWidth: "360px",
-        marginBottom: "12px"
-      }}>
+        background: "#0f172a",
+        color: "#ffffff",
+        padding: "10px",
+        paddingBottom: "40px",
+        boxSizing: "border-box",
+        fontFamily: "Arial, sans-serif"
+      }}
+    >
+      {/* HEADER */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "1200px",
+          margin: "0 auto 12px auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "10px"
+        }}
+      >
         <div>
           <h1 style={{ margin: 0, color: "#38bdf8", fontSize: "20px" }}>
             MY CARDS ({selectedCards.length})
           </h1>
-          <p style={{ margin: "2px 0 0 0", color: "#94a3b8", fontSize: "11px" }}>
+          <p
+            style={{
+              margin: "3px 0 0 0",
+              color: "#94a3b8",
+              fontSize: "11px"
+            }}
+          >
             Tap numbers to highlight called numbers
           </p>
         </div>
-        <button 
-          onClick={() => setIsConfirmed(false)}
+
+        <button
+          onClick={function () {
+            setConfirmed(false);
+          }}
           style={{
             background: "#334155",
             color: "#ffffff",
             border: "none",
-            borderRadius: "6px",
+            borderRadius: "7px",
             padding: "8px 12px",
-            fontSize: "12px",
             fontWeight: "bold",
             cursor: "pointer"
           }}
@@ -360,92 +609,166 @@ return (
         </button>
       </div>
 
-      <div style={{
-  display: "flex",
-  flexDirection: "column",
-  gap: "24px",
-  width: "100%",
-  maxWidth: "360px",
-  paddingBottom: "100px"
-}}>
+      {/* CARTELA GRID */}
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "1200px",
+          margin: "0 auto",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gap: "12px",
+          alignItems: "start"
+        }}
+      >
+        {selectedCards.map(function (cartelaNumber) {
+          const matrix = getMatrix(cartelaNumber);
+          const { patternName, winningCoords } = checkWinner(cartelaNumber);
 
-{selectedCards.map(cartelaNum => {
-  const cartela = allCartelas.find(
-    c => Number(c.id) === Number(cartelaNum)
-  );
+          if (matrix.length === 0) {
+            return (
+              <div
+                key={cartelaNumber}
+                style={{
+                  background: "#7f1d1d",
+                  borderRadius: "12px",
+                  padding: "15px",
+                  textAlign: "center"
+                }}
+              >
+                Cartela #{cartelaNumber} not found.
+              </div>
+            );
+          }
 
-  if (!cartela) return null;
+          return (
+            <div
+              key={cartelaNumber}
+              style={{
+                background: "#1e293b",
+                borderRadius: "12px",
+                padding: "8px",
+                boxSizing: "border-box",
+                width: "100%",
+                minWidth: 0,
+                border: patternName
+                  ? "2px solid #22c55e"
+                  : "2px solid transparent"
+              }}
+            >
+              {/* WINNER BANNER */}
+              {patternName && (
+                <div
+                  style={{
+                    background: "#22c55e",
+                    color: "#ffffff",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                    padding: "6px",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                    marginBottom: "8px"
+                  }}
+                >
+                  🏆 WINNER! {patternName}
+                </div>
+              )}
 
-  const matrix = cartela.numbers.rows;
-
-  return (
-    <div key={cartelaNum} style={{
-      background: "#1e293b",
-      padding: "12px",
-      borderRadius: "12px",
-      width: "100%",
-      boxSizing: "border-box"
-    }}>
-              <div style={{
-                textAlign: "center",
-                fontWeight: "bold",
-                color: "#f59e0b",
-                fontSize: "18px",
-                marginBottom: "8px"
-              }}>
-                CARTELA #{cartelaNum}
+              {/* TITLE */}
+              <div
+                style={{
+                  textAlign: "center",
+                  color: "#f59e0b",
+                  fontSize: "17px",
+                  fontWeight: "bold",
+                  marginBottom: "7px"
+                }}
+              >
+                CARTELA #{cartelaNumber}
               </div>
 
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
-                gap: "6px"
-              }}>
-                {['B', 'I', 'N', 'G', 'O'].map((letter) => (
-                  <div key={letter} style={{
-                    background: "#0284c7",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    padding: "8px 0",
-                    borderRadius: "6px",
-                    fontSize: "16px"
-                  }}>
-                    {letter}
-                  </div>
-                ))}
-
-                {matrix.flat().map((cell, idx) => {
-                  const isFree = cell === "FREE";
-                  const key = `${cartelaNum}-${cell}`;
-                  const isMarked = isFree || Boolean(markedCells[key]);
-
+              {/* CARTELA GRID */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                  gap: "4px",
+                  width: "100%"
+                }}
+              >
+                {["B", "I", "N", "G", "O"].map(function (letter) {
                   return (
-                    <button
-                      key={idx}
-                      onClick={() => toggleCellMark(cartelaNum, cell)}
+                    <div
+                      key={letter}
                       style={{
-                        background: isFree 
-                          ? "#059669" 
-                          : isMarked 
-                            ? "#eab308" 
-                            : "#334155",
-                        color: isMarked && !isFree ? "#0f172a" : "#ffffff",
+                        background: "#0284c7",
+                        color: "#ffffff",
+                        textAlign: "center",
                         fontWeight: "bold",
-                        border: isMarked && !isFree ? "2px solid #fef08a" : "1px solid #475569",
-                        padding: "12px 0",
-                        borderRadius: "6px",
-                        fontSize: isFree ? "11px" : "16px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: isFree ? "default" : "pointer",
-                        transition: "all 0.15s ease",
-                        boxShadow: isMarked && !isFree ? "0 0 10px rgba(234, 179, 8, 0.5)" : "none"
+                        padding: "6px 0",
+                        borderRadius: "5px",
+                        fontSize: "14px"
                       }}
                     >
-                      {cell}
-                    </button>
+                      {letter}
+                    </div>
                   );
+                })}
+
+                {matrix.map(function (row, rowIndex) {
+                  return row.map(function (value, colIndex) {
+                    const isFree = value === "★" || value === "FREE";
+                    const key = String(cartelaNumber) + "-" + String(value);
+                    const isMarked = isFree || Boolean(markedCells[key]);
+
+                    // Dynamic winner color styling logic
+                    const isWinningCell = winningCoords.has(`${rowIndex}-${colIndex}`);
+
+                    let cellBg = "#334155";
+                    let cellColor = "#ffffff";
+                    let cellBorder = "1px solid #475569";
+
+                    if (isWinningCell && !isFree) {
+                      cellBg = "#22c55e"; // Winning pattern highlight color (Green)
+                      cellColor = "#0f172a";
+                      cellBorder = "2px solid #86efac";
+                    } else if (isFree) {
+                      cellBg = "#059669"; // Free star color
+                      cellColor = "#ffffff";
+                    } else if (isMarked) {
+                      cellBg = "#eab308"; // Marked cell color (Yellow)
+                      cellColor = "#0f172a";
+                      cellBorder = "2px solid #fef08a";
+                    }
+
+                    return (
+                      <button
+                        key={`${rowIndex}-${colIndex}`}
+                        onClick={function () {
+                          toggleCell(cartelaNumber, value);
+                        }}
+                        style={{
+                          width: "100%",
+                          aspectRatio: "1 / 1",
+                          minWidth: 0,
+                          padding: 0,
+                          borderRadius: "5px",
+                          border: cellBorder,
+                          background: cellBg,
+                          color: cellColor,
+                          fontSize: "14px",
+                          fontWeight: "bold",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          cursor: isFree ? "default" : "pointer",
+                          boxSizing: "border-box"
+                        }}
+                      >
+                        {value}
+                      </button>
+                    );
+                  });
                 })}
               </div>
             </div>
