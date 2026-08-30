@@ -57,19 +57,19 @@ router.get("/", async (req, res) => {
 const fs = require("fs");
 const path = require("path");
 
-router.post("/replace-152-patterns", async (req, res) => {
+router.post("/replace-200-patterns", async (req, res) => {
   const client = await pool.connect();
 
   try {
     console.log("=================================");
-    console.log("STARTING 152 CARTELA REPLACEMENT");
+    console.log("STARTING 200 CARTELA REPLACEMENT");
     console.log("=================================");
 
     const filePath = path.join(
       __dirname,
       "..",
       "data",
-      "cartela_patterns_1_to_152.json"
+      "cartela_patterns_1_to_200.json"
     );
 
     console.log("PATTERN FILE:", filePath);
@@ -90,15 +90,22 @@ router.post("/replace-152-patterns", async (req, res) => {
 
     console.log("PATTERNS FOUND:", patternIds.length);
 
-    if (patternIds.length !== 152) {
+    // ============================================================
+    // EXPECT EXACTLY 200 CARTELAS
+    // ============================================================
+
+    if (patternIds.length !== 200) {
       return res.status(400).json({
         success: false,
-        error: `Expected 152 patterns but found ${patternIds.length}`,
+        error: `Expected 200 patterns but found ${patternIds.length}`,
       });
     }
 
-    // Make sure every card 1-152 exists
-    for (let id = 1; id <= 152; id++) {
+    // ============================================================
+    // MAKE SURE EVERY CARD 1-200 EXISTS IN JSON
+    // ============================================================
+
+    for (let id = 1; id <= 200; id++) {
       if (!patterns[String(id)]) {
         return res.status(400).json({
           success: false,
@@ -110,12 +117,20 @@ router.post("/replace-152-patterns", async (req, res) => {
     await client.query("BEGIN");
 
     let updated = 0;
-    const missing = [];
+    let inserted = 0;
 
-    for (let id = 1; id <= 152; id++) {
+    // ============================================================
+    // UPDATE EXISTING / INSERT MISSING CARTELAS
+    // ============================================================
+
+    for (let id = 1; id <= 200; id++) {
       const pattern = patterns[String(id)];
 
       const columns = ["B", "I", "N", "G", "O"];
+
+      // ----------------------------------------------------------
+      // Validate pattern
+      // ----------------------------------------------------------
 
       for (const column of columns) {
         if (
@@ -128,22 +143,67 @@ router.post("/replace-152-patterns", async (req, res) => {
         }
       }
 
-      const result = await client.query(
+      const numbers = JSON.stringify(pattern);
+
+      // ----------------------------------------------------------
+      // Check whether cartela already exists
+      // ----------------------------------------------------------
+
+      const existing = await client.query(
         `
-        UPDATE cartelas
-        SET numbers = $1
-        WHERE id = $2
+        SELECT id, serial, status
+        FROM cartelas
+        WHERE id = $1
         `,
-        [
-          JSON.stringify(pattern),
-          id,
-        ]
+        [id]
       );
 
-      if (result.rowCount === 0) {
-        missing.push(id);
-      } else {
+      if (existing.rows.length > 0) {
+        // ========================================================
+        // EXISTING CARTELA → UPDATE ONLY NUMBERS
+        // ========================================================
+
+        await client.query(
+          `
+          UPDATE cartelas
+          SET numbers = $1
+          WHERE id = $2
+          `,
+          [numbers, id]
+        );
+
         updated++;
+
+      } else {
+        // ========================================================
+        // MISSING CARTELA → CREATE IT
+        // ========================================================
+
+        const serial =
+          `C${id}-${Math.floor(
+            100000 + Math.random() * 900000
+          )}`;
+
+        await client.query(
+          `
+          INSERT INTO cartelas
+            (id, serial, numbers, status)
+          VALUES
+            ($1, $2, $3, $4)
+          `,
+          [
+            id,
+            serial,
+            numbers,
+            "available",
+          ]
+        );
+
+        inserted++;
+
+        console.log(
+          `✅ INSERTED CARTELA ${id} → ${serial}`
+        );
       }
     }
 
@@ -152,19 +212,23 @@ router.post("/replace-152-patterns", async (req, res) => {
     console.log("=================================");
     console.log("REPLACEMENT FINISHED");
     console.log("UPDATED:", updated);
-    console.log("MISSING:", missing);
+    console.log("INSERTED:", inserted);
     console.log("=================================");
 
     res.json({
       success: true,
+      total: 200,
       updated,
-      missing,
+      inserted,
     });
 
   } catch (err) {
     await client.query("ROLLBACK");
 
-    console.error("REPLACEMENT ERROR:", err);
+    console.error(
+      "REPLACEMENT ERROR:",
+      err
+    );
 
     res.status(500).json({
       success: false,

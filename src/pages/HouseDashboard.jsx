@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+
+import { useParams, Link, useNavigate } from "react-router-dom";
 
 export default function HouseDashboard() {
-  const { id } = useParams(); // Identifier passed in the URL (e.g., house id or username)
+  const { id } = useParams(); 
+  const navigate = useNavigate();
+  // Identifier passed in the URL (e.g., house id or username)
   console.log("House Dashboard ID:", id);
   
   // State handles for inline cashier creation
@@ -556,11 +559,45 @@ export default function HouseDashboard() {
 
   return (
     <div style={styles.container}>
-      {/* Top Header */}
-      <div style={styles.headerSection}>
-        <h1 style={styles.mainTitle}>HOUSE DASHBOARD ({currentHouseUser.name || id})</h1>
-        <span style={styles.houseBadge}>House ID: {id}</span>
-      </div>
+     {/* Top Header */}
+<div
+  style={{
+    ...styles.headerSection,
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    position: "relative",
+  }}
+>
+  <button
+    type="button"
+    onClick={() => navigate("/")}
+    title="Back to Login"
+    style={{
+      border: "none",
+      background: "transparent",
+      color: "inherit",
+      cursor: "pointer",
+      fontSize: "30px",
+      fontWeight: "700",
+      lineHeight: "1",
+      padding: "2px 8px",
+      margin: 0,
+    }}
+  >
+    ←
+  </button>
+
+  <div>
+    <h1 style={styles.mainTitle}>
+      HOUSE DASHBOARD ({currentHouseUser.name || id})
+    </h1>
+
+    <span style={styles.houseBadge}>
+      House ID: {id}
+    </span>
+  </div>
+</div>
 
       {/* Top Overview Cards Grid */}
       <div style={styles.grid}>

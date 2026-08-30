@@ -52,51 +52,123 @@ export default function CashierDashboard() {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  const [bet, setBet] = useState(25);
-  const [commission, setCommission] = useState(15);
-  const [voiceMode, setVoiceMode] = useState("speech");
+ const [bet, setBet] = useState(25);
 
-  const [selectedCartela, setSelectedCartela] = useState(null);
-  const [keyboardInput, setKeyboardInput] = useState("");
-  const [selectedPatterns, setSelectedPatterns] = useState([]);
-  const [showFinance, setShowFinance] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
+const commissionKey = `cashier_commission_${id}`;
 
-  const [soldCartelas, setSoldCartelas] = useState([]);
-  const [currentCashier, setCurrentCashier] = useState({});
-  const [rawPackageInfo, setRawPackageInfo] = useState({ totalAmount: 3642, remainingAmount: 1755 });
-  const [loading, setLoading] = useState(true);
+const [commission, setCommission] = useState(() => {
+  const savedCommission = localStorage.getItem(
+    `cashier_commission_${id}`
+  );
+
+  return savedCommission !== null
+    ? Number(savedCommission)
+    : 15;
+});
+
+const [voiceMode, setVoiceMode] = useState("speech");
+
+const [selectedCartela, setSelectedCartela] = useState(null);
+const [keyboardInput, setKeyboardInput] = useState("");
+const [selectedPatterns, setSelectedPatterns] = useState([]);
+const [showFinance, setShowFinance] = useState(false);
+const [showQrModal, setShowQrModal] = useState(false);
+
+const [soldCartelas, setSoldCartelas] = useState([]);
+const [currentCashier, setCurrentCashier] = useState({});
+const [rawPackageInfo, setRawPackageInfo] = useState({
+  totalAmount: 3642,
+  remainingAmount: 1755
+});
+
+const [loading, setLoading] = useState(true);
+
 const location = useLocation();
 const [startClicked, setStartClicked] = useState(false);
 const [gameStarted, setGameStarted] = useState(false);
 const passedGame = location.state?.game;
-  // Fetch initial cashier data, settings, package info, and sold cartelas from PostgreSQL backend
-  useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        const res = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashier-dashboard/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.bet !== undefined) setBet(data.bet);
-          if (data.commission !== undefined) setCommission(data.commission);
-          if (data.voiceMode) setVoiceMode(data.voiceMode);
-          if (data.soldCartelas) setSoldCartelas(data.soldCartelas);
-          if (data.cashier) setCurrentCashier(data.cashier);
-          if (data.packageInfo) setRawPackageInfo(data.packageInfo);
-        }
-      } catch (err) {
-        console.error("Error fetching dashboard data from server:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchDashboardData();
-  }, [id]);
 
-  const grossIncome = bet * soldCartelas.length;
-  const commissionAmount = grossIncome * (Number(commission) / 100);
-  const netIncome = grossIncome - commissionAmount;
-  
+
+// Fetch initial cashier data
+useEffect(() => {
+  async function fetchDashboardData() {
+    try {
+      const res = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/cashier-dashboard/${id}`
+      );
+
+      if (res.ok) {
+        const data = await res.json();
+
+        if (data.bet !== undefined) {
+          setBet(data.bet);
+        }
+
+        // 🔒 DO NOT overwrite saved commission
+        // Only use server commission if this cashier
+        // has never selected one on this browser.
+        const savedCommission =
+          localStorage.getItem("cashier_commission");
+
+        if (
+          savedCommission === null &&
+          data.commission !== undefined
+        ) {
+          setCommission(Number(data.commission));
+
+          localStorage.setItem(
+            "cashier_commission",
+            String(data.commission)
+          );
+        }
+
+        if (data.voiceMode) {
+          setVoiceMode(data.voiceMode);
+        }
+
+        if (data.soldCartelas) {
+          setSoldCartelas(data.soldCartelas);
+        }
+
+        if (data.cashier) {
+          setCurrentCashier(data.cashier);
+        }
+
+        if (data.packageInfo) {
+          setRawPackageInfo(data.packageInfo);
+        }
+      }
+    } catch (err) {
+      console.error(
+        "Error fetching dashboard data from server:",
+        err
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  fetchDashboardData();
+}, [id]);
+
+
+// 💾 Save commission whenever cashier changes it
+useEffect(() => {
+  localStorage.setItem(
+    `cashier_commission_${id}`,
+    String(commission)
+  );
+}, [commission, id]);
+
+
+const grossIncome =
+  bet * soldCartelas.length;
+
+const commissionAmount =
+  grossIncome * (Number(commission) / 100);
+
+const netIncome =
+  grossIncome - commissionAmount;
  const houseId =
   Number(currentCashier.house_id) || Number(id);
 
@@ -160,10 +232,10 @@ const totalAmount = Number(
     const parsedNums = keyboardInput
       .split(/[\s,]+/)
       .map(n => Number(n.trim()))
-      .filter(n => !isNaN(n) && n >= 1 && n <= 150);
+      .filter(n => !isNaN(n) && n >= 1 && n <= 200);
 
     if (parsedNums.length === 0) {
-      alert("Please enter valid cartela number(s) between 1 and 150.");
+      alert("Please enter valid cartela number(s) between 1 and 200.");
       return;
     }
 
@@ -177,48 +249,26 @@ const totalAmount = Number(
     setSoldCartelas(updated);
     setKeyboardInput("");
     setSelectedCartela(null);
-    await syncSoldCartelas(updated);
+   
   };
-const syncSoldCartelas = async (cartelas) => {
-  try {
-    if (!game?.id) {
-      console.warn("Cannot sync sold cartelas: game ID is missing");
-      return;
-    }
 
-    const response = await fetch(`${API_URL}/sold-cartelas`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        gameId: game.id,
-        soldCartelas: cartelas,
-      }),
-    });
+async function toggleSoldCartela(num) {
+  let updated;
 
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || "Failed to sync sold cartelas");
-    }
-
-    console.log("✅ Sold cartelas synced:", cartelas);
-  } catch (error) {
-    console.error("❌ Error syncing sold cartelas:", error);
+  if (soldCartelas.includes(num)) {
+    updated = soldCartelas.filter(n => n !== num);
+  } else {
+    updated = Array.from(
+      new Set([...soldCartelas, num])
+    ).sort((a, b) => a - b);
   }
-};
-  async function toggleSoldCartela(num) {
-    let updated;
-    if (soldCartelas.includes(num)) {
-      updated = soldCartelas.filter(n => n !== num);
-    } else {
-      updated = Array.from(new Set([...soldCartelas, num])).sort((a, b) => a - b);
-    }
-    setSoldCartelas(updated);
-    if (selectedCartela === num) setSelectedCartela(null);
-    await syncSoldCartelas(updated);
+
+  setSoldCartelas(updated);
+
+  if (selectedCartela === num) {
+    setSelectedCartela(null);
   }
+}
 
   
 async function startGame() {
@@ -268,7 +318,10 @@ async function startGame() {
   console.log("Cashier ID:", id);
   console.log("House ID:", houseId);
   console.log("House ID type:", typeof houseId);
-
+localStorage.setItem(
+  "logged_in_cashier",
+  String(id)
+);
   // ==========================================
   // 3. CREATE GAME
   // ==========================================
@@ -376,9 +429,58 @@ setGameStarted(true);
   
 
   return (
-    <div className="dashboard-container" style={{ ...localeFontStyle, display: "flex", flexDirection: "column", minHeight: "100vh", padding: "4px", boxSizing: "border-box" }}>
-      <div className="dashboard-wrapper" style={{ display: "flex", flexDirection: "column", flex: 1, gap: "4px" }}>
-        
+   
+   <div
+  className="dashboard-container"
+  style={{
+    ...localeFontStyle,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: "100vh",
+    padding: "4px",
+    boxSizing: "border-box"
+  }}
+>
+  <div
+    className="dashboard-wrapper"
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      flex: 1,
+      gap: "4px"
+    }}
+  >
+
+    {/* DASHBOARD HEADER */}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "5px"
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        style={{
+          background: "transparent",
+          border: "none",
+          color: "#00f0ff",
+          fontSize: "18px",
+          fontWeight: "bold",
+          cursor: "pointer",
+          padding: "0 3px",
+          lineHeight: "1"
+        }}
+        title="Back to Login"
+      >
+        ←
+      </button>
+
+     
+    </div>
+
+    {/* YOUR EXISTING DASHBOARD CONTENT CONTINUES HERE */}
         {/* HEADER */}
         <div className="dashboard-header" style={{ padding: "4px 8px", marginBottom: "0px" }}>
           <div className="header-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
@@ -587,7 +689,7 @@ setGameStarted(true);
             
             {/* CARTELA GRID */}
             <div className="cartela-scroll-grid" style={{ flex: 1, maxHeight: "calc(100vh - 110px)" }}>
-              {Array.from({ length: 152 }, (_, i) => i + 1).map(num => {
+              {Array.from({ length: 200 }, (_, i) => i + 1).map(num => {
                 const sold = soldCartelas.includes(num);
                 const selected = selectedCartela === num;
                 
@@ -674,7 +776,7 @@ setGameStarted(true);
               📱 {t?.scanToChooseCards || "SCAN TO CHOOSE CARDS"}
             </h2>
             <p style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "12px", lineHeight: 1.4 }}>
-              {t?.qrInstructions || "Players scan this QR code on their mobile phones to choose 1 or more Cartela numbers (1–152)."}
+              {t?.qrInstructions || "Players scan this QR code on their mobile phones to choose 1 or more Cartela numbers (1–200)."}
             </p>
 
             <div style={{

@@ -13,6 +13,9 @@ export default function PlayerCartelaView() {
     id ? true : false
   );
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const CARDS_PER_PAGE = 4;
+
   const [typedInput, setTypedInput] = useState("");
   const [markedCells, setMarkedCells] = useState({});
   const [loading, setLoading] = useState(true);
@@ -21,7 +24,7 @@ export default function PlayerCartelaView() {
   // LOAD CARTELA JSON
   // ---------------------------------------------------------
   useEffect(() => {
-    fetch("/cartela_patterns_1_to_152.json")
+    fetch("/cartela_patterns_1_to_200.json")
       .then(function (response) {
         if (!response.ok) {
           throw new Error("Cartela JSON not found");
@@ -32,8 +35,6 @@ export default function PlayerCartelaView() {
         console.log("================================");
         console.log("CARTELA JSON LOADED");
         console.log("TOTAL:", Object.keys(data).length);
-        console.log("CARTELA 151:", data["151"]);
-        console.log("CARTELA 152:", data["152"]);
         console.log("================================");
 
         setCartelaData(data);
@@ -71,7 +72,7 @@ export default function PlayerCartelaView() {
           const validCards = data.selectedCards
             .map(Number)
             .filter(function (number) {
-              return number >= 1 && number <= 152;
+              return number >= 1 && number <= 200;
             });
 
           if (validCards.length > 0) {
@@ -147,13 +148,13 @@ export default function PlayerCartelaView() {
       .filter(function (number) {
         return (
           number >= 1 &&
-          number <= 152 &&
+          number <= 200 &&
           cartelaData[String(number)]
         );
       });
 
     if (numbers.length === 0) {
-      alert("Enter valid Cartela numbers from 1 to 152.");
+      alert("Enter valid Cartela numbers from 1 to 200.");
       return;
     }
 
@@ -216,7 +217,6 @@ export default function PlayerCartelaView() {
 
   // ---------------------------------------------------------
   // WINNER CHECK & PATTERN DETECTION LOGIC
-  // Returns: { patternName: string | null, winningCoords: Set<string> }
   // ---------------------------------------------------------
   function checkWinner(cartelaNumber) {
     const matrix = getMatrix(cartelaNumber);
@@ -312,6 +312,20 @@ export default function PlayerCartelaView() {
   }
 
   // ---------------------------------------------------------
+  // PAGINATION CALCULATIONS (4 CARTELAS PER PAGE)
+  // ---------------------------------------------------------
+  const totalPages = Math.max(1, Math.ceil(selectedCards.length / CARDS_PER_PAGE));
+  const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
+  const currentVisibleCards = selectedCards.slice(startIndex, startIndex + CARDS_PER_PAGE);
+
+  // Reset page to 1 if user removes cards and page goes out of range
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(1);
+    }
+  }, [selectedCards.length, totalPages, currentPage]);
+
+  // ---------------------------------------------------------
   // LOADING SCREEN
   // ---------------------------------------------------------
   if (loading) {
@@ -379,7 +393,7 @@ export default function PlayerCartelaView() {
               marginBottom: "16px"
             }}
           >
-            Choose one or more Cartelas from 1 to 152.
+            Choose one or more Cartelas from 1 to 200.
           </p>
 
           {/* MANUAL INPUT */}
@@ -397,7 +411,7 @@ export default function PlayerCartelaView() {
               onChange={function (event) {
                 setTypedInput(event.target.value);
               }}
-              placeholder="Example: 1, 25, 151, 152"
+              placeholder="Example: 1, 25, 151, 200"
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -488,7 +502,7 @@ export default function PlayerCartelaView() {
             }}
           >
             {Array.from(
-              { length: 152 },
+              { length: 200 },
               function (_, index) {
                 return index + 1;
               }
@@ -549,7 +563,7 @@ export default function PlayerCartelaView() {
   }
 
   // ---------------------------------------------------------
-  // DISPLAY CARTELAS
+  // DISPLAY 4 CARTELAS PER PAGE
   // ---------------------------------------------------------
   return (
     <div
@@ -558,70 +572,112 @@ export default function PlayerCartelaView() {
         width: "100%",
         background: "#0f172a",
         color: "#ffffff",
-        padding: "10px",
-        paddingBottom: "40px",
+        padding: "8px",
         boxSizing: "border-box",
         fontFamily: "Arial, sans-serif"
       }}
     >
-      {/* HEADER */}
+      {/* HEADER BAR */}
       <div
         style={{
           width: "100%",
-          maxWidth: "1200px",
-          margin: "0 auto 12px auto",
+          maxWidth: "700px",
+          margin: "0 auto 8px auto",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "10px"
+          gap: "8px"
         }}
       >
         <div>
-          <h1 style={{ margin: 0, color: "#38bdf8", fontSize: "20px" }}>
+          <h1 style={{ margin: 0, color: "#38bdf8", fontSize: "16px" }}>
             MY CARDS ({selectedCards.length})
           </h1>
           <p
             style={{
-              margin: "3px 0 0 0",
+              margin: "1px 0 0 0",
               color: "#94a3b8",
-              fontSize: "11px"
+              fontSize: "10px"
             }}
           >
-            Tap numbers to highlight called numbers
+            Page {currentPage} of {totalPages}
           </p>
         </div>
 
-        <button
-          onClick={function () {
-            setConfirmed(false);
-          }}
-          style={{
-            background: "#334155",
-            color: "#ffffff",
-            border: "none",
-            borderRadius: "7px",
-            padding: "8px 12px",
-            fontWeight: "bold",
-            cursor: "pointer"
-          }}
-        >
-          ✏️ Change
-        </button>
+        {/* PAGINATION NAVIGATION CONTROLS */}
+        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+          {totalPages > 1 && (
+            <>
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                style={{
+                  background: currentPage === 1 ? "#1e293b" : "#0284c7",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                  opacity: currentPage === 1 ? 0.5 : 1
+                }}
+              >
+                ◀ Prev
+              </button>
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                style={{
+                  background: currentPage === totalPages ? "#1e293b" : "#0284c7",
+                  color: "#ffffff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  fontWeight: "bold",
+                  cursor: currentPage === totalPages ? "not-allowed" : "pointer",
+                  opacity: currentPage === totalPages ? 0.5 : 1
+                }}
+              >
+                Next ▶
+              </button>
+            </>
+          )}
+
+          <button
+            onClick={function () {
+              setConfirmed(false);
+            }}
+            style={{
+              background: "#334155",
+              color: "#ffffff",
+              border: "none",
+              borderRadius: "6px",
+              padding: "6px 10px",
+              fontSize: "12px",
+              fontWeight: "bold",
+              cursor: "pointer"
+            }}
+          >
+            ✏️ Edit
+          </button>
+        </div>
       </div>
 
-      {/* CARTELA GRID */}
+      {/* 4-CARTELA GRID CONTAINER */}
       <div
         style={{
           width: "100%",
-          maxWidth: "1200px",
+          maxWidth: "700px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-          gap: "12px",
+          gridTemplateColumns: "repeat(2, 1fr)",
+          gap: "8px",
           alignItems: "start"
         }}
       >
-        {selectedCards.map(function (cartelaNumber) {
+        {currentVisibleCards.map(function (cartelaNumber) {
           const matrix = getMatrix(cartelaNumber);
           const { patternName, winningCoords } = checkWinner(cartelaNumber);
 
@@ -631,9 +687,10 @@ export default function PlayerCartelaView() {
                 key={cartelaNumber}
                 style={{
                   background: "#7f1d1d",
-                  borderRadius: "12px",
-                  padding: "15px",
-                  textAlign: "center"
+                  borderRadius: "8px",
+                  padding: "10px",
+                  textAlign: "center",
+                  fontSize: "12px"
                 }}
               >
                 Cartela #{cartelaNumber} not found.
@@ -646,14 +703,13 @@ export default function PlayerCartelaView() {
               key={cartelaNumber}
               style={{
                 background: "#1e293b",
-                borderRadius: "12px",
-                padding: "8px",
+                borderRadius: "10px",
+                padding: "6px",
                 boxSizing: "border-box",
                 width: "100%",
-                minWidth: 0,
                 border: patternName
                   ? "2px solid #22c55e"
-                  : "2px solid transparent"
+                  : "1px solid #334155"
               }}
             >
               {/* WINNER BANNER */}
@@ -664,10 +720,10 @@ export default function PlayerCartelaView() {
                     color: "#ffffff",
                     textAlign: "center",
                     fontWeight: "bold",
-                    padding: "6px",
-                    borderRadius: "6px",
-                    fontSize: "13px",
-                    marginBottom: "8px"
+                    padding: "3px",
+                    borderRadius: "4px",
+                    fontSize: "10px",
+                    marginBottom: "4px"
                   }}
                 >
                   🏆 WINNER! {patternName}
@@ -679,20 +735,20 @@ export default function PlayerCartelaView() {
                 style={{
                   textAlign: "center",
                   color: "#f59e0b",
-                  fontSize: "17px",
+                  fontSize: "13px",
                   fontWeight: "bold",
-                  marginBottom: "7px"
+                  marginBottom: "4px"
                 }}
               >
                 CARTELA #{cartelaNumber}
               </div>
 
-              {/* CARTELA GRID */}
+              {/* CARTELA 5x5 MATRIX */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-                  gap: "4px",
+                  gap: "2px",
                   width: "100%"
                 }}
               >
@@ -705,9 +761,9 @@ export default function PlayerCartelaView() {
                         color: "#ffffff",
                         textAlign: "center",
                         fontWeight: "bold",
-                        padding: "6px 0",
-                        borderRadius: "5px",
-                        fontSize: "14px"
+                        padding: "2px 0",
+                        borderRadius: "3px",
+                        fontSize: "11px"
                       }}
                     >
                       {letter}
@@ -721,7 +777,6 @@ export default function PlayerCartelaView() {
                     const key = String(cartelaNumber) + "-" + String(value);
                     const isMarked = isFree || Boolean(markedCells[key]);
 
-                    // Dynamic winner color styling logic
                     const isWinningCell = winningCoords.has(`${rowIndex}-${colIndex}`);
 
                     let cellBg = "#334155";
@@ -729,16 +784,16 @@ export default function PlayerCartelaView() {
                     let cellBorder = "1px solid #475569";
 
                     if (isWinningCell && !isFree) {
-                      cellBg = "#22c55e"; // Winning pattern highlight color (Green)
+                      cellBg = "#22c55e";
                       cellColor = "#0f172a";
-                      cellBorder = "2px solid #86efac";
+                      cellBorder = "1px solid #86efac";
                     } else if (isFree) {
-                      cellBg = "#059669"; // Free star color
+                      cellBg = "#059669";
                       cellColor = "#ffffff";
                     } else if (isMarked) {
-                      cellBg = "#eab308"; // Marked cell color (Yellow)
+                      cellBg = "#eab308";
                       cellColor = "#0f172a";
-                      cellBorder = "2px solid #fef08a";
+                      cellBorder = "1px solid #fef08a";
                     }
 
                     return (
@@ -752,11 +807,11 @@ export default function PlayerCartelaView() {
                           aspectRatio: "1 / 1",
                           minWidth: 0,
                           padding: 0,
-                          borderRadius: "5px",
+                          borderRadius: "3px",
                           border: cellBorder,
                           background: cellBg,
                           color: cellColor,
-                          fontSize: "14px",
+                          fontSize: "11px",
                           fontWeight: "bold",
                           display: "flex",
                           alignItems: "center",
