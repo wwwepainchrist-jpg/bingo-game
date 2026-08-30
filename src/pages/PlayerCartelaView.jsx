@@ -23,28 +23,44 @@ export default function PlayerCartelaView() {
   // ---------------------------------------------------------
   // LOAD CARTELA JSON
   // ---------------------------------------------------------
-  useEffect(() => {
-    fetch("/cartela_patterns_1_to_200.json")
-      .then(function (response) {
-        if (!response.ok) {
-          throw new Error("Cartela JSON not found");
-        }
-        return response.json();
-      })
-      .then(function (data) {
-        console.log("================================");
-        console.log("CARTELA JSON LOADED");
-        console.log("TOTAL:", Object.keys(data).length);
-        console.log("================================");
+ // ---------------------------------------------------------
+// LOAD CARTELA JSON
+// ---------------------------------------------------------
+useEffect(() => {
+  fetch("/cartela_patterns_1_to_200.json", {
+    cache: "no-store"
+  })
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error(
+          "Cartela JSON HTTP error: " + response.status
+        );
+      }
 
-        setCartelaData(data);
-        setLoading(false);
-      })
-      .catch(function (error) {
-        console.error("ERROR LOADING CARTELA JSON:", error);
-        setLoading(false);
-      });
-  }, []);
+      return response.json();
+    })
+    .then(function (data) {
+      console.log("================================");
+      console.log("✅ CARTELA JSON LOADED");
+      console.log("TOTAL:", Object.keys(data).length);
+      console.log("CARTELA 1:", data["1"]);
+      console.log("CARTELA 151:", data["151"]);
+      console.log("CARTELA 152:", data["152"]);
+      console.log("CARTELA 200:", data["200"]);
+      console.log("================================");
+
+      setCartelaData(data);
+      setLoading(false);
+    })
+    .catch(function (error) {
+      console.error(
+        "❌ ERROR LOADING CARTELA JSON:",
+        error
+      );
+
+      setLoading(false);
+    });
+}, []);
 
   // ---------------------------------------------------------
   // LOAD SAVED PLAYER CARTELAS
@@ -192,28 +208,51 @@ export default function PlayerCartelaView() {
   // ---------------------------------------------------------
   // MAKE 5 x 5 CARTELA MATRIX (DIRECTLY FROM JSON)
   // ---------------------------------------------------------
-  function getMatrix(number) {
-    const cartela = cartelaData[String(number)];
+ function getMatrix(number) {
+  const cartela = cartelaData[String(number)];
 
-    if (!cartela) {
-      return [];
-    }
-
-    const matrix = [];
-
-    for (let row = 0; row < 5; row++) {
-      const currentRow = [
-        cartela.B[row],
-        cartela.I[row],
-        cartela.N[row],
-        cartela.G[row],
-        cartela.O[row]
-      ];
-      matrix.push(currentRow);
-    }
-
-    return matrix;
+  if (!cartela) {
+    return [];
   }
+
+  return [
+    [
+      cartela.B[0],
+      cartela.I[0],
+      cartela.N[0],
+      cartela.G[0],
+      cartela.O[0]
+    ],
+    [
+      cartela.B[1],
+      cartela.I[1],
+      cartela.N[1],
+      cartela.G[1],
+      cartela.O[1]
+    ],
+    [
+      cartela.B[2],
+      cartela.I[2],
+      "★",
+      cartela.G[2],
+      cartela.O[2]
+    ],
+    [
+      cartela.B[3],
+      cartela.I[3],
+      cartela.N[3],
+      cartela.G[3],
+      cartela.O[3]
+    ],
+    [
+      cartela.B[4],
+      cartela.I[4],
+      cartela.N[4],
+      cartela.G[4],
+      cartela.O[4]
+    ]
+  ];
+}
 
   // ---------------------------------------------------------
   // WINNER CHECK & PATTERN DETECTION LOGIC
@@ -566,17 +605,20 @@ export default function PlayerCartelaView() {
   // DISPLAY 4 CARTELAS PER PAGE
   // ---------------------------------------------------------
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100%",
-        background: "#0f172a",
-        color: "#ffffff",
-        padding: "8px",
-        boxSizing: "border-box",
-        fontFamily: "Arial, sans-serif"
-      }}
-    >
+   <div
+  style={{
+    height: "100vh",
+    width: "100%",
+    background: "#0f172a",
+    color: "#ffffff",
+    padding: "8px",
+    boxSizing: "border-box",
+    fontFamily: "Arial, sans-serif",
+    overflowY: "auto",
+    overflowX: "hidden",
+    WebkitOverflowScrolling: "touch"
+  }}
+>
       {/* HEADER BAR */}
       <div
         style={{
@@ -666,17 +708,19 @@ export default function PlayerCartelaView() {
       </div>
 
       {/* 4-CARTELA GRID CONTAINER */}
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "700px",
-          margin: "0 auto",
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: "8px",
-          alignItems: "start"
-        }}
-      >
+    {/* CARTELA GRID CONTAINER */}
+<div
+  style={{
+    width: "100%",
+    maxWidth: "700px",
+    margin: "0 auto",
+    display: "grid",
+    gridTemplateColumns: "repeat(2, 1fr)",
+    gap: "8px",
+    alignItems: "start",
+    paddingBottom: "100px"
+  }}
+>
         {currentVisibleCards.map(function (cartelaNumber) {
           const matrix = getMatrix(cartelaNumber);
           const { patternName, winningCoords } = checkWinner(cartelaNumber);
