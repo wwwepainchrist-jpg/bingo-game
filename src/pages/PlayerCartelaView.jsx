@@ -14,7 +14,7 @@ export default function PlayerCartelaView() {
   );
 
   const [currentPage, setCurrentPage] = useState(1);
-  const CARDS_PER_PAGE = 4;
+const CARDS_PER_PAGE = selectedCards.length || 1;
 
   const [typedInput, setTypedInput] = useState("");
   const [markedCells, setMarkedCells] = useState({});
@@ -604,21 +604,20 @@ useEffect(() => {
   // ---------------------------------------------------------
   // DISPLAY 4 CARTELAS PER PAGE
   // ---------------------------------------------------------
-  return (
-   <div
-  style={{
-    height: "100vh",
-    width: "100%",
-    background: "#0f172a",
-    color: "#ffffff",
-    padding: "8px",
-    boxSizing: "border-box",
-    fontFamily: "Arial, sans-serif",
-    overflowY: "auto",
-    overflowX: "hidden",
-    WebkitOverflowScrolling: "touch"
-  }}
->
+ return (
+  <div
+    style={{
+      width: "100%",
+      minHeight: "100vh",
+      background: "#0f172a",
+      color: "#ffffff",
+      padding: "8px",
+      boxSizing: "border-box",
+      fontFamily: "Arial, sans-serif",
+      overflowY: "auto",
+      overflowX: "hidden"
+    }}
+  >
       {/* HEADER BAR */}
       <div
         style={{
@@ -709,6 +708,7 @@ useEffect(() => {
 
       {/* 4-CARTELA GRID CONTAINER */}
     {/* CARTELA GRID CONTAINER */}
+{/* CARTELA VERTICAL SCROLL CONTAINER */}
 <div
   style={{
     width: "100%",
