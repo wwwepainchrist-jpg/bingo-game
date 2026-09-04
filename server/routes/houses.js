@@ -153,46 +153,115 @@ router.put("/:id/package", async (req, res) => {
 });
 
 // ==========================================================================
-// GET HOUSE PERFORMANCE & LOGS (WITH REFRESH DATA)
+// GET HOUSE PERFORMANCE & LOGS
+// DAILY / WEEKLY / MONTHLY / YEARLY
 // ==========================================================================
 router.get("/:id/performance", async (req, res) => {
   try {
     const { id } = req.params;
-    const period = req.query.period || "daily"; // optional: handle different tabs
 
-    let timeFilter = "NOW() - INTERVAL '24 hours'";
-    if (period === "weekly") timeFilter = "NOW() - INTERVAL '7 days'";
-    if (period === "monthly") timeFilter = "NOW() - INTERVAL '30 days'";
-    if (period === "yearly") timeFilter = "NOW() - INTERVAL '365 days'";
+    const houseId = Number(id);
 
+    // Get all games for this house from the last 365 days
     const result = await pool.query(
-      `SELECT * FROM game_logs 
-       WHERE house_id = $1 
-       AND created_at >= ${timeFilter} 
-       ORDER BY created_at DESC`,
-      [Number(id)]
+      `
+      SELECT
+        cartelas_sold,
+        commission,
+        created_at
+      FROM game_logs
+      WHERE house_id = $1
+        AND created_at >= NOW() - INTERVAL '365 days'
+      ORDER BY created_at DESC
+      `,
+      [houseId]
     );
 
     const rows = result.rows;
 
-    const summary = rows.reduce(
-      (acc, row) => {
-        acc.cartelasSold += Number(row.cartelas_sold || 0);
-        acc.netCommission += Number(row.commission || 0);
-        acc.gamesPlayed += 1;
-        return acc;
-      },
-      { cartelasSold: 0, netCommission: 0, gamesPlayed: 0 }
+    // Calculate each period independently
+    const now = Date.now();
+
+    const dailyRows = rows.filter(
+      row =>
+        now - new Date(row.created_at).getTime() <=
+        24 * 60 * 60 * 1000
     );
+
+    const weeklyRows = rows.filter(
+      row =>
+        now - new Date(row.created_at).getTime() <=
+        7 * 24 * 60 * 60 * 1000
+    );
+
+    const monthlyRows = rows.filter(
+      row =>
+        now - new Date(row.created_at).getTime() <=
+        30 * 24 * 60 * 60 * 1000
+    );
+
+    const yearlyRows = rows;
+
+    const calculateStats = (gameRows) => {
+      return {
+        cards: gameRows.reduce(
+          (total, row) =>
+            total + Number(row.cartelas_sold || 0),
+          0
+        ),
+
+        commission: gameRows.reduce(
+          (total, row) =>
+            total + Number(row.commission || 0),
+          0
+        ),
+
+        games: gameRows.length,
+      };
+    };
+
+    const daily = calculateStats(dailyRows);
+    const weekly = calculateStats(weeklyRows);
+    const monthly = calculateStats(monthlyRows);
+    const yearly = calculateStats(yearlyRows);
+
+    console.log("📊 HOUSE PERFORMANCE:", houseId);
+    console.log("DAILY:", daily);
+    console.log("WEEKLY:", weekly);
+    console.log("MONTHLY:", monthly);
+    console.log("YEARLY:", yearly);
 
     res.json({
       success: true,
-      summary,
+
+      performance: {
+        daily_cards: daily.cards,
+        daily_commission: daily.commission,
+        daily_games: daily.games,
+
+        weekly_cards: weekly.cards,
+        weekly_commission: weekly.commission,
+        weekly_games: weekly.games,
+
+        monthly_cards: monthly.cards,
+        monthly_commission: monthly.commission,
+        monthly_games: monthly.games,
+
+        yearly_cards: yearly.cards,
+        yearly_commission: yearly.commission,
+        yearly_games: yearly.games,
+      },
+
       logs: rows,
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("❌ HOUSE PERFORMANCE ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 // ==========================================================================

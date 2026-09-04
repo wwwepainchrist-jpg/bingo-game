@@ -435,7 +435,7 @@ const cashier = await pool.query(
       cashier: cashier.rows[0],
       packageInfo: packageResult.rows[0] || {},
       bet: 50,
-      commission: 15,
+    commission: Number(cashier.rows[0].commission ?? 15),
       soldCartelas: [],
       voiceMode: "recorded"
     });

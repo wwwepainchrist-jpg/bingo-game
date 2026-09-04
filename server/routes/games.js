@@ -108,30 +108,32 @@ router.post("/", async (req, res) => {
 
     const gameResult = await client.query(
       `
-      INSERT INTO games
-      (
-        game_id,
-        house_id,
-        cashier_id,
-        bet,
-        prize,
-        commission,
-        cards_sold,
-        house_commission,
-        voice_mode
-      )
-      VALUES
-      (
-        $1,
-        $2,
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9
-      )
+     INSERT INTO games
+(
+  game_id,
+  house_id,
+  cashier_id,
+  bet,
+  prize,
+  commission,
+  cards_sold,
+  house_commission,
+  voice_mode,
+  winning_pattern_count
+)
+VALUES
+(
+  $1,
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9,
+  $10
+)
       RETURNING
         id,
         game_id,
@@ -143,19 +145,29 @@ router.post("/", async (req, res) => {
         cards_sold,
         house_commission,
         voice_mode,
+        winning_pattern_count,
         status
       `,
-      [
-        String(game.id),
-        String(game.house),
-        String(game.cashier),
-        Number(game.bet),
-        Number(game.prize),
-        Number(game.commission),
-        Number(game.cardsSold),
-        Number(houseCommission),
-        game.voiceMode || "recorded"
-      ]
+    [
+  String(game.id),
+  String(game.house),
+  String(game.cashier),
+  Number(game.bet),
+  Number(game.prize),
+  Number(game.commission),
+  Number(game.cardsSold),
+  Number(houseCommission),
+  game.voiceMode || "recorded",
+
+  // 🔒 LOCK WINNING PATTERN REQUIREMENT FOR THIS GAME
+  Math.min(
+    10,
+    Math.max(
+      1,
+      Number(game.winningPatternCount) || 1
+    )
+  )
+]
     );
 
     console.timeEnd("GAME INSERT");
@@ -530,7 +542,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
 
     const gameResult = await pool.query(
       `
-      SELECT id, game_id
+      SELECT id, game_id, winning_pattern_count
       FROM games
       WHERE game_id = $1
       `,
@@ -549,6 +561,18 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     }
 
     const gameDbId = gameResult.rows[0].id;
+    const winningPatternCount = Math.min(
+      3,
+      Math.max(
+        1,
+        Number(gameResult.rows[0].winning_pattern_count) || 1
+      )
+    );
+
+    console.log(
+      "🔒 WINNING PATTERN REQUIREMENT:",
+      winningPatternCount
+    );
 
     console.log("GAME STRING ID:", gameResult.rows[0].game_id);
     console.log("GAME DATABASE ID:", gameDbId);
@@ -720,11 +744,7 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
       "CALLED NUMBERS:",
       Array.from(calledSet)
     );
-
-    // ============================================================
-    // 7. CHECK WHETHER A CELL IS MARKED
-    // ============================================================
-
+const winningPatterns = [];
     function marked(cell) {
       if (cell === "FREE") {
         return true;
@@ -750,84 +770,140 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
       return result;
     }
 
-    // ============================================================
-    // 8. HORIZONTAL LINES
-    // ============================================================
+   // ============================================================
+// 8. HORIZONTAL LINES
+// ============================================================
 
-    let horizontalWinner = false;
+let horizontalCount = 0;
 
-    for (let row = 0; row < 5; row++) {
-      let complete = true;
+for (let row = 0; row < 5; row++) {
+  let complete = true;
 
-      for (let col = 0; col < 5; col++) {
-        if (!marked(board[row][col])) {
-          complete = false;
-          break;
-        }
-      }
-
-      if (complete) {
-        horizontalWinner = true;
-        break;
-      }
+  for (let col = 0; col < 5; col++) {
+    if (!marked(board[row][col])) {
+      complete = false;
+      break;
     }
+  }
 
-    // ============================================================
-    // 9. VERTICAL LINES
-    // ============================================================
+  if (complete) {
+    horizontalCount++;
 
-    let verticalWinner = false;
+    const patternCells = [];
 
     for (let col = 0; col < 5; col++) {
-      let complete = true;
-
-      for (let row = 0; row < 5; row++) {
-        if (!marked(board[row][col])) {
-          complete = false;
-          break;
-        }
-      }
-
-      if (complete) {
-        verticalWinner = true;
-        break;
-      }
+      patternCells.push(`${row}-${col}`);
     }
 
-    // ============================================================
-    // 10. DIAGONALS
-    // ============================================================
+    winningPatterns.push(patternCells);
+  }
+}
 
-    let diag1Winner = true;
+const horizontalWinner = horizontalCount > 0;
 
-    for (let i = 0; i < 5; i++) {
-      if (!marked(board[i][i])) {
-        diag1Winner = false;
-        break;
-      }
+
+// ============================================================
+// 9. VERTICAL LINES
+// ============================================================
+
+let verticalCount = 0;
+
+for (let col = 0; col < 5; col++) {
+  let complete = true;
+
+  for (let row = 0; row < 5; row++) {
+    if (!marked(board[row][col])) {
+      complete = false;
+      break;
+    }
+  }
+
+  if (complete) {
+    verticalCount++;
+
+    const patternCells = [];
+
+    for (let row = 0; row < 5; row++) {
+      patternCells.push(`${row}-${col}`);
     }
 
-    let diag2Winner = true;
+    winningPatterns.push(patternCells);
+  }
+}
 
-    for (let i = 0; i < 5; i++) {
-      if (!marked(board[i][4 - i])) {
-        diag2Winner = false;
-        break;
-      }
-    }
+const verticalWinner = verticalCount > 0;
 
-    const diagonalWinner =
-      diag1Winner || diag2Winner;
 
-    // ============================================================
-    // 11. FOUR CORNERS
-    // ============================================================
+// ============================================================
+// 10. DIAGONALS
+// ============================================================
 
-    const fourCornersWinner =
-      marked(board[0][0]) &&
-      marked(board[0][4]) &&
-      marked(board[4][0]) &&
-      marked(board[4][4]);
+let diag1Winner = true;
+
+for (let i = 0; i < 5; i++) {
+  if (!marked(board[i][i])) {
+    diag1Winner = false;
+    break;
+  }
+}
+
+let diag2Winner = true;
+
+for (let i = 0; i < 5; i++) {
+  if (!marked(board[i][4 - i])) {
+    diag2Winner = false;
+    break;
+  }
+}
+
+let diagonalCount = 0;
+
+if (diag1Winner) {
+  diagonalCount++;
+
+  const patternCells = [];
+
+  for (let i = 0; i < 5; i++) {
+    patternCells.push(`${i}-${i}`);
+  }
+
+  winningPatterns.push(patternCells);
+}
+
+if (diag2Winner) {
+  diagonalCount++;
+
+  const patternCells = [];
+
+  for (let i = 0; i < 5; i++) {
+    patternCells.push(`${i}-${4 - i}`);
+  }
+
+  winningPatterns.push(patternCells);
+}
+
+const diagonalWinner = diagonalCount > 0;
+
+
+// ============================================================
+// 11. FOUR CORNERS
+// ============================================================
+
+const fourCornersWinner =
+  marked(board[0][0]) &&
+  marked(board[0][4]) &&
+  marked(board[4][0]) &&
+  marked(board[4][4]);
+
+if (fourCornersWinner) {
+  winningPatterns.push([
+    "0-0",
+    "0-4",
+    "4-0",
+    "4-4",
+  ]);
+}
+
 
 // ============================================================
 // 11B. FOUR CORNERS NEAR STAR
@@ -838,40 +914,72 @@ const fourCornersNearStarWinner =
   marked(board[1][3]) &&
   marked(board[3][1]) &&
   marked(board[3][3]);
-    // ============================================================
-    // 12. FULL HOUSE
-    // ============================================================
 
-    let fullHouseWinner = true;
+if (fourCornersNearStarWinner) {
+  winningPatterns.push([
+    "1-1",
+    "1-3",
+    "3-1",
+    "3-3",
+  ]);
+}
 
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
-        if (!marked(board[row][col])) {
-          fullHouseWinner = false;
-          break;
-        }
-      }
 
-      if (!fullHouseWinner) {
-        break;
-      }
+// ============================================================
+// 12. FULL HOUSE
+// ============================================================
+
+let fullHouseWinner = true;
+
+for (let row = 0; row < 5; row++) {
+  for (let col = 0; col < 5; col++) {
+    if (!marked(board[row][col])) {
+      fullHouseWinner = false;
+      break;
     }
+  }
 
-    // ============================================================
-    // 13. FINAL WINNER
-    // ============================================================
+  if (!fullHouseWinner) {
+    break;
+  }
+}
 
-    const lineWinner =
-      horizontalWinner ||
-      verticalWinner ||
-      diagonalWinner;
+if (fullHouseWinner) {
+  const patternCells = [];
 
-    const isWinner =
-      lineWinner ||
-      fourCornersWinner ||
-        fourCornersNearStarWinner ||
-      fullHouseWinner;
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      patternCells.push(`${row}-${col}`);
+    }
+  }
 
+  winningPatterns.push(patternCells);
+}
+
+
+// ============================================================
+// 13. COUNT ALL COMPLETED WINNING PATTERNS
+// ============================================================
+
+const completedWinningPatterns =
+  winningPatterns.length;
+
+
+// ============================================================
+// 13B. FINAL WINNER
+// ============================================================
+
+const isWinner =
+  completedWinningPatterns >= winningPatternCount;
+
+
+// ============================================================
+// ONLY THE REQUIRED NUMBER OF PATTERNS BECOME RED
+// ============================================================
+
+const winningCells = winningPatterns
+  .slice(0, winningPatternCount)
+  .flat();
     // ============================================================
     // 14. LOG RESULT
     // ============================================================
@@ -879,16 +987,66 @@ const fourCornersNearStarWinner =
     console.log("=================================");
     console.log("BINGO VERIFICATION RESULT");
     console.log("Cartela:", cartelaId);
-    console.log("Horizontal:", horizontalWinner);
-    console.log("Vertical:", verticalWinner);
-    console.log("Diagonal:", diagonalWinner);
-    console.log("Four Corners:", fourCornersWinner);
+
+    console.log("---------------------------------");
+
     console.log(
-  "Four Corners Near Star:",
-  fourCornersNearStarWinner
-);
-    console.log("Full House:", fullHouseWinner);
-    console.log("FINAL WINNER:", isWinner);
+      "Horizontal count:",
+      horizontalCount
+    );
+
+    console.log(
+      "Vertical count:",
+      verticalCount
+    );
+
+    console.log(
+      "Diagonal count:",
+      diagonalCount
+    );
+
+    console.log(
+      "Diagonal 1:",
+      diag1Winner
+    );
+
+    console.log(
+      "Diagonal 2:",
+      diag2Winner
+    );
+
+    console.log(
+      "Four Corners:",
+      fourCornersWinner
+    );
+
+    console.log(
+      "Four Corners Near Star:",
+      fourCornersNearStarWinner
+    );
+
+    console.log(
+      "Full House:",
+      fullHouseWinner
+    );
+
+    console.log("---------------------------------");
+
+    console.log(
+      "COMPLETED PATTERNS:",
+      completedWinningPatterns
+    );
+
+    console.log(
+      "REQUIRED PATTERNS:",
+      winningPatternCount
+    );
+
+    console.log(
+      "FINAL WINNER:",
+      isWinner
+    );
+
     console.log("=================================");
 
     // ============================================================
@@ -899,8 +1057,11 @@ const fourCornersNearStarWinner =
       sold: true,
 
       isWinner,
-
-      isLine: lineWinner,
+  winningCells,
+      isLine:
+        horizontalWinner ||
+        verticalWinner ||
+        diagonalWinner,
 
       isHorizontal: horizontalWinner,
 
@@ -909,26 +1070,67 @@ const fourCornersNearStarWinner =
       isDiagonal: diagonalWinner,
 
       isFourCorners: fourCornersWinner,
-      isFourCornersNearStar: fourCornersNearStarWinner,
 
-      isFullHouse: fullHouseWinner,
+      isFourCornersNearStar:
+        fourCornersNearStarWinner,
+
+      isFullHouse:
+        fullHouseWinner,
+
+      // Counts for debugging/frontend
+      horizontalCount,
+
+      verticalCount,
+
+      diagonalCount,
+
+      completedWinningPatterns,
+
+      requiredWinningPatterns:
+        winningPatternCount,
 
       cartela: {
         ...cartela,
         matrix: board,
       },
     });
-
-  } catch (err) {
-    console.error("❌ VERIFY CARTELA ERROR:", err);
-
+  } catch (error) {
+    console.error("❌ ERROR VERIFYING CARTELA:", error);
     return res.status(500).json({
       sold: false,
       isWinner: false,
-      error: err.message,
+      error: "Internal server error",
     });
   }
 });
+
+router.post("/:id/reset", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log("Reset requested for game:", id);
+
+    const result = await pool.query(
+      `
+      DELETE FROM called_balls
+      WHERE game_id = $1
+      `,
+      [id]
+    );
+
+    console.log("Deleted rows:", result.rowCount);
+
+    res.json({
+      success: true
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: err.message
+    });
+  }
+});
+
 
 router.post("/:id/reset", async (req, res) => {
   try {
@@ -1047,61 +1249,105 @@ router.get("/house/:id/performance", async (req, res) => {
 
     const query = `
       SELECT
-        COALESCE(SUM(CASE
-          WHEN created_at::date = CURRENT_DATE
-          THEN cards_sold ELSE 0
-        END), 0) AS daily_cards,
 
-        COALESCE(SUM(CASE
-          WHEN created_at::date = CURRENT_DATE
-          THEN house_commission ELSE 0
-        END), 0) AS daily_commission,
+        -- DAILY: past 24 hours
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '24 hours'
+            THEN cards_sold
+            ELSE 0
+          END
+        ), 0) AS daily_cards,
 
-        COUNT(CASE
-          WHEN created_at::date = CURRENT_DATE THEN 1
-        END) AS daily_games,
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '24 hours'
+            THEN house_commission
+            ELSE 0
+          END
+        ), 0) AS daily_commission,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days'
-          THEN cards_sold ELSE 0
-        END), 0) AS weekly_cards,
+        COUNT(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '24 hours'
+            THEN 1
+          END
+        ) AS daily_games,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days'
-          THEN house_commission ELSE 0
-        END), 0) AS weekly_commission,
 
-        COUNT(CASE
-          WHEN created_at >= CURRENT_DATE - INTERVAL '6 days' THEN 1
-        END) AS weekly_games,
+        -- WEEKLY: past 7 days
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '7 days'
+            THEN cards_sold
+            ELSE 0
+          END
+        ), 0) AS weekly_cards,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE)
-          THEN cards_sold ELSE 0
-        END), 0) AS monthly_cards,
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '7 days'
+            THEN house_commission
+            ELSE 0
+          END
+        ), 0) AS weekly_commission,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE)
-          THEN house_commission ELSE 0
-        END), 0) AS monthly_commission,
+        COUNT(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '7 days'
+            THEN 1
+          END
+        ) AS weekly_games,
 
-        COUNT(CASE
-          WHEN created_at >= DATE_TRUNC('month', CURRENT_DATE) THEN 1
-        END) AS monthly_games,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE)
-          THEN cards_sold ELSE 0
-        END), 0) AS yearly_cards,
+        -- MONTHLY: past 30 days
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '30 days'
+            THEN cards_sold
+            ELSE 0
+          END
+        ), 0) AS monthly_cards,
 
-        COALESCE(SUM(CASE
-          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE)
-          THEN house_commission ELSE 0
-        END), 0) AS yearly_commission,
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '30 days'
+            THEN house_commission
+            ELSE 0
+          END
+        ), 0) AS monthly_commission,
 
-        COUNT(CASE
-          WHEN created_at >= DATE_TRUNC('year', CURRENT_DATE) THEN 1
-        END) AS yearly_games
+        COUNT(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '30 days'
+            THEN 1
+          END
+        ) AS monthly_games,
+
+
+        -- YEARLY: past 365 days
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '365 days'
+            THEN cards_sold
+            ELSE 0
+          END
+        ), 0) AS yearly_cards,
+
+        COALESCE(SUM(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '365 days'
+            THEN house_commission
+            ELSE 0
+          END
+        ), 0) AS yearly_commission,
+
+        COUNT(
+          CASE
+            WHEN created_at >= NOW() - INTERVAL '365 days'
+            THEN 1
+          END
+        ) AS yearly_games
 
       FROM games
       WHERE house_id = $1::text;
@@ -1109,13 +1355,16 @@ router.get("/house/:id/performance", async (req, res) => {
 
     const result = await pool.query(query, [id]);
 
+    console.log("📊 HOUSE PERFORMANCE:", id);
+    console.log("📅 PERFORMANCE RESULT:", result.rows[0]);
+
     res.json({
       success: true,
       performance: result.rows[0],
     });
 
   } catch (err) {
-    console.error("Error fetching house performance:", err);
+    console.error("❌ Error fetching house performance:", err);
 
     res.status(500).json({
       success: false,

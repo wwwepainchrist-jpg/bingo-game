@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 import { useLanguage } from "../context/LanguageContext";
@@ -12,30 +12,57 @@ export default function Login() {
   const [username, setUsername] = useState("");
 const [password, setPassword] = useState("");
 const [loggingIn, setLoggingIn] = useState(false);
-
+const loginLockRef = useRef(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [changeUsername, setChangeUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+useEffect(() => {
+  const savedUser = localStorage.getItem("currentUser");
 
+  if (savedUser) {
+    try {
+      const user = JSON.parse(savedUser);
+
+      if (user?.role) {
+        console.log("✅ EXISTING LOGIN FOUND:", user);
+      }
+    } catch (err) {
+      console.error("❌ INVALID SAVED LOGIN:", err);
+      localStorage.removeItem("currentUser");
+    }
+  }
+
+  setUsername("");
+  setPassword("");
+}, []);
 const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
 
-  useEffect(() => {
-    setUsername("");
-    setPassword("");
-  }, []);
 
+ 
+   
 async function login() {
-  if (loggingIn) return;
+console.log("🖱️ LOGIN FUNCTION CALLED", {
+  time: Date.now(),
+  lock: loginLockRef.current,
+});
+  // 🔒 HARD LOGIN LOCK
+  if (loginLockRef.current) {
+    console.log("⛔ LOGIN ALREADY IN PROGRESS");
+    return;
+  }
 
   if (!username.trim() || !password) {
     alert("Please enter username and password.");
     return;
   }
 
+  // 🔒 Lock immediately
+  loginLockRef.current = true;
   setLoggingIn(true);
 
   try {
+
     console.log("⚡ LOGIN START");
 
     const startTime = performance.now();
@@ -60,7 +87,9 @@ async function login() {
     );
 
     if (!response.ok || !data.success) {
-      alert(data.message || "Wrong username or password");
+
+      alert(data.message || "Wrong username or password.");
+
       return;
     }
 
@@ -69,17 +98,13 @@ async function login() {
     console.log("✅ LOGIN SUCCESS:", user);
     console.log("👤 ROLE:", user.role);
 
-    /*
-     * Save immediately.
-     */
+    // 💾 SAVE LOGIN
     localStorage.setItem(
       "currentUser",
       JSON.stringify(user)
     );
 
-    /*
-     * Navigate immediately after authentication.
-     */
+    // 🚀 NAVIGATE
     if (user.role === "Super Admin") {
 
       navigate("/super-admin", {
@@ -89,7 +114,7 @@ async function login() {
     } else if (user.role === "House Admin") {
 
       navigate(
-        "/house-dashboard/" + user.house_id,
+        `/house-dashboard/${user.house_id}`,
         {
           replace: true,
         }
@@ -98,7 +123,7 @@ async function login() {
     } else if (user.role === "Agent") {
 
       navigate(
-        "/agent-dashboard/" + user.username,
+        `/agent-dashboard/${user.username}`,
         {
           replace: true,
         }
@@ -107,7 +132,7 @@ async function login() {
     } else if (user.role === "Cashier") {
 
       navigate(
-        "/cashier-dashboard/" + user.username,
+        `/cashier-dashboard/${user.username}`,
         {
           replace: true,
         }
@@ -116,6 +141,7 @@ async function login() {
     } else {
 
       alert("Unknown role: " + user.role);
+
     }
 
   } catch (err) {
@@ -125,9 +151,8 @@ async function login() {
     alert("Cannot connect to server.");
 
   } finally {
-
-    setLoggingIn(false);
-  }
+  loginLockRef.current = false;
+}
 }
 
   async function handlePasswordChange() {
@@ -172,7 +197,70 @@ async function login() {
       alert("Cannot connect to server.");
     }
   }
+  // 🎮 GAME LOADING SCREEN
+  if (loggingIn) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0f172a",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          color: "#fff",
+          fontFamily: "Arial, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: "70px",
+            height: "70px",
+            border: "6px solid rgba(255,255,255,0.2)",
+            borderTop: "6px solid #38bdf8",
+            borderRadius: "50%",
+            animation: "loginSpin 1s linear infinite",
+            marginBottom: "25px",
+          }}
+        />
 
+        <h1
+          style={{
+            margin: 0,
+            fontSize: "32px",
+            fontWeight: "bold",
+            letterSpacing: "2px",
+          }}
+        >
+          GAME LOADING
+        </h1>
+
+        <p
+          style={{
+            marginTop: "10px",
+            color: "#94a3b8",
+            fontSize: "16px",
+          }}
+        >
+          Please wait...
+        </p>
+
+        <style>
+          {`
+            @keyframes loginSpin {
+              from {
+                transform: rotate(0deg);
+              }
+
+              to {
+                transform: rotate(360deg);
+              }
+            }
+          `}
+        </style>
+      </div>
+    );
+  }
   return (
     <div
       className="login-container"

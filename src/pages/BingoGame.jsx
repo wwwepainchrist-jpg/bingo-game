@@ -235,22 +235,371 @@ export default function BingoGame() {
   const shuffleAudioRef = useRef(null);
   const isDrawingBallRef = useRef(false);
   const loopTimeoutRef = useRef(null);
-
+const audioGenerationInProgressRef = useRef(false);
+const audioLoadingRef = useRef(false);
   const remainingNumbersRef = useRef(Array.from({ length: 75 }, (_, i) => i + 1));
   const activeUtteranceRef = useRef(null);
   const activeAudioRef = useRef(null);
   const pausedAudioRef = useRef(null);
   const audioTimeoutRef = useRef(null);
-  
+  const audioGenerationRef = useRef(0);
   const calledRef = useRef(called);
   const stateRef = useRef({ called, paused, speed, current, game });
   const [volume, setVolume] = useState(0.7);
   const volumeRef = useRef(0.7);
   const location = useLocation();
+  const selectedWinningPattern =
+  location.state?.winningPatternCount ??
+  location.state?.game?.winningPatternCount ??
+  1;
+  const [activeWinningPattern, setActiveWinningPattern] =
+  useState(selectedWinningPattern);
   const passedGame = location.state?.game;
 const [voiceSpeed, setVoiceSpeed] = useState(1.0);
 const voiceSpeedRef = useRef(1.0);
 const TARGET_GENERATION_INTERVAL_MS = 400;
+const [winningCells, setWinningCells] = useState([]);
+const [displayedWinningPatterns, setDisplayedWinningPatterns] = useState([]);
+const audioContextRef = useRef(null);
+const audioSourceRef = useRef(null);
+const bassFilterRef = useRef(null);
+
+const SHUFFLE_PLAYED_KEY = "bingo_shuffle_played";
+const pendingBingoCallRef = useRef(null);
+const playPauseActionRef = useRef(0);
+const resumeAfterGenerationRef = useRef(false);
+const [voiceDepth, setVoiceDepth] = useState(() => {
+  const cashierId = localStorage.getItem("logged_in_cashier");
+
+  if (!cashierId) return 0;
+
+  const saved = localStorage.getItem(
+    `cashier_voice_depth_${cashierId}`
+  );
+
+  return saved !== null ? Number(saved) : 0;
+});
+useEffect(() => {
+  voiceDepthRef.current = voiceDepth;
+
+  // Change bass immediately if audio is currently playing
+  if (bassFilterRef.current) {
+    bassFilterRef.current.gain.value = voiceDepth * 0.8;
+
+    console.log(
+      "🎙️ LIVE VOICE DEPTH:",
+      voiceDepth,
+      "BASS GAIN:",
+      voiceDepth * 0.8
+    );
+  }
+
+  // Save for this cashier
+  const cashierId = localStorage.getItem("logged_in_cashier");
+
+  if (cashierId) {
+    localStorage.setItem(
+      `cashier_voice_depth_${cashierId}`,
+      String(voiceDepth)
+    );
+  }
+}, [voiceDepth]);
+const voiceDepthRef = useRef(voiceDepth);
+const winningPatternAnimationRef = useRef(null);
+const winningPatternIndexRef = useRef(0);
+// ============================================================
+// 🏆 WINNING PATTERN PREVIEW ANIMATION
+// Shows EVERY possible winning pattern combination
+// ============================================================
+
+
+useEffect(() => {
+  if (!activeWinningPattern) {
+    setDisplayedWinningPatterns([]);
+
+    winningPatternIndexRef.current = 0;
+
+    if (winningPatternAnimationRef.current !== null) {
+      clearTimeout(winningPatternAnimationRef.current);
+
+      winningPatternAnimationRef.current = null;
+    }
+
+    return;
+  }
+
+  // ============================================================
+  // ALL POSSIBLE WINNING PATTERNS
+  // ============================================================
+
+  const allPatterns = [];
+
+  // ----------------------------
+  // HORIZONTAL
+  // ----------------------------
+  for (let row = 0; row < 5; row++) {
+    const cells = [];
+
+    for (let col = 0; col < 5; col++) {
+      cells.push(`${row}-${col}`);
+    }
+
+    allPatterns.push(cells);
+  }
+
+  // ----------------------------
+  // VERTICAL
+  // ----------------------------
+  for (let col = 0; col < 5; col++) {
+    const cells = [];
+
+    for (let row = 0; row < 5; row++) {
+      cells.push(`${row}-${col}`);
+    }
+
+    allPatterns.push(cells);
+  }
+
+  // ----------------------------
+  // DIAGONAL 1
+  // ----------------------------
+  allPatterns.push([
+    "0-0",
+    "1-1",
+    "2-2",
+    "3-3",
+    "4-4",
+  ]);
+
+  // ----------------------------
+  // DIAGONAL 2
+  // ----------------------------
+  allPatterns.push([
+    "0-4",
+    "1-3",
+    "2-2",
+    "3-1",
+    "4-0",
+  ]);
+
+  // ----------------------------
+  // FOUR CORNERS
+  // ----------------------------
+  allPatterns.push([
+    "0-0",
+    "0-4",
+    "4-0",
+    "4-4",
+  ]);
+
+  // ----------------------------
+  // FOUR CORNERS NEAR STAR
+  // ----------------------------
+  allPatterns.push([
+    "1-1",
+    "1-3",
+    "3-1",
+    "3-3",
+  ]);
+
+  // ----------------------------
+  // FULL HOUSE
+  // ----------------------------
+  const fullHouse = [];
+
+  for (let row = 0; row < 5; row++) {
+    for (let col = 0; col < 5; col++) {
+      fullHouse.push(`${row}-${col}`);
+    }
+  }
+
+  allPatterns.push(fullHouse);
+
+  // ============================================================
+  // REQUIRED NUMBER OF PATTERNS
+  // ============================================================
+
+  const requiredCount = Math.min(
+    10,
+    Math.max(
+      1,
+      Number(activeWinningPattern) || 1
+    )
+  );
+
+  console.log(
+    "🏆 REQUIRED WINNING PATTERNS:",
+    requiredCount
+  );
+
+  // ============================================================
+  // BUILD COMBINATIONS
+  //
+  // We only need enough combinations for the UI.
+  // DO NOT generate every possible combination.
+  // ============================================================
+
+  const combinations = [];
+
+  // First combination
+  const firstCombination = [];
+
+  for (
+    let i = 0;
+    i < requiredCount &&
+    i < allPatterns.length;
+    i++
+  ) {
+    firstCombination.push(i);
+  }
+
+  combinations.push(firstCombination);
+
+  // Additional combinations
+  // Rotate the patterns so the displayed pattern changes.
+  for (
+    let start = 1;
+    start < allPatterns.length;
+    start++
+  ) {
+    const combination = [];
+
+    for (let offset = 0; offset < requiredCount; offset++) {
+      const index =
+        (start + offset) %
+        allPatterns.length;
+
+      combination.push(index);
+    }
+
+    combinations.push(combination);
+  }
+
+  console.log(
+    "🏆 UI COMBINATIONS:",
+    combinations.length
+  );
+
+  // ============================================================
+  // RESET ANIMATION INDEX
+  // ============================================================
+
+  winningPatternIndexRef.current = 0;
+
+  // ============================================================
+  // SHOW NEXT COMBINATION
+  // ============================================================
+
+  const showNextCombination = () => {
+
+    // ----------------------------------------------------------
+    // PAUSED = STOP TIMER
+    // ----------------------------------------------------------
+
+    if (stateRef.current.paused) {
+      console.log(
+        "⏸️ WINNING ANIMATION PAUSED"
+      );
+
+      winningPatternAnimationRef.current = null;
+
+      return;
+    }
+
+    if (!combinations.length) {
+      winningPatternAnimationRef.current = null;
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // CURRENT COMBINATION
+    // ----------------------------------------------------------
+
+    const currentIndex =
+      winningPatternIndexRef.current;
+
+    const indexes =
+      combinations[currentIndex];
+
+    // ----------------------------------------------------------
+    // GET CELLS
+    // ----------------------------------------------------------
+
+    const cells = indexes.flatMap(
+      patternIndex =>
+        allPatterns[patternIndex]
+    );
+
+    // Remove duplicate cells
+    const uniqueCells = [
+      ...new Set(cells)
+    ];
+
+    // ----------------------------------------------------------
+    // DISPLAY
+    // ----------------------------------------------------------
+
+    setDisplayedWinningPatterns(
+      uniqueCells
+    );
+
+    console.log(
+      `🏆 SHOWING ${requiredCount} PATTERNS — COMBINATION ${
+        currentIndex + 1
+      } / ${combinations.length}`,
+      uniqueCells
+    );
+
+    // ----------------------------------------------------------
+    // NEXT COMBINATION
+    // ----------------------------------------------------------
+
+    winningPatternIndexRef.current =
+      (currentIndex + 1) %
+      combinations.length;
+
+    // ----------------------------------------------------------
+    // ONE TIMER ONLY
+    // ----------------------------------------------------------
+
+    winningPatternAnimationRef.current =
+      setTimeout(() => {
+
+        winningPatternAnimationRef.current =
+          null;
+
+        showNextCombination();
+
+      }, 1000);
+  };
+
+  // ============================================================
+  // START
+  // ============================================================
+
+  if (!stateRef.current.paused) {
+    showNextCombination();
+  }
+
+  // ============================================================
+  // CLEANUP
+  // ============================================================
+
+  return () => {
+
+    if (
+      winningPatternAnimationRef.current !== null
+    ) {
+      clearTimeout(
+        winningPatternAnimationRef.current
+      );
+
+      winningPatternAnimationRef.current = null;
+    }
+  };
+
+}, [activeWinningPattern, paused]);
 
 
 const nextGenerationTimeRef = useRef(null);
@@ -285,12 +634,14 @@ const callIntervalTimerRef = useRef(null);
 
 
 const playPauseGenerationRef = useRef(0);
-
+const generationCancelRef = useRef(0);
 
 // 🔄 LOAD CASHIER SPEED
 
 const gameRunIdRef = useRef(0);
-const hasPlayedShuffleRef = useRef(false);
+const hasPlayedShuffleRef = useRef(
+  sessionStorage.getItem("bingo_shuffle_played") === "true"
+);
 const callIntervalChangeRef = useRef(null);
   // ============================================
   // CALL NUMBER API (prevents spam)
@@ -554,19 +905,31 @@ useEffect(() => {
     );
   }
 
-  const socket = socketRef.current;
+ const socket = socketRef.current;
 
-  const handleConnect = () => {
-    console.log("🔌 CONNECTED:", socket.id);
+const handleConnect = () => {
+  console.log("🔌 CONNECTED:", socket.id);
 
-    socket.emit("join-game", id);
+  socket.emit("join-game", id);
 
-    console.log(
-      "🎱 JOINED GAME:",
-      id
-    );
-  };
+  console.log(
+    "🎱 JOINED GAME:",
+    id
+  );
+};
 
+// 🏆 RECEIVE WINNING PATTERN FROM CASHIER
+const handleWinningPattern = ({ gameId, pattern }) => {
+  if (gameId !== id) return;
+
+  console.log(
+    `🏆 WINNING PATTERN RECEIVED: Pattern ${pattern}`
+  );
+
+  setActiveWinningPattern(Number(pattern));
+};
+
+socket.on("winning-pattern-selected", handleWinningPattern);
  const handleNumberCalled = ({ gameId, ball }) => {
 
   if (gameId !== id) {
@@ -617,29 +980,35 @@ useEffect(() => {
     handleConnect();
   }
 
+  
   return () => {
-    console.log(
-      "🧹 CLEANING GAME SOCKET:",
+  console.log(
+    "🧹 CLEANING GAME SOCKET:",
+    id
+  );
+
+  socket.off(
+    "connect",
+    handleConnect
+  );
+
+  socket.off(
+    "number-called",
+    handleNumberCalled
+  );
+
+  socket.off(
+    "winning-pattern-selected",
+    handleWinningPattern
+  );
+
+  if (socket.connected) {
+    socket.emit(
+      "leave-game",
       id
     );
-
-    socket.off(
-      "connect",
-      handleConnect
-    );
-
-    socket.off(
-      "number-called",
-      handleNumberCalled
-    );
-
-    if (socket.connected) {
-      socket.emit(
-        "leave-game",
-        id
-      );
-    }
-  };
+  }
+};
 }, [id]);
   // --- Audio & Voice Initialization ---
   useEffect(() => {
@@ -782,249 +1151,1141 @@ useEffect(() => {
     };
   }, []);
 
+// ============================================================
+// 🛑 AUDIO CLEANUP
+// ============================================================
 
-function playRecordedAudio(fileName, onComplete = () => {}) {
-  const currentGame = stateRef.current.game || game;
+// ============================================================
+// 🛑 AUDIO CLEANUP
+// ============================================================
 
-  console.log("🎤 CURRENT VOICE MODE:", currentGame.voiceMode);
-  console.log("🌍 CURRENT SPEECH LANG:", currentGame.speechLang);
-  console.log("⚡ CURRENT VOICE SPEED:", voiceSpeedRef.current);
-  
-  const isOromo = currentGame.voiceMode === "recorded-oromo";
-  const folder = isOromo ? "oromo" : "amharic";
-  console.log("📁 SELECTED FOLDER:", folder);
-  
-  const cleanName = String(fileName)
-    .trim()
-    .toLowerCase();
+// ============================================================
+// 🛑 STOP AUDIO COMPLETELY
+// Use ONLY when starting a NEW audio call.
+// Do NOT use this during pause.
+// ============================================================
 
-  const possiblePaths = [
-    `/${folder}/${cleanName}.mp3`,
-    `/${folder}/${cleanName}.wav`
-  ];
+// ============================================================
+// 🛑 AUDIO CLEANUP
+// ============================================================
 
-  console.log("🔊 RECORDED VOICE:", folder);
-  console.log("🎵 FILE:", cleanName);
-  console.log("📁 TRYING:", possiblePaths);
+function stopAndResetAudio() {
+  const audio = activeAudioRef.current;
 
-  const tryPaths = async () => {
-    for (const audioPath of possiblePaths) {
-      try {
-        await new Promise((resolve, reject) => {
-          const audio = new Audio(audioPath);
+  if (!audio) {
+    return;
+  }
 
-          audio.volume = volumeRef.current;
-          audio.playbackRate = voiceSpeedRef.current;
-          audio.preservesPitch = true;
+  console.log("🛑 STOPPING AUDIO:", audio.src);
 
-          activeAudioRef.current = audio;
+  try {
+    // Mark that this is an intentional stop.
+    audio._intentionalStop = true;
 
-          audio.onended = () => {
-            activeAudioRef.current = null;
-            resolve();
-          };
+    audio.pause();
 
-          audio.onerror = () => {
-            activeAudioRef.current = null;
-            reject();
-          };
+    // This function is for COMPLETELY stopping audio,
+    // NOT for pause/resume.
+    audio.currentTime = 0;
 
-          audio.play()
-            .then(() => {
-              console.log("▶️ AUDIO STARTED:", audioPath);
-            })
-            .catch(() => {
-              activeAudioRef.current = null;
-              reject();
-            });
-        });
+    audio.onended = null;
+    audio.onerror = null;
 
-        console.log("✅ PLAYED:", audioPath);
+  } catch (error) {
+    console.error("❌ AUDIO CLEANUP ERROR:", error);
+  }
 
-        onComplete();
-        return;
+  // ==========================================================
+  // DISCONNECT WEB AUDIO
+  // ==========================================================
 
-      } catch (error) {
-        console.log("❌ Audio not found:", audioPath);
-      }
+  try {
+    if (audio._voiceNodes) {
+
+      Object.values(audio._voiceNodes).forEach((node) => {
+
+        try {
+          if (
+            node &&
+            typeof node.disconnect === "function"
+          ) {
+            node.disconnect();
+          }
+        } catch (e) {}
+
+      });
+
+      audio._voiceNodes = null;
+    }
+  } catch (error) {
+    console.warn(
+      "⚠️ AUDIO NODE CLEANUP ERROR:",
+      error
+    );
+  }
+
+  // ==========================================================
+  // CLEAR REFERENCES
+  // ==========================================================
+
+  audioSourceRef.current = null;
+  bassFilterRef.current = null;
+
+  if (activeAudioRef.current === audio) {
+    activeAudioRef.current = null;
+  }
+}
+// ============================================================
+// 🎙️ VOICE DEPTH ENGINE
+//
+// IMPORTANT:
+//
+// VOICE SPEED and VOICE DEPTH are COMPLETELY INDEPENDENT.
+//
+// Speed controller:
+//      → controls ONLY playbackRate
+//
+// Depth controller:
+//      → controls pitch/bass/body/warmth
+//
+// Changing depth will NEVER modify the speed controller.
+// ============================================================
+
+// ============================================================
+// 🎙️ VOICE DEPTH ENGINE
+//
+// IMPORTANT:
+// VOICE SPEED AND VOICE DEPTH ARE COMPLETELY INDEPENDENT.
+//
+// Speed controller:
+//     → controls audio.playbackRate ONLY
+//
+// Voice Depth:
+//     → controls bass
+//     → controls chest/body
+//     → controls warmth
+//     → controls compression
+//
+// DEPTH NEVER CHANGES playbackRate.
+// ============================================================
+
+function applyVoiceDepth(audio) {
+  try {
+
+    // ==========================================================
+    // CREATE AUDIO CONTEXT
+    // ==========================================================
+
+    if (!audioContextRef.current) {
+      audioContextRef.current =
+        new (window.AudioContext ||
+          window.webkitAudioContext)();
     }
 
-    console.error(
-      `❌ Could not find recorded audio for ${folder}/${cleanName}`
+    const ctx = audioContextRef.current;
+
+    // ==========================================================
+    // RESUME AUDIO CONTEXT
+    // ==========================================================
+
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    // ==========================================================
+    // READ DEPTH
+    // ==========================================================
+
+    const rawDepth =
+      Number(voiceDepthRef.current) || 0;
+
+    // Your slider is -20 → +20
+    const depth =
+      Math.max(-20, Math.min(20, rawDepth));
+
+    // ==========================================================
+    // ⚠️ DO NOT TOUCH PLAYBACK RATE HERE
+    // ==========================================================
+    //
+    // The speed controller already controls:
+    //
+    // audio.playbackRate = voiceSpeedRef.current
+    //
+    // Voice depth must NEVER modify it.
+    //
+    // ==========================================================
+
+    audio.preservesPitch = true;
+
+    // Keep whatever speed the speed controller selected.
+    audio.playbackRate =
+      Number(voiceSpeedRef.current) || 1;
+
+    // ==========================================================
+    // CREATE MEDIA SOURCE
+    // ==========================================================
+
+    const source =
+      ctx.createMediaElementSource(audio);
+
+    // ==========================================================
+    // 🎙️ BASS / LOW FREQUENCY
+    // ==========================================================
+
+    const bassFilter =
+      ctx.createBiquadFilter();
+
+    bassFilter.type = "lowshelf";
+
+    bassFilter.frequency.value = 120;
+
+    // Positive depth = much more bass
+    // Negative depth = less bass
+
+    bassFilter.gain.value =
+      depth * 1.15;
+
+    // ==========================================================
+    // 🎤 CHEST / VOCAL BODY
+    // ==========================================================
+
+    const bodyFilter =
+      ctx.createBiquadFilter();
+
+    bodyFilter.type = "peaking";
+
+    bodyFilter.frequency.value = 180;
+
+    bodyFilter.Q.value = 0.9;
+
+    bodyFilter.gain.value =
+      depth * 0.75;
+
+    // ==========================================================
+    // 🎤 LOW-MID PRESENCE
+    // Makes the announcer sound thicker and bolder
+    // ==========================================================
+
+    const lowMidFilter =
+      ctx.createBiquadFilter();
+
+    lowMidFilter.type = "peaking";
+
+    lowMidFilter.frequency.value = 280;
+
+    lowMidFilter.Q.value = 0.8;
+
+    lowMidFilter.gain.value =
+      depth * 0.45;
+
+    // ==========================================================
+    // 🔥 WARMTH
+    // ==========================================================
+
+    const warmthFilter =
+      ctx.createBiquadFilter();
+
+    warmthFilter.type = "lowpass";
+
+    // Keep enough high frequencies so speech stays clear.
+
+    warmthFilter.frequency.value =
+      depth > 0
+        ? 7000
+        : 12000;
+
+    // ==========================================================
+    // 🎚️ BROADCAST COMPRESSOR
+    // ==========================================================
+
+    const compressor =
+      ctx.createDynamicsCompressor();
+
+    compressor.threshold.value = -20;
+
+    compressor.knee.value = 10;
+
+    compressor.ratio.value =
+      depth > 0
+        ? 4.5
+        : 3;
+
+    compressor.attack.value = 0.003;
+
+    compressor.release.value = 0.22;
+
+    // ==========================================================
+    // 🔊 OUTPUT GAIN
+    // ==========================================================
+
+    const outputGain =
+      ctx.createGain();
+
+    // Don't allow the depth control to become dangerously loud.
+
+    const outputLevel =
+      depth > 0
+        ? 1.0
+        : 0.95;
+
+    outputGain.gain.value =
+      outputLevel;
+
+    // ==========================================================
+    // 🔊 AUDIO CHAIN
+    //
+    // Audio
+    //   ↓
+    // Bass
+    //   ↓
+    // Vocal Body
+    //   ↓
+    // Low-Mid
+    //   ↓
+    // Warmth
+    //   ↓
+    // Compressor
+    //   ↓
+    // Output
+    //   ↓
+    // Speakers
+    // ==========================================================
+
+    source
+      .connect(bassFilter)
+      .connect(bodyFilter)
+      .connect(lowMidFilter)
+      .connect(warmthFilter)
+      .connect(compressor)
+      .connect(outputGain)
+      .connect(ctx.destination);
+
+    // ==========================================================
+    // SAVE NODES ON AUDIO OBJECT
+    // ==========================================================
+
+    audio._voiceNodes = {
+      source,
+      bassFilter,
+      bodyFilter,
+      lowMidFilter,
+      warmthFilter,
+      compressor,
+      outputGain
+    };
+
+    // ==========================================================
+    // SAVE REFERENCES
+    // ==========================================================
+
+    audioSourceRef.current =
+      source;
+
+    bassFilterRef.current =
+      bassFilter;
+
+    // ==========================================================
+    // DEBUG
+    // ==========================================================
+
+    console.log(
+      "================================="
     );
 
-    onComplete();
-  };
+    console.log(
+      "🎙️ VOICE DEPTH:",
+      depth
+    );
 
-  tryPaths();
+    console.log(
+      "⚡ VOICE SPEED:",
+      voiceSpeedRef.current
+    );
+
+    console.log(
+      "🎚️ PLAYBACK RATE:",
+      audio.playbackRate
+    );
+
+    console.log(
+      "🔊 BASS:",
+      bassFilter.gain.value
+    );
+
+    console.log(
+      "🎤 BODY:",
+      bodyFilter.gain.value
+    );
+
+    console.log(
+      "🎤 LOW-MID:",
+      lowMidFilter.gain.value
+    );
+
+    console.log(
+      "================================="
+    );
+
+    return audio._voiceNodes;
+
+  } catch (error) {
+
+    console.error(
+      "❌ VOICE DEPTH ENGINE ERROR:",
+      error
+    );
+
+    return null;
+  }
 }
-
-/*
-========================================================
-  CONTINUOUS RECORDED BINGO CALL
-  Example: B.mp3 + 12.mp3 -> B12
-========================================================
-*/
+// ============================================================
+// 🎯 BINGO CALL PLAYBACK
+// ============================================================
+// ============================================================
+// 🎯 BINGO CALL PLAYBACK
+// ============================================================
 
 async function playRecordedBingoCall(
   letter,
   number,
   onComplete = () => {}
 ) {
-  const currentGame =
-    stateRef.current.game || game;
 
-  // 🔒 ONLY OROMO VOICE
+  // ==========================================================
+  // CREATE UNIQUE GENERATION
+  // ==========================================================
+
+  const generationId =
+    ++audioGenerationRef.current;
+
+  const completeName =
+    `${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}`;
+
+  console.log(
+    "🎯 NEW AUDIO GENERATION:",
+    generationId,
+    letter,
+    number
+  );
+
+  // ==========================================================
+  // REMEMBER THIS BALL
+  //
+  // VERY IMPORTANT:
+  // Even if Pause happens while searching for the file,
+  // we still remember which ball must resume.
+  // ==========================================================
+
+  pendingBingoCallRef.current = {
+    letter,
+    number,
+    generationId,
+    completeName
+  };
+
+  // ==========================================================
+  // DO NOT PLAY WHILE PAUSED
+  // ==========================================================
+
+ 
+  // ==========================================================
+  // STOP OLD AUDIO
+  // ==========================================================
+
+  const oldAudio =
+    activeAudioRef.current;
+
+  if (
+    oldAudio &&
+    !oldAudio.ended
+  ) {
+
+    console.log(
+      "🛑 STOPPING OLD AUDIO:",
+      oldAudio.src
+    );
+
+    try {
+      oldAudio.pause();
+    } catch (e) {}
+
+  }
+
+  // ==========================================================
+  // OROMO FOLDER
+  // ==========================================================
+
   const folder = "oromo";
 
   const letterName =
-    String(letter).trim().toLowerCase();
+    String(letter)
+      .trim()
+      .toLowerCase();
 
   const numberName =
-    String(number).trim().toLowerCase();
-
-  const completeName =
-    `${letterName}${numberName}`;
+    String(number)
+      .trim()
+      .toLowerCase();
 
   const completePaths = [
-    `/${folder}/${completeName}.mp3`,
-    `/${folder}/${completeName}.wav`
+    `/${folder}/${letterName}${numberName}.mp3`,
+    `/${folder}/${letterName}${numberName}.wav`
   ];
 
-  console.log("🎙️ BINGO CALL — OROMO ONLY");
-  console.log("🔤 LETTER:", letterName);
-  console.log("🔢 NUMBER:", numberName);
-  console.log("🎯 COMPLETE RECORDING:", completeName);
-  console.log("📁 FOLDER:", folder);
+  console.log(
+    "🎙️ BINGO CALL:",
+    `${letterName}${numberName}`
+  );
+
+  console.log(
+    "🎙️ DEPTH:",
+    voiceDepthRef.current
+  );
+
+  console.log(
+    "⚡ SPEED:",
+    voiceSpeedRef.current
+  );
 
   // ==========================================================
-  // FIND COMPLETE RECORDING
+  // FIND RECORDING
   // ==========================================================
+
   async function findCompleteRecording() {
+
     for (const path of completePaths) {
+
+      // --------------------------------------------------------
+      // GENERATION CHECK
+      // --------------------------------------------------------
+
+      if (
+        generationId !==
+        audioGenerationRef.current
+      ) {
+
+        console.log(
+          "🛑 OLD AUDIO GENERATION CANCELLED:",
+          generationId
+        );
+
+        return null;
+      }
+
+      // --------------------------------------------------------
+      // IMPORTANT:
+      //
+      // DO NOT CANCEL THE PENDING BALL JUST BECAUSE GAME
+      // IS PAUSED.
+      //
+      // We want Play to resume this SAME ball.
+      // --------------------------------------------------------
+
+      if (stateRef.current.paused) {
+
+        console.log(
+          "⏸️ PAUSED WHILE SEARCHING — KEEPING PENDING CALL:",
+          completeName
+        );
+
+        return null;
+      }
+
       try {
-        const response = await fetch(path, {
-          method: "HEAD",
-          cache: "no-cache"
-        });
+
+        const response =
+          await fetch(
+            path,
+            {
+              method: "HEAD",
+              cache: "no-cache"
+            }
+          );
 
         if (response.ok) {
-          console.log("✅ FOUND COMPLETE RECORDING:", path);
+
+          console.log(
+            "✅ FOUND:",
+            path
+          );
+
           return path;
         }
+
       } catch (error) {
-        console.log("❌ COULD NOT CHECK:", path);
+
+        console.log(
+          "❌ CHECK FAILED:",
+          path
+        );
       }
     }
+
     return null;
   }
 
   // ==========================================================
-  // PLAY COMPLETE RECORDING
+  // PLAY RECORDING
   // ==========================================================
-  function playCompleteRecording(path) {
-    return new Promise((resolve, reject) => {
-      const audio = new Audio(path);
 
-      audio.volume = Number(volumeRef.current) || 1;
-      audio.playbackRate = Number(voiceSpeedRef.current) || 1;
-      audio.preservesPitch = true;
+  function playCompleteRecording(path, onFinished = () => {}) {
 
-      activeAudioRef.current = audio;
+    return new Promise(
+      (resolve, reject) => {
 
-      // ==========================================
-      // AUDIO FINISHED
-      // ==========================================
-      audio.onended = () => {
-        if (activeAudioRef.current === audio) {
-          activeAudioRef.current = null;
-        }
+        // ====================================================
+        // CHECK BEFORE CREATING AUDIO
+        // ====================================================
 
         if (
-          pausedAudioRef.current &&
-          pausedAudioRef.current.audio === audio
+          stateRef.current.paused
         ) {
-          pausedAudioRef.current = null;
-        }
 
-        console.log(
-          "✅ COMPLETE CALL FINISHED:",
-          path
-        );
-
-        resolve();
-      };
-
-      // ==========================================
-      // AUDIO ERROR
-      // ==========================================
-      audio.onerror = () => {
-        if (activeAudioRef.current === audio) {
-          activeAudioRef.current = null;
-        }
-
-        console.error(
-          "❌ AUDIO ERROR:",
-          path
-        );
-
-        reject(
-          new Error(`Could not play ${path}`)
-        );
-      };
-
-      // ==========================================
-      // PLAY
-      // ==========================================
-      audio.play()
-        .then(() => {
           console.log(
-            "▶️ AUDIO STARTED:",
-            path,
-            "TIME:",
-            audio.currentTime
+            "⏸️ GAME PAUSED BEFORE AUDIO CREATION:",
+            completeName
           );
-        })
-        .catch((error) => {
-          if (activeAudioRef.current === audio) {
-            activeAudioRef.current = null;
+
+          resolve({
+            paused: true,
+            completed: false
+          });
+
+          return;
+        }
+
+        // ====================================================
+        // CHECK GENERATION
+        // ====================================================
+
+        if (
+          generationId !==
+          audioGenerationRef.current
+        ) {
+
+          console.log(
+            "🛑 GENERATION NO LONGER CURRENT:",
+            generationId
+          );
+
+          resolve({
+            cancelled: true,
+            completed: false
+          });
+
+          return;
+        }
+
+        // ====================================================
+        // CREATE AUDIO
+        // ====================================================
+
+        const audio =
+          new Audio(path);
+
+        // ====================================================
+        // VOLUME
+        // ====================================================
+
+        audio.volume =
+          Math.max(
+            0,
+            Math.min(
+              1,
+              Number(volumeRef.current) || 1
+            )
+          );
+
+        // ====================================================
+        // SPEED
+        // ====================================================
+
+        const selectedSpeed =
+          Number(voiceSpeedRef.current) || 1;
+
+        audio.playbackRate =
+          Math.max(
+            0.5,
+            Math.min(
+              2.0,
+              selectedSpeed
+            )
+          );
+
+        // ====================================================
+        // VOICE DEPTH
+        // ====================================================
+
+        const audioNodes =
+          applyVoiceDepth(audio);
+
+        // ====================================================
+        // ACTIVE AUDIO
+        // ====================================================
+
+        activeAudioRef.current =
+          audio;
+
+        let finished = false;
+
+        // ====================================================
+        // CLEANUP
+        // ====================================================
+
+        const cleanup = () => {
+
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
+          if (
+            activeAudioRef.current === audio
+          ) {
+
+            activeAudioRef.current =
+              null;
+          }
+
+          try {
+
+            if (audio._voiceNodes) {
+
+              Object.values(
+                audio._voiceNodes
+              ).forEach((node) => {
+
+                try {
+
+                  if (
+                    node &&
+                    typeof node.disconnect ===
+                      "function"
+                  ) {
+
+                    node.disconnect();
+                  }
+
+                } catch (e) {}
+
+              });
+
+              audio._voiceNodes = null;
+            }
+
+          } catch (error) {
+
+            console.warn(
+              "⚠️ AUDIO NODE CLEANUP:",
+              error
+            );
+          }
+
+          if (
+            audioSourceRef.current ===
+            audioNodes?.source
+          ) {
+
+            audioSourceRef.current =
+              null;
+          }
+
+          if (
+            bassFilterRef.current ===
+            audioNodes?.bassFilter
+          ) {
+
+            bassFilterRef.current =
+              null;
+          }
+
+          audio.onended = null;
+          audio.onerror = null;
+        };
+
+        // ====================================================
+        // TIME DEBUG
+        // ====================================================
+
+        audio.addEventListener(
+          "timeupdate",
+          () => {
+
+            if (
+              activeAudioRef.current ===
+              audio
+            ) {
+
+              console.log(
+                "🎵 AUDIO TIME:",
+                audio.currentTime
+              );
+            }
+
+          }
+        );
+
+        // ====================================================
+        // AUDIO ENDED
+        // ====================================================
+
+       audio.onended = () => {
+  console.log(
+    "✅ VOICE FINISHED:",
+    completeName
+  );
+
+  cleanup();
+
+  // Do NOT clear the pending call here.
+  // The Bingo call completion handler owns that state.
+
+  try {
+    onFinished();
+  } catch (error) {
+    console.error(
+      "❌ BINGO COMPLETION CALLBACK ERROR:",
+      error
+    );
+  }
+
+  resolve({
+    completed: true
+  });
+};
+        // ====================================================
+        // AUDIO ERROR
+        // ====================================================
+
+        audio.onerror = (error) => {
+
+          // --------------------------------------------------
+          // PAUSE IS NOT AN ERROR
+          // --------------------------------------------------
+
+          if (
+            stateRef.current.paused
+          ) {
+
+            console.log(
+              "⏸️ AUDIO ERROR WHILE PAUSED — KEEPING AUDIO"
+            );
+
+            // DO NOT cleanup active audio here.
+            // Pause/Resume still owns this object.
+
+            resolve({
+              paused: true,
+              completed: false
+            });
+
+            return;
           }
 
           console.error(
-            "❌ AUDIO PLAY ERROR:",
+            "❌ VOICE AUDIO ERROR:",
+            path,
             error
           );
 
-          reject(error);
-        });
-    });
-  }
+          cleanup();
 
-  // Execute playback
-  try {
-    const foundPath = await findCompleteRecording();
-    if (foundPath) {
-      await playCompleteRecording(foundPath);
-    } else {
-      console.error(`❌ No audio file found for ${completeName}`);
-    }
-  } catch (error) {
-    console.error("❌ Error in playRecordedBingoCall:", error);
-  } finally {
-    onComplete();
-  }
+          reject(
+            new Error(
+              `Could not play ${path}`
+            )
+          );
+        };
+
+        // ====================================================
+        // PLAY
+        // ====================================================
+
+        audio.play()
+          .then(() => {
+
+            console.log(
+              "▶️ PLAYING:",
+              path
+            );
+
+            console.log(
+              "🎙️ DEPTH:",
+              voiceDepthRef.current
+            );
+
+            console.log(
+              "⚡ SPEED:",
+              voiceSpeedRef.current
+            );
+
+            console.log(
+              "⚡ ACTUAL RATE:",
+              audio.playbackRate
+            );
+
+            // ------------------------------------------------
+            // IF PAUSE HAPPENED DURING play()
+            // ------------------------------------------------
+
+            if (
+              stateRef.current.paused
+            ) {
+
+              console.log(
+                "⏸️ AUDIO STARTED BUT GAME IS PAUSED"
+              );
+
+              return;
+            }
+
+          })
+          .catch((error) => {
+
+            // =================================================
+            // ABORT ERROR CAUSED BY PAUSE
+            // =================================================
+
+           if (
+  error?.name === "AbortError" &&
+  stateRef.current.paused
+) {
+  console.log(
+    "⏸️ PLAY INTERRUPTED BECAUSE GAME WAS PAUSED"
+  );
+
+  // IMPORTANT:
+  // Pause is NOT completion.
+  // Keep the playRecordedBingoCall promise alive.
+  // The same audio object will continue after PLAY.
+  // audio.onended will complete the call.
+
+  return;
 }
 
+            console.error(
+              "❌ AUDIO PLAY ERROR:",
+              error
+            );
+
+            cleanup();
+
+            reject(error);
+          });
+
+      }
+    );
+  }
+
+  // ==========================================================
+  // EXECUTE
+  // ==========================================================
+
+  try {
+
+    const foundPath =
+      await findCompleteRecording();
+// ========================================================
+// GENERATION CHECK AFTER AUDIO SEARCH
+// ========================================================
+
+if (
+  generationId !==
+  audioGenerationRef.current
+) {
+
+  console.log(
+    "🛑 OLD GENERATION WILL NOT CONTINUE:",
+    generationId,
+    "CURRENT:",
+    audioGenerationRef.current
+  );
+
+  return;
+}
+
+
+// ========================================================
+// GAME PAUSED DURING SEARCH
+// ========================================================
+
+if (stateRef.current.paused) {
+
+  console.log(
+    "⏸️ GAME PAUSED WHILE FINDING AUDIO — KEEPING BALL:",
+    completeName
+  );
+
+  pendingBingoCallRef.current = {
+    letter,
+    number,
+    generationId,
+    completeName,
+    foundPath
+  };
+
+  // VERY IMPORTANT
+  isDrawingBallRef.current = false;
+
+  return;
+}
+    // ========================================================
+    // GAME PAUSED DURING SEARCH
+    // ========================================================
+
+    if (
+      stateRef.current.paused
+    ) {
+
+      console.log(
+        "⏸️ GAME PAUSED WHILE FINDING AUDIO — KEEPING BALL:",
+        completeName
+      );
+
+      // DO NOT CLEAR pendingBingoCallRef
+      // DO NOT call onComplete
+      // DO NOT generate another number
+
+      return;
+    }
+
+    // ========================================================
+    // GENERATION CHECK
+    // ========================================================
+
+    if (
+      generationId !==
+      audioGenerationRef.current
+    ) {
+
+      console.log(
+        "🛑 OLD GENERATION WILL NOT PLAY:",
+        generationId
+      );
+
+      return;
+    }
+
+    // ========================================================
+    // PLAY FOUND RECORDING
+    // ========================================================
+
+    if (foundPath) {
+
+    const result =
+  await playCompleteRecording(
+    foundPath,
+    () => {
+      console.log(
+        "🔔 DIRECT AUDIO COMPLETION:",
+        completeName
+      );
+
+      // This callback is intentionally only a completion signal.
+      // The normal onComplete below remains responsible
+      // for scheduling the next number.
+    }
+  );
+
+      // ------------------------------------------------------
+      // PAUSED
+      // ------------------------------------------------------
+
+    if (result?.paused) {
+
+  console.log(
+    "⏸️ CALL WAITING FOR RESUME:",
+    completeName
+  );
+
+  isDrawingBallRef.current = false;
+
+  return;
+}
+
+      // ------------------------------------------------------
+      // COMPLETED
+      // ------------------------------------------------------
+
+      if (
+        result?.completed
+      ) {
+
+        onComplete();
+      }
+
+    } else {
+
+      console.error(
+        `❌ NO RECORDING FOUND: ${completeName}`
+      );
+
+      // We don't want the game to silently continue.
+      isDrawingBallRef.current =
+        false;
+    }
+
+  } catch (error) {
+
+  if (
+    error?.name === "AbortError"
+  ) {
+
+    console.log(
+      "⏸️ AUDIO ABORTED DURING PAUSE"
+    );
+
+    isDrawingBallRef.current = false;
+
+  } else {
+
+    console.error(
+      "❌ BINGO VOICE ERROR:",
+      error
+    );
+
+    isDrawingBallRef.current = false;
+  }
+}
+ } // ==========================================================
+
+ 
 function playShuffleSound(onComplete = () => {}) {
   const audioPath = "/oromo/shuffle.mp3";
 
   console.log("🎵 OROMO SHUFFLE:", audioPath);
 
-  const audio = new Audio(audioPath);
+ const audio = new Audio(audioPath);
 
-  audio.volume = Number(volumeRef.current) || 1;
-  audio.playbackRate = Number(voiceSpeedRef.current) || 1;
-  audio.preservesPitch = true;
+// ==========================================================
+// 🎵 DEBUG AUDIO POSITION
+// ==========================================================
+
+audio.addEventListener("timeupdate", () => {
+
+  if (activeAudioRef.current === audio) {
+
+    console.log(
+      "🎵 AUDIO TIME:",
+      audio.currentTime
+    );
+
+  }
+
+});
+
+// ==========================================================
+// AUDIO SETTINGS
+// ==========================================================
+
+audio.volume =
+  Number(volumeRef.current) || 1;
+
+audio.playbackRate =
+  Number(voiceSpeedRef.current) || 1;
+
+audio.preservesPitch = true;
 
   activeAudioRef.current = audio;
   shuffleAudioRef.current = audio;
@@ -1456,11 +2717,16 @@ function updateRunningCallInterval() {
       loopTimeoutRef.current =
         null;
 
-      if (stateRef.current.paused) {
-        isDrawingBallRef.current =
-          false;
-        return;
-      }
+    if (stateRef.current.paused) {
+  console.log("⏸️ PAUSED DURING CALL — KEEPING BALL PENDING");
+
+  isDrawingBallRef.current = false;
+
+  // Keep the ball so PLAY can resume it
+  resumeAfterGenerationRef.current = false;
+
+  return;
+}
 
       console.log(
         "🚀 UPDATED INTERVAL: STARTING NEXT NUMBER"
@@ -1508,342 +2774,583 @@ function announceLetsGo(callback) {
 }
 
 const togglePlayPause = () => {
-  // PREVENT RAPID CLICK SPAM
-  if (togglePlayPause.lock) {
-    console.log("⏳ PLAY/PAUSE CLICK IGNORED");
-    return;
-  }
+  // ==========================================================
+  // PLAY / PAUSE - STABLE SINGLE-CALL CONTROL
+  // ==========================================================
 
-  togglePlayPause.lock = true;
+  const actionId = ++playPauseActionRef.current;
+  const isCurrentlyPaused = stateRef.current.paused;
 
-  setTimeout(() => {
-    togglePlayPause.lock = false;
-  }, 300);
+  // ==========================================================
+  // ⏸️ PAUSE
+  // ==========================================================
 
-  // ==========================================
-// PAUSE / PLAY
-// ==========================================
-
-if (!paused) {
-
-  // ==========================================
-  // PAUSE
-  // ==========================================
-
-  console.log("⏸️ PAUSE");
-
-  stateRef.current.paused = true;
-  setPaused(true);
-
-  // Cancel only the next-number timer
-  if (loopTimeoutRef.current !== null) {
-    clearTimeout(loopTimeoutRef.current);
-    loopTimeoutRef.current = null;
-
-    console.log("⏹️ NEXT NUMBER TIMER CANCELLED");
-  }
-
-  // ==========================================
-  // PAUSE CURRENT AUDIO
-  // ==========================================
-
-  const audio = activeAudioRef.current;
-
-  if (audio && !audio.ended) {
-
-    console.log(
-      "⏸️ SAVING EXACT CURRENT AUDIO:",
-      audio.src,
-      "TIME:",
-      audio.currentTime
-    );
-
-    pausedAudioRef.current = {
-      audio: audio,
-      fileName: audio.src
-        .split("/")
-        .pop()
-        .split(".")[0]
-        .toLowerCase()
-    };
-
-    // Pause the SAME Audio object
-    audio.pause();
-
-    // Keep reference to SAME audio
-    activeAudioRef.current = audio;
-
-    return;
-  }
-
-  // ==========================================
-  // NO ACTIVE AUDIO
-  // ==========================================
-
-  console.log(
-    "⏸️ GAME PAUSED — NO ACTIVE AUDIO"
-  );
-
-  return;
-}
-
-
-// ==========================================
-// PLAY / RESUME
-// ==========================================
-
-console.log("▶️ PLAY");
-
-
-// ==========================================
-// FIRST: CHECK PAUSED AUDIO
-// ==========================================
-
-const pausedData = pausedAudioRef.current;
-
-if (pausedData && pausedData.audio) {
-
-  const audio = pausedData.audio;
-
-  // ------------------------------------------
-  // AUDIO ALREADY FINISHED
-  // ------------------------------------------
-
-  if (audio.ended) {
-
-    console.log(
-      "⚠️ PAUSED AUDIO ALREADY ENDED — CLEARING"
-    );
-
-    pausedAudioRef.current = null;
-
-    if (activeAudioRef.current === audio) {
-      activeAudioRef.current = null;
-    }
+  if (!isCurrentlyPaused) {
+    console.log("⏸️ PAUSE");
 
     // IMPORTANT:
-    // The old generation is finished.
-    // Allow a NEW generation.
-    isDrawingBallRef.current = false;
+    // Update the ref immediately so every async callback
+    // knows the game is paused.
+    stateRef.current.paused = true;
+    setPaused(true);
 
-  }
+    // ----------------------------------------------------------
+    // STOP ONLY THE NEXT-NUMBER TIMER
+    // ----------------------------------------------------------
 
-  // ------------------------------------------
-  // AUDIO CAN STILL RESUME
-  // ------------------------------------------
+    if (loopTimeoutRef.current !== null) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
 
-  else {
+      console.log("⏹️ NEXT NUMBER TIMER CANCELLED");
+    }
 
-    console.log(
-      "▶️ RESUMING EXACT PAUSED AUDIO:",
-      audio.src,
-      "TIME:",
-      audio.currentTime
-    );
+    if (callIntervalTimerRef.current !== null) {
+      clearTimeout(callIntervalTimerRef.current);
+      callIntervalTimerRef.current = null;
+    }
 
-    activeAudioRef.current = audio;
+    // ==========================================================
+    // 1. CURRENT HTML AUDIO
+    // ==========================================================
 
-    pausedAudioRef.current = null;
+    const audio = activeAudioRef.current;
 
-    stateRef.current.paused = false;
-    setPaused(false);
+    if (audio && !audio.ended) {
+      const currentTime = Number(audio.currentTime) || 0;
 
-    audio.play()
-      .then(() => {
+      console.log("⏸️ PAUSING AUDIO:", audio.src);
+      console.log("⏱️ SAVING POSITION:", currentTime);
 
-        console.log(
-          "✅ EXACT AUDIO RESUMED:",
-          audio.src,
-          "TIME:",
-          audio.currentTime
-        );
+      // Save the exact same Audio object.
+      pausedAudioRef.current = {
+        audio,
+        fileName: audio.src
+          .split("/")
+          .pop()
+          .split(".")[0]
+          .toLowerCase(),
+        time: currentTime,
+      };
 
-      })
-      .catch((err) => {
+      try {
+        audio.pause();
+      } catch (error) {
+        console.warn("⚠️ AUDIO PAUSE ERROR:", error);
+      }
 
-        console.error(
-          "❌ EXACT AUDIO RESUME ERROR:",
-          err
-        );
+      // Keep this exact audio object alive.
+      activeAudioRef.current = audio;
 
-        // Put the SAME audio back into paused storage
-        // if it has not finished.
-        if (!audio.ended) {
+      console.log("🔒 CURRENT CALL LOCKED");
+      return;
+    }
 
-          pausedAudioRef.current = {
-            audio: audio,
-            fileName: audio.src
-              .split("/")
-              .pop()
-              .split(".")[0]
-              .toLowerCase()
-          };
+    // ==========================================================
+    // 2. NATIVE SPEECH
+    // ==========================================================
 
-          activeAudioRef.current = audio;
+    if (
+      typeof window !== "undefined" &&
+      window.speechSynthesis &&
+      activeUtteranceRef.current
+    ) {
+      console.log("⏸️ PAUSING NATIVE SPEECH");
 
-          stateRef.current.paused = true;
-          setPaused(true);
-
-          return;
-        }
-
-        // Audio really finished
-        pausedAudioRef.current = null;
-        activeAudioRef.current = null;
-
-        isDrawingBallRef.current = false;
-
-        stateRef.current.paused = false;
-        setPaused(false);
-      });
-
-    // VERY IMPORTANT:
-    // Do NOT generate another number.
-    return;
-  }
-}
-
-
-// ==========================================
-// NO VALID PAUSED AUDIO
-// ==========================================
-
-stateRef.current.paused = false;
-setPaused(false);
-
-
-// ==========================================
-// CHECK ACTIVE AUDIO
-// ==========================================
-
-const activeAudio = activeAudioRef.current;
-
-if (
-  activeAudio &&
-  !activeAudio.ended
-) {
-
-  console.log(
-    "▶️ AUDIO ALREADY EXISTS — NOT GENERATING:",
-    activeAudio.src,
-    "TIME:",
-    activeAudio.currentTime
-  );
-
-  if (activeAudio.paused) {
-
-    activeAudio.play()
-      .then(() => {
-
-        console.log(
-          "✅ EXISTING AUDIO RESUMED:",
-          activeAudio.src,
-          "TIME:",
-          activeAudio.currentTime
-        );
-
-      })
-      .catch((err) => {
-
-        console.error(
-          "❌ EXISTING AUDIO RESUME ERROR:",
-          err
-        );
-
-      });
-  }
-
-  return;
-}
-
-
-// ==========================================
-// NO AUDIO — START NEW NUMBER
-// ==========================================
-
-console.log(
-  "▶️ NO CURRENT AUDIO — STARTING GAME"
-);
-
-
-// ==========================================
-// IMPORTANT:
-// If there is no audio and no timer,
-// the previous generation is finished.
-// Release stale generation lock.
-// ==========================================
-
-if (
-  !activeAudioRef.current &&
-  loopTimeoutRef.current === null
-) {
-
-  if (isDrawingBallRef.current) {
-
-    console.log(
-      "🔓 CLEARING STALE GENERATION LOCK"
-    );
-
-    isDrawingBallRef.current = false;
-  }
-}
-
-
-// ==========================================
-// CHECK LOCK AFTER CLEANUP
-// ==========================================
-
-if (isDrawingBallRef.current) {
-
-  console.log(
-    "🛑 GENERATION ALREADY LOCKED"
-  );
-
-  return;
-}
-
-
-// ==========================================
-// SHUFFLE ONLY FIRST PLAY
-// ==========================================
-
-if (!hasPlayedShuffleRef.current) {
-
-  hasPlayedShuffleRef.current = true;
-
-  console.log(
-    "🎵 PLAYING SHUFFLE"
-  );
-
-  playShuffleSound(() => {
-
-    if (stateRef.current.paused) {
-
-      console.log(
-        "⏸️ PAUSED DURING SHUFFLE"
-      );
+      try {
+        window.speechSynthesis.pause();
+      } catch (error) {
+        console.warn("⚠️ SPEECH PAUSE ERROR:", error);
+      }
 
       return;
     }
 
+    // ==========================================================
+    // 3. AUDIO SEARCH / PENDING NUMBER
+    // ==========================================================
+
+    if (pendingBingoCallRef.current) {
+      console.log(
+        "⏸️ CURRENT NUMBER WAITING:",
+        pendingBingoCallRef.current
+      );
+
+      // Do NOT remove the pending number.
+      // Play will announce this SAME number.
+
+      // Cancel any old async audio search.
+      audioGenerationRef.current++;
+
+      // The number already exists, so don't let the
+      // generation lock block Play.
+      isDrawingBallRef.current = false;
+
+      console.log("🔒 PENDING NUMBER SAVED FOR RESUME");
+
+      return;
+    }
+
+    // ==========================================================
+    // 4. GENERATION STARTED BUT NO NUMBER YET
+    // ==========================================================
+
+    if (isDrawingBallRef.current) {
+      console.log(
+        "⏸️ GENERATION IN PROGRESS — CANCELLING CURRENT GENERATION"
+      );
+
+      generationCancelRef.current++;
+      audioGenerationRef.current++;
+
+      isDrawingBallRef.current = false;
+
+      console.log("🛑 GENERATION CANCELLED");
+
+      return;
+    }
+
+    console.log("⏸️ PAUSED — NOTHING CURRENTLY PLAYING");
+
+    return;
+  }
+
+  // ==========================================================
+  // ▶️ PLAY / RESUME
+  // ==========================================================
+
+  console.log("▶️ PLAY");
+
+  // Update immediately.
+  stateRef.current.paused = false;
+  setPaused(false);
+
+  // ==========================================================
+  // 1. RESUME EXACT SAME PAUSED AUDIO
+  // ==========================================================
+
+  const pausedData = pausedAudioRef.current;
+
+  if (pausedData && pausedData.audio) {
+    const audio = pausedData.audio;
+
+    // ----------------------------------------------------------
+    // VERY IMPORTANT:
+    //
+    // Remove pausedData BEFORE calling audio.play().
+    //
+    // This prevents rapid Play → Play from starting multiple
+    // play() promises for the same audio.
+    //
+    // If the user presses Pause again while play() is starting,
+    // the Pause handler will create a fresh pausedData object.
+    // ----------------------------------------------------------
+
+    pausedAudioRef.current = null;
+
+    // Make sure this is still the newest button action.
+    if (actionId !== playPauseActionRef.current) {
+      console.log("🛑 OLD PLAY ACTION IGNORED");
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // Audio already finished
+    // ----------------------------------------------------------
+
+    if (audio.ended) {
+      console.log("⚠️ PAUSED AUDIO ALREADY FINISHED");
+
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+
+      isDrawingBallRef.current = false;
+
+      // Do NOT generate here.
+      // The normal flow below will decide what to do.
+    } else {
+      // --------------------------------------------------------
+      // Restore exact position
+      // --------------------------------------------------------
+
+      const savedTime = Number(pausedData.time) || 0;
+
+      try {
+        if (
+          Number.isFinite(audio.duration) &&
+          audio.duration > 0 &&
+          savedTime >= 0 &&
+          savedTime < audio.duration
+        ) {
+          audio.currentTime = savedTime;
+
+          console.log(
+            "⏱️ RESTORED AUDIO POSITION:",
+            audio.currentTime
+          );
+        }
+      } catch (error) {
+        console.warn(
+          "⚠️ COULD NOT RESTORE AUDIO POSITION:",
+          error
+        );
+      }
+
+      // Keep same audio active.
+      activeAudioRef.current = audio;
+
+      // --------------------------------------------------------
+      // Start the SAME audio
+      // --------------------------------------------------------
+
+      let resumePromise;
+
+      try {
+        resumePromise = audio.play();
+      } catch (error) {
+        console.error("❌ AUDIO RESUME ERROR:", error);
+
+        // Put it back so the next Play can retry.
+        if (!audio.ended) {
+          pausedAudioRef.current = {
+            audio,
+            fileName: audio.src
+              .split("/")
+              .pop()
+              .split(".")[0]
+              .toLowerCase(),
+            time: Number(audio.currentTime) || 0,
+          };
+
+          stateRef.current.paused = true;
+          setPaused(true);
+        }
+
+        return;
+      }
+
+      resumePromise
+        .then(() => {
+          // ----------------------------------------------------
+          // Ignore stale Play promises.
+          // ----------------------------------------------------
+
+          if (actionId !== playPauseActionRef.current) {
+            console.log(
+              "🛑 OLD RESUME PROMISE IGNORED"
+            );
+            return;
+          }
+
+          // ----------------------------------------------------
+          // User pressed Pause while play() was starting.
+          // ----------------------------------------------------
+
+          if (stateRef.current.paused) {
+            console.log(
+              "⏸️ AUDIO STARTED BUT GAME IS PAUSED"
+            );
+            return;
+          }
+
+          console.log(
+            "✅ AUDIO RESUMED:",
+            audio.src,
+            "TIME:",
+            audio.currentTime
+          );
+        })
+        .catch((error) => {
+          // ----------------------------------------------------
+          // AbortError is normal when Pause happens quickly.
+          // ----------------------------------------------------
+
+          if (error?.name === "AbortError") {
+            console.log(
+              "⏸️ RESUME ABORTED — PAUSE HANDLER WILL SAVE POSITION"
+            );
+
+            return;
+          }
+
+          console.error(
+            "❌ AUDIO RESUME ERROR:",
+            error
+          );
+
+          // Preserve current position if playback failed.
+          if (!audio.ended) {
+            pausedAudioRef.current = {
+              audio,
+              fileName: audio.src
+                .split("/")
+                .pop()
+                .split(".")[0]
+                .toLowerCase(),
+              time: Number(audio.currentTime) || 0,
+            };
+
+            activeAudioRef.current = audio;
+
+            stateRef.current.paused = true;
+            setPaused(true);
+          }
+        });
+
+      // ========================================================
+      // VERY IMPORTANT:
+      //
+      // We are resuming the current number.
+      // NEVER generate another number here.
+      // ========================================================
+
+      return;
+    }
+  }
+
+  // ==========================================================
+  // 2. RESUME NATIVE SPEECH
+  // ==========================================================
+
+  if (
+    typeof window !== "undefined" &&
+    window.speechSynthesis &&
+    activeUtteranceRef.current
+  ) {
+    console.log("▶️ RESUMING NATIVE SPEECH");
+
+    try {
+      window.speechSynthesis.resume();
+    } catch (error) {
+      console.warn(
+        "⚠️ SPEECH RESUME ERROR:",
+        error
+      );
+    }
+
+    return;
+  }
+
+  // ==========================================================
+  // 3. ACTIVE AUDIO EXISTS
+  // ==========================================================
+
+  const activeAudio = activeAudioRef.current;
+
+  if (
+    activeAudio &&
+    !activeAudio.ended
+  ) {
     console.log(
-      "🎵 SHUFFLE FINISHED"
+      "▶️ ACTIVE AUDIO EXISTS:",
+      activeAudio.src
     );
 
-    generateNumber();
+    // Only call play() if it is actually paused.
+    if (activeAudio.paused) {
+      let playPromise;
 
-  });
+      try {
+        playPromise = activeAudio.play();
+      } catch (error) {
+        console.error(
+          "❌ ACTIVE AUDIO PLAY ERROR:",
+          error
+        );
+        return;
+      }
 
-  return;
-}
+      playPromise
+        .then(() => {
+          if (
+            actionId !== playPauseActionRef.current
+          ) {
+            console.log(
+              "🛑 OLD ACTIVE AUDIO PLAY IGNORED"
+            );
+            return;
+          }
 
+          if (stateRef.current.paused) {
+            console.log(
+              "⏸️ AUDIO PLAYED BUT GAME IS PAUSED"
+            );
+            return;
+          }
 
-// ==========================================
-// GENERATE NEXT NUMBER
-// ==========================================
+          console.log(
+            "✅ ACTIVE AUDIO PLAYING:",
+            activeAudio.currentTime
+          );
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError") {
+            console.log(
+              "⏸️ ACTIVE AUDIO PLAY ABORTED"
+            );
+            return;
+          }
 
-generateNumber();
+          console.error(
+            "❌ ACTIVE AUDIO PLAY ERROR:",
+            error
+          );
+        });
+    }
+
+    // Never generate another number while current audio exists.
+    return;
+  }
+
+  // ==========================================================
+  // 4. GENERATION STILL IN PROGRESS
+  // ==========================================================
+
+  if (isDrawingBallRef.current) {
+    console.log(
+      "⏳ CALL GENERATION STILL IN PROGRESS"
+    );
+
+    return;
+  }
+
+  // ==========================================================
+  // 5. PENDING BINGO CALL
+  // ==========================================================
+
+  if (pendingBingoCallRef.current) {
+    const pending = pendingBingoCallRef.current;
+
+    console.log(
+      "▶️ RESUMING PENDING CALL:",
+      pending
+    );
+
+    // ----------------------------------------------------------
+    // IMPORTANT:
+    //
+    // Lock generation BEFORE starting the async audio search.
+    //
+    // This prevents:
+    //
+    // Play
+    // Play
+    // Play
+    //
+    // from launching the same pending call three times.
+    // ----------------------------------------------------------
+
+    isDrawingBallRef.current = true;
+
+    playRecordedBingoCall(
+      pending.letter,
+      pending.number,
+      () => {
+        // ------------------------------------------------------
+        // If user paused during this call:
+        // ------------------------------------------------------
+
+        if (stateRef.current.paused) {
+          console.log(
+            "⏸️ PENDING CALL FINISHED BUT GAME IS PAUSED"
+          );
+
+          isDrawingBallRef.current = false;
+
+          return;
+        }
+
+        // ------------------------------------------------------
+        // Current number is now completely announced.
+        // ------------------------------------------------------
+
+        pendingBingoCallRef.current = null;
+
+        isDrawingBallRef.current = false;
+
+        console.log(
+          "✅ PENDING CALL FINISHED:",
+          pending.letter,
+          pending.number
+        );
+
+        // ------------------------------------------------------
+        // Start next number ONLY ONCE.
+        // ------------------------------------------------------
+
+        generateNumber();
+      }
+    );
+
+    return;
+  }
+
+  // ==========================================================
+  // 6. NO CURRENT CALL
+  // ==========================================================
+
+  console.log(
+    "▶️ NO AUDIO / NO GENERATION / NO PENDING CALL"
+  );
+
+  // ==========================================================
+  // FIRST GAME SHUFFLE
+  // ==========================================================
+
+  if (!hasPlayedShuffleRef.current) {
+    hasPlayedShuffleRef.current = true;
+
+    sessionStorage.setItem(
+      "bingo_shuffle_played",
+      "true"
+    );
+
+    console.log(
+      "🎵 PLAYING SHUFFLE — FIRST GAME START"
+    );
+
+    playShuffleSound(() => {
+      if (stateRef.current.paused) {
+        console.log(
+          "⏸️ PAUSED DURING SHUFFLE"
+        );
+
+        return;
+      }
+
+      if (isDrawingBallRef.current) {
+        console.log(
+          "⏳ GENERATION ALREADY STARTED"
+        );
+
+        return;
+      }
+
+      generateNumber();
+    });
+
+    return;
+  }
+
+  // ==========================================================
+  // NORMAL NEW NUMBER
+  // ==========================================================
+
+  console.log(
+    "🚀 STARTING NEW NUMBER"
+  );
+
+  generateNumber();
 };
+
+// ==========================================
+// END PAUSE / PLAY
+// ==========================================
+// ==========================================
+// END PAUSE / PLAY
+// ==========================================
+
 useEffect(() => {
   const updatePhysics = () => {
     setCageBalls(prev => prev.map(ball => {
@@ -1904,95 +3411,204 @@ useEffect(() => {
 async function generateNumber() {
   const generationStart = Date.now();
 
+  const myGenerationId =
+    generationCancelRef.current;
+
+  const currentGameId =
+    stateRef.current.game?.game_id ||
+    stateRef.current.game?.id;
+
   console.log(
     "🔥 GENERATE ENTERED",
     generationStart,
     "LOCK:",
     isDrawingBallRef.current,
+    "CANCEL ID:",
+    myGenerationId,
     "GAME:",
-    stateRef.current.game?.game_id || stateRef.current.game?.id
+    currentGameId
   );
 
-  // Never allow two generations at the same time
- if (isDrawingBallRef.current || stateRef.current.paused) {
-  console.log(
-    ">>> GENERATE BLOCKED",
-    {
-      locked: isDrawingBallRef.current,
-      paused: stateRef.current.paused
-    }
-  );
-  return;
-}
+  if (stateRef.current.paused) {
+    console.log(
+      ">>> GENERATE BLOCKED - PAUSED"
+    );
+    return;
+  }
 
-if (loopTimeoutRef.current) {
-  console.log(">>> GENERATE BLOCKED - LOOP ALREADY EXISTS");
-  return;
-}
-
-  const currentGame = stateRef.current.game;
-  const gameId = currentGame?.game_id || currentGame?.id;
-  if (!navigator.onLine) {
-  console.log("❌ INTERNET LOST - GAME PAUSED");
-
-  setPaused(true);
+  if (isDrawingBallRef.current) {
+    console.log(
+      "⏳ CALL GENERATION STILL IN PROGRESS"
+    );
+    return;
+  }
 
   if (loopTimeoutRef.current) {
-    clearTimeout(loopTimeoutRef.current);
-    loopTimeoutRef.current = null;
-  }
-
-  isDrawingBallRef.current = false;
-
-  alert("Internet disconnected. Game paused.");
-
-  return;
-}
-
-  if (!gameId) {
-    console.error("No game_id found:", currentGame);
+    console.log(
+      ">>> GENERATE BLOCKED - LOOP ALREADY EXISTS"
+    );
     return;
   }
 
-  const currentRemaining = remainingNumbersRef.current;
+  // =========================================================
+  // MAKE SURE GAME ID EXISTS
+  // =========================================================
 
-  if (!currentRemaining.length) {
-    console.log(">>> NO NUMBERS REMAINING");
-    setPaused(true);
-    return;
-  }
-
-  // LOCK immediately
-  isDrawingBallRef.current = true;
-
-  try {
-    // Pick random number
-    const randomIndex = Math.floor(
-      Math.random() * currentRemaining.length
+  if (!currentGameId) {
+    console.error(
+      "❌ NO GAME ID AVAILABLE — CANNOT GENERATE NUMBER"
     );
 
-    const number = currentRemaining[randomIndex];
+    isDrawingBallRef.current = false;
+
+    return;
+  }
+
+  // =========================================================
+  // LOCK IMMEDIATELY
+  // =========================================================
+
+  isDrawingBallRef.current = true;
+
+  // =========================================================
+  // GENERATION VALIDATION
+  // =========================================================
+
+  const generationStillValid = () => {
+    return (
+      myGenerationId ===
+        generationCancelRef.current &&
+      !stateRef.current.paused
+    );
+  };
+
+  try {
+    // =========================================================
+    // GET REMAINING NUMBERS
+    // =========================================================
+
+    const currentRemaining =
+      remainingNumbersRef.current;
+
+    if (
+      !currentRemaining ||
+      currentRemaining.length === 0
+    ) {
+      console.log(
+        "🛑 NO REMAINING NUMBERS"
+      );
+
+      isDrawingBallRef.current = false;
+
+      return;
+    }
+
+    // =========================================================
+    // PICK RANDOM NUMBER
+    // =========================================================
+
+    const randomIndex = Math.floor(
+      Math.random() *
+        currentRemaining.length
+    );
+
+    const number =
+      currentRemaining[randomIndex];
+
+    // =========================================================
+    // CHECK CANCELLATION
+    // =========================================================
+
+    if (!generationStillValid()) {
+      console.log(
+        "🛑 OLD GENERATION CANCELLED — STOPPING"
+      );
+
+      isDrawingBallRef.current = false;
+
+      return;
+    }
+
+    // =========================================================
+    // REMOVE NUMBER FROM REMAINING
+    // =========================================================
 
     remainingNumbersRef.current =
-      currentRemaining.filter(n => n !== number);
+      currentRemaining.filter(
+        n => n !== number
+      );
 
-    // Determine Bingo letter
+    // =========================================================
+    // DETERMINE BINGO LETTER
+    // =========================================================
+
     let letter = "B";
 
-    if (number >= 16) letter = "I";
-    if (number >= 31) letter = "N";
-    if (number >= 46) letter = "G";
-    if (number >= 61) letter = "O";
+    if (number >= 16) {
+      letter = "I";
+    }
 
-    const result = `${letter} ${number}`;
-seenBallsRef.current.add(result);
-    // Update frontend state
+    if (number >= 31) {
+      letter = "N";
+    }
+
+    if (number >= 46) {
+      letter = "G";
+    }
+
+    if (number >= 61) {
+      letter = "O";
+    }
+
+    const result =
+      `${letter} ${number}`;
+
+    // =========================================================
+    // REMEMBER BALL
+    // =========================================================
+
+    seenBallsRef.current.add(result);
+
+    // =========================================================
+    // REMEMBER PENDING CALL
+    // =========================================================
+
+    pendingBingoCallRef.current = {
+      letter,
+      number,
+      result
+    };
+
+    console.log(
+      "💾 PENDING BINGO CALL:",
+      pendingBingoCallRef.current
+    );
+
+    // =========================================================
+    // CHECK AGAIN BEFORE STATE UPDATE
+    // =========================================================
+
+    if (!generationStillValid()) {
+      console.log(
+        "🛑 OLD GENERATION CANCELLED — STOPPING BEFORE STATE UPDATE"
+      );
+
+      isDrawingBallRef.current = false;
+
+      return;
+    }
+
+    // =========================================================
+    // UPDATE FRONTEND STATE
+    // =========================================================
+
     const updatedCalled = [
       ...calledRef.current,
       result
     ];
 
-    calledRef.current = updatedCalled;
+    calledRef.current =
+      updatedCalled;
 
     setCalled(updatedCalled);
     setCurrent(result);
@@ -2001,97 +3617,122 @@ seenBallsRef.current.add(result);
       "🎯 CALLING NUMBER:",
       result,
       "FOR GAME:",
-      gameId
+      currentGameId
     );
 
     // =========================================================
     // SAVE NUMBER TO BACKEND
     // =========================================================
+
+    fetch(
+      `${API_URL}/games/${currentGameId}/call-number`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+
+        body: JSON.stringify({
+          ball: result
+        })
+      }
+    )
+      .then(async response => {
+        if (!response.ok) {
+          const errorText =
+            await response.text();
+
+          throw new Error(
+            `Call-number API failed: ${response.status} ${errorText}`
+          );
+        }
+
+        console.log(
+          "✅ NUMBER SAVED IN BACKGROUND:",
+          result
+        );
+      })
+      .catch(err => {
+        console.error(
+          "❌ BACKGROUND NUMBER SAVE FAILED:",
+          result,
+          err
+        );
+
+        setPaused(true);
+
+        if (
+          loopTimeoutRef.current
+        ) {
+          clearTimeout(
+            loopTimeoutRef.current
+          );
+
+          loopTimeoutRef.current =
+            null;
+        }
+
+        isDrawingBallRef.current =
+          false;
+
+        alert(
+          "Connection lost. Game paused."
+        );
+      });
+
     // =========================================================
-// SAVE NUMBER TO BACKEND — BACKGROUND
-// =========================================================
+    // CHECK BEFORE VOICE
+    // =========================================================
 
-fetch(
-  `${API_URL}/games/${gameId}/call-number`,
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      ball: result
-    })
-  }
-)
-  .then(async (response) => {
-
-    if (!response.ok) {
-      const errorText = await response.text();
-
-      throw new Error(
-        `Call-number API failed: ${response.status} ${errorText}`
+    if (!generationStillValid()) {
+      console.log(
+        "🛑 OLD GENERATION CANCELLED — STOPPING BEFORE VOICE"
       );
+
+      isDrawingBallRef.current = false;
+
+      return;
     }
 
-    console.log(
-      "✅ NUMBER SAVED IN BACKGROUND:",
-      result
-    );
+    // =========================================================
+    // PLAY VOICE
+    // =========================================================
 
-  })
- .catch((err) => {
-  console.error(
-    "❌ BACKGROUND NUMBER SAVE FAILED:",
-    result,
-    err
+  playRecordedBingoCall(letter, number, () => {
+
+  console.log(
+    "✅ CURRENT CALL FINISHED:",
+    result
   );
 
-  setPaused(true);
-
-  if (loopTimeoutRef.current) {
-    clearTimeout(loopTimeoutRef.current);
-    loopTimeoutRef.current = null;
-  }
-
+  // The voice is definitely finished.
   isDrawingBallRef.current = false;
 
-  alert("Connection lost. Game paused.");
-});
-
-// =========================================================
-// PLAY VOICE IMMEDIATELY
-// =========================================================
-
-speakBallSequence(letter, number, () => {
-
-  /*
-   * ============================================================
-   * CURRENT GAME STATUS
-   * ============================================================
-   */
+  // The number has now been fully announced.
+  if (
+    pendingBingoCallRef.current &&
+    pendingBingoCallRef.current.letter === letter &&
+    pendingBingoCallRef.current.number === number
+  ) {
+    pendingBingoCallRef.current = null;
+  }
+  // ==========================================================
+  // IF PAUSED, DO NOT START THE NEXT NUMBER
+  // ==========================================================
 
   if (stateRef.current.paused) {
-    isDrawingBallRef.current = false;
+    console.log(
+      "⏸️ CALL FINISHED WHILE PAUSED — WAITING FOR PLAY"
+    );
+
     return;
   }
 
-
-  /*
-   * ============================================================
-   * READ CURRENT CALL INTERVAL
-   *
-   * Positive:
-   *   +5 = wait 5 seconds
-   *
-   * Zero:
-   *    0 = next call immediately
-   *
-   * Negative:
-   *   -1 = start next call 1 second early
-   *   -2 = start next call 2 seconds early
-   *   -20 = extremely fast
-   * ============================================================
-   */
+  // ==========================================================
+  // READ CURRENT CALL INTERVAL
+  // ==========================================================
 
   const selectedSeconds =
     Number(callIntervalRef.current);
@@ -2100,155 +3741,150 @@ speakBallSequence(letter, number, () => {
     Number.isFinite(selectedSeconds)
       ? selectedSeconds
       : 5;
+        // =====================================================
+        // PREVENT DUPLICATE TIMER
+        // =====================================================
 
-
-  /*
-   * ============================================================
-   * PREVENT DUPLICATE TIMERS
-   * ============================================================
-   */
-
-  if (loopTimeoutRef.current !== null) {
-
-    console.log(
-      ">>> LOOP ALREADY SCHEDULED"
-    );
-
-    return;
-  }
-
-
-  /*
-   * ============================================================
-   * NEGATIVE = FAST CALLING
-   *
-   * IMPORTANT:
-   *
-   * We DO NOT stop the game.
-   *
-   * We DO NOT return.
-   *
-   * We simply schedule the next number.
-   *
-   * The actual overlap amount is controlled
-   * by the negative value.
-   * ============================================================
-   */
-
-  if (safeSeconds < 0) {
-
-    const overlapSeconds =
-      Math.abs(safeSeconds);
-
-    /*
-     * Start the next number after the
-     * overlap amount.
-     *
-     * The current audio continues playing.
-     */
-
-    const fastDelayMs =
-      Math.max(
-        0,
-        (1 - overlapSeconds) * 1000
-      );
-
-
-    console.log(
-      `⚡ FAST CALL MODE: ${safeSeconds}s`
-    );
-
-    console.log(
-      `🚀 NEXT NUMBER STARTS IN: ${
-        fastDelayMs / 1000
-      } SECOND(S)`
-    );
-
-
-    loopTimeoutRef.current =
-      setTimeout(() => {
-
-        loopTimeoutRef.current = null;
-
-
-        if (stateRef.current.paused) {
-
-          isDrawingBallRef.current =
-            false;
+        if (
+          loopTimeoutRef.current !==
+          null
+        ) {
+          console.log(
+            ">>> LOOP ALREADY SCHEDULED"
+          );
 
           return;
         }
 
+        // =====================================================
+        // NEGATIVE = FAST CALL MODE
+        // =====================================================
 
-        /*
-         * Release lock before
-         * generating the next number.
-         */
+        if (safeSeconds < 0) {
 
-        isDrawingBallRef.current =
-          false;
+          const overlapSeconds =
+            Math.abs(
+              safeSeconds
+            );
 
+          const fastDelayMs =
+            Math.max(
+              0,
+              1000 -
+                overlapSeconds *
+                  1000
+            );
+
+          console.log(
+            `⚡ FAST CALL MODE: ${safeSeconds}s`
+          );
+
+          console.log(
+            `🚀 NEXT NUMBER STARTS IN: ${
+              fastDelayMs / 1000
+            } SECOND(S)`
+          );
+
+          loopTimeoutRef.current =
+            setTimeout(() => {
+
+              loopTimeoutRef.current =
+                null;
+
+              if (
+                stateRef.current.paused
+              ) {
+                isDrawingBallRef.current =
+                  false;
+
+                return;
+              }
+
+              // Check cancellation
+              if (
+                myGenerationId !==
+                generationCancelRef.current
+              ) {
+                console.log(
+                  "🛑 OLD GENERATION TIMER CANCELLED"
+                );
+
+                isDrawingBallRef.current =
+                  false;
+
+                return;
+              }
+
+              isDrawingBallRef.current =
+                false;
+
+              console.log(
+                "⚡ FAST CALL: STARTING NEXT NUMBER"
+              );
+
+              generateNumber();
+
+            }, fastDelayMs);
+
+          return;
+        }
+
+        // =====================================================
+        // NORMAL / ZERO INTERVAL
+        // =====================================================
+
+        const delayMs =
+          safeSeconds * 1000;
 
         console.log(
-          "⚡ FAST CALL: STARTING NEXT NUMBER"
+          `>>> NEXT NUMBER IN EXACTLY ${
+            safeSeconds
+          } SECOND(S)`
         );
 
+        loopTimeoutRef.current =
+          setTimeout(() => {
 
-        generateNumber();
+            loopTimeoutRef.current =
+              null;
 
-      }, fastDelayMs);
+            if (
+              stateRef.current.paused
+            ) {
+              isDrawingBallRef.current =
+                false;
 
+              return;
+            }
 
-    return;
-  }
+            // Check cancellation
+            if (
+              myGenerationId !==
+              generationCancelRef.current
+            ) {
+              console.log(
+                "🛑 OLD GENERATION TIMER CANCELLED"
+              );
 
+              isDrawingBallRef.current =
+                false;
 
-  /*
-   * ============================================================
-   * NORMAL POSITIVE / ZERO MODE
-   * ============================================================
-   */
+              return;
+            }
 
-  const delayMs =
-    safeSeconds * 1000;
+            isDrawingBallRef.current =
+              false;
 
+            console.log(
+              ">>> TIMEOUT FIRED"
+            );
 
-  console.log(
-    `>>> NEXT NUMBER IN EXACTLY ${
-      safeSeconds
-    } SECOND(S)`
-  );
+            generateNumber();
 
-
-  loopTimeoutRef.current =
-    setTimeout(() => {
-
-      loopTimeoutRef.current = null;
-
-
-      if (stateRef.current.paused) {
-
-        isDrawingBallRef.current =
-          false;
-
-        return;
+          }, delayMs);
       }
+    );
 
-
-      isDrawingBallRef.current =
-        false;
-
-
-      console.log(
-        ">>> TIMEOUT FIRED"
-      );
-
-
-      generateNumber();
-
-    }, delayMs);
-
-});
   } catch (err) {
 
     console.error(
@@ -2256,7 +3892,8 @@ speakBallSequence(letter, number, () => {
       err
     );
 
-    isDrawingBallRef.current = false;
+    isDrawingBallRef.current =
+      false;
 
     // Do NOT schedule another call here.
   }
@@ -2330,6 +3967,9 @@ if (!verificationData.sold) {
 }
 
 setCheckedCartela(verificationData.cartela);
+setWinningCells(
+  verificationData.winningCells || []
+);
 
       if (verificationData.isWinner) {
         let patternName = "🎉 LINE BINGO!";
@@ -2423,8 +4063,7 @@ setCheckedCartela(verificationData.cartela);
 
   
 
-  return (
-   
+ return (
   <div className={`bingo-wrapper ${tvMode ? 'tv-viewport' : ''}`}>
 
     {/* SMALL BACK BUTTON */}
@@ -2487,10 +4126,20 @@ setCheckedCartela(verificationData.cartela);
       ←
     </button>
 
-    <div className="bingo-container">
+    <div 
+      className="bingo-container"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-start",
+        alignItems: "stretch",
+        margin: 0,
+        padding: 0
+      }}
+    >
 
-        {/* --- Bingo Board Grid --- */}
-        <section className="board-section">
+        {/* --- 1. BINGO BOARD --- */}
+        <section className="board-section" style={{ margin: 0, padding: 0 }}>
           <div className="bingo-board">
             {['B', 'I', 'N', 'G', 'O'].map((letter) => (
               <div key={letter} className="board-row">
@@ -2511,21 +4160,19 @@ setCheckedCartela(verificationData.cartela);
           </div>
         </section>
 
-        {/* --- Main Dashboard Hub Container --- */}
+        {/* --- 2. LEFT | MIDDLE | RIGHT DASHBOARD (TOUCHES BINGO BOARD IMMEDIATELY) --- */}
         <div 
           className="main-display" 
-          style={{ 
-            margin: '0', 
-            padding: '1px', 
-            flex: 1, 
-            minHeight: 0,
+          style={{
+            margin: '0',
+            padding: '0',
             display: 'grid',
             gridTemplateColumns: '1fr 1.2fr 1fr',
             alignItems: 'center',
             border: '1px solid rgba(255,255,255,0.05)'
           }}
         >
-          
+         
           {/* 1. Left Wing: Check Winner Interface */}
           <div
             className="left-panel"
@@ -2613,76 +4260,450 @@ setCheckedCartela(verificationData.cartela);
                 </button>
               </div>
 
-           <div style={{ textAlign: "center", marginTop: "4px" }}>
-  <div
-    style={{
-      fontSize: "22px",
-      color: "#a0aec0",
-      fontWeight: "bold",
-      letterSpacing: "1px"
-    }}
-  >
-  የጨዋታው ደራሽ
-  </div>
-
-  <div
-    style={{
-      fontSize: "40px",
-      color: "#00f0ff",
-      fontWeight: "900",
-      textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
-      lineHeight: "1.1"
-    }}
-  >
-    {game.netIncome ? game.netIncome : game.prize} ብር
-  </div>
-</div>
-            </div>
-          </div>
-
-          {/* 2. Center Spherical Machine Cage Component */}
-          <div className="cage-container">
-            <div className="cage-sphere">
-              <div className="glass-reflection-light"></div>
-              <div className="glass-reflection-dark"></div>
-
-              {cageBalls.map((ball) => (
+              <div style={{ textAlign: "center", marginTop: "4px" }}>
                 <div
-                  key={ball.id}
-                  className="mini-ball"
                   style={{
-                    left: `${ball.x}%`,
-                    top: `${ball.y}%`,
-                    backgroundColor: ball.color,
+                    fontSize: "22px",
+                    color: "#a0aec0",
+                    fontWeight: "bold",
+                    letterSpacing: "1px"
                   }}
                 >
-                  <span className="mini-ball-num">{ball.num}</span>
+                  የጨዋታው ደራሽ
                 </div>
-              ))}
-            </div>
 
-            <div className="machine-handle"></div>
-            <div className="ball-exit">
-              {current && (
-                <div className="called-ball">
-                  {current.split(" ")[1]}
+                <div
+                  style={{
+                    fontSize: "40px",
+                    color: "#00f0ff",
+                    fontWeight: "900",
+                    textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
+                    lineHeight: "1.1"
+                  }}
+                >
+                  {game.netIncome ? game.netIncome : game.prize} ብር
                 </div>
-              )}
+              </div>
             </div>
           </div>
-          {/* 3. Right Wing: High-Visibility Current Called Display */}
-          <div 
-            className="ball-column" 
-            style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              borderLeft: '1px solid rgba(255,255,255,0.05)',
-              height: '100%'
+
+          {/* CENTER AREA: WINNING PATTERN (LEFT) + ROLLING MACHINE (RIGHT) */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "16px",
+              width: "100%",
             }}
-          >
-            <span style={{ fontSize: '15px', fontWeight: 'bold', color: '#ff5aa5', letterSpacing: '1px', marginBottom: '2px' }}>
+          >   
+            {checkedCartela && (
+              <div
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 9999,
+                  background: "rgba(0, 0, 0, 0.65)",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  padding: "8px",
+                  boxSizing: "border-box",
+                }}
+              >
+                {/* MEDIUM VERIFICATION CARTELA */}
+                <div
+                  style={{
+                    position: "relative",
+                    width: "min(92vw, 480px)",
+                    background: "#090f1d",
+                    border:
+                      verificationStatus === "WINNER"
+                        ? "3px solid #00ff66"
+                        : verificationStatus === "CHECKING"
+                          ? "3px solid #00c8ff"
+                          : "3px solid #ff3344",
+                    borderRadius: "14px",
+                    padding: "10px 12px 10px",
+                    boxSizing: "border-box",
+                    boxShadow:
+                      verificationStatus === "WINNER"
+                        ? "0 0 30px rgba(0,255,102,0.3)"
+                        : "0 0 30px rgba(255,51,68,0.25)",
+                  }}
+                >
+                  {/* CLOSE */}
+                  <button
+                    onClick={closeVerificationBoard}
+                    style={{
+                      position: "absolute",
+                      top: "8px",
+                      right: "9px",
+                      width: "30px",
+                      height: "30px",
+                      borderRadius: "50%",
+                      background: "#182236",
+                      border: "1px solid #475569",
+                      color: "#fff",
+                      fontSize: "16px",
+                      fontWeight: "900",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    ✕
+                  </button>
+
+                  {/* STATUS */}
+                  <div
+                    style={{
+                      textAlign: "center",
+                      marginBottom: "6px",
+                      paddingRight: "30px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        fontWeight: "900",
+                        color:
+                          verificationStatus === "WINNER"
+                            ? "#00ff66"
+                            : "#ff3344",
+                      }}
+                    >
+                      {verificationStatus === "WINNER"
+                        ? `🎉 ${t.winner}!`
+                        : "❌ NO BINGO YET"}
+                    </div>
+
+                    <div
+                      style={{
+                        marginTop: "1px",
+                        fontSize: "12px",
+                        color: "#94a3b8",
+                        fontWeight: "700",
+                      }}
+                    >
+                      Cartela #{checkedCartela.id || checkedCartela.cartelaId}
+                    </div>
+                  </div>
+
+                  {/* B I N G O HEADER */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(5, 1fr)",
+                      gap: "4px",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {["B", "I", "N", "G", "O"].map((letter, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          height: "26px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "6px",
+                          background: "#111c31",
+                          border: "2px solid #00c8ff",
+                          color: "#00c8ff",
+                          fontSize: "16px",
+                          fontWeight: "900",
+                        }}
+                      >
+                        {letter}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* CARTELA */}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(5, 1fr)",
+                      gap: "4px",
+                    }}
+                  >
+                    {checkedCartela.matrix.map((row, rIdx) =>
+                      row.map((cell, cIdx) => {
+                        const isFree = cell === "FREE";
+
+                        const isWinnerCell =
+                          winningCells.includes(`${rIdx}-${cIdx}`);
+
+                        let num = cell;
+
+                        if (!isFree) {
+                          if (typeof cell === "string") {
+                            const parts = cell.trim().split(/\s+/);
+                            num = parts[1] || cell;
+                          }
+
+                          num = Number(num);
+                        }
+
+                        const isCalled =
+                          !isFree &&
+                          called.some((item) => {
+                            const parts = String(item).trim().split(/\s+/);
+
+                            const calledNumber =
+                              parts.length > 1
+                                ? Number(parts[1])
+                                : Number(parts[0]);
+
+                            return calledNumber === num;
+                          });
+
+                        return (
+                          <div
+                            key={`${rIdx}-${cIdx}`}
+                            style={{
+                              height: "38px",
+                              background: isFree
+                                ? "#FFD700"
+                                : isWinnerCell
+                                ? "#FF0000"
+                                : isCalled
+                                ? "#00C853"
+                                : "#1E293B",
+                              color: isFree ? "#000" : "#fff",
+                              border: isWinnerCell
+                                ? "2px solid #FF6666"
+                                : isCalled
+                                ? "2px solid #00ff66"
+                                : isFree
+                                ? "2px solid #FFD700"
+                                : "1px solid #334155",
+                              borderRadius: "6px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              position: "relative",
+                              boxSizing: "border-box",
+                              boxShadow: isWinnerCell
+                                ? "0 0 14px rgba(255,0,0,0.8)"
+                                : isCalled
+                                ? "0 0 10px rgba(0,255,102,0.5)"
+                                : "none",
+                            }}
+                          >
+                            {/* CHECK MARK */}
+                            {isCalled && (
+                              <div
+                                style={{
+                                  position: "absolute",
+                                  top: "2px",
+                                  right: "3px",
+                                  width: "13px",
+                                  height: "13px",
+                                  borderRadius: "50%",
+                                  background: "#00ff66",
+                                  color: "#000",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "9px",
+                                  fontWeight: "900",
+                                }}
+                              >
+                                ✓
+                              </div>
+                            )}
+
+                            {/* NUMBER */}
+                            <span
+                              style={{
+                                fontSize: isFree ? "11px" : "18px",
+                                fontWeight: "900",
+                                lineHeight: "1",
+                              }}
+                            >
+                              {isFree ? "FREE" : num}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* LEGEND */}
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      display: "flex",
+                      justifyContent: "center",
+                      gap: "12px",
+                      flexWrap: "wrap",
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      color: "#cbd5e1",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          background: "#00C853",
+                          border: "1.5px solid #00ff66",
+                          borderRadius: "2px",
+                        }}
+                      />
+                      Called
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          background: "#1E293B",
+                          border: "1px solid #334155",
+                          borderRadius: "2px",
+                        }}
+                      />
+                      Not Called
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          background: "#FFD700",
+                          borderRadius: "2px",
+                        }}
+                      />
+                      Free
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* 1. LEFT SIDE: WINNING PATTERN PREVIEW */}
+            {activeWinningPattern && (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "5px",
+                  animation: "winningPatternPulse 1.5s ease-in-out infinite",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: "900",
+                    color: "#ffd700",
+                    letterSpacing: "1px",
+                  }}
+                >
+             🏆 {activeWinningPattern} PATTERN
+{activeWinningPattern > 1 ? "S" : ""}
+                </div>
+
+                <div
+                  style={{
+                    width: "90px",
+                    height: "90px",
+                    display: "grid",
+                    gridTemplateColumns: "repeat(5, 1fr)",
+                    gap: "3px",
+                    padding: "5px",
+                    borderRadius: "8px",
+                    background: "rgba(15, 23, 42, 0.9)",
+                    border: "2px solid #ffd700",
+                    boxShadow: "0 0 15px rgba(255, 215, 0, 0.5)",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  {Array.from({ length: 25 }).map((_, index) => {
+                    const row = Math.floor(index / 5);
+                    const col = index % 5;
+                    const cellKey = `${row}-${col}`;
+
+                    const highlighted =
+                      displayedWinningPatterns?.includes(cellKey) ?? false;
+
+                    return (
+                      <div
+                        key={index}
+                        style={{
+                          borderRadius: "2px",
+                         background:
+  row === 2 && col === 2
+    ? "#22c55e"   // ⭐ CENTER / FREE SPACE
+    : highlighted
+      ? "#ffd700" // 🏆 Winning pattern
+      : "rgba(100, 116, 139, 0.25)",
+                          boxShadow: highlighted
+                            ? "0 0 7px rgba(255, 215, 0, 0.9)"
+                            : "none",
+                          transition: "all 0.3s ease",
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 2. RIGHT SIDE: ROLLING MACHINE CAGE */}
+            <div className="cage-container">
+              <div className="cage-sphere">
+                <div className="glass-reflection-light"></div>
+                <div className="glass-reflection-dark"></div>
+
+                {cageBalls?.map((ball) => (
+                  <div
+                    key={ball.id}
+                    className="mini-ball"
+                    style={{
+                      left: `${ball.x}%`,
+                      top: `${ball.y}%`,
+                      backgroundColor: ball.color,
+                    }}
+                  >
+                    <span className="mini-ball-num">{ball.num}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="machine-handle"></div>
+              <div className="ball-exit">
+                {current && (
+                  <div className="called-ball">
+                    {current.includes(" ") ? current.split(" ")[1] : current}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Right Wing: High-Visibility Current Called Display */}
+         <div
+  className="ball-column"
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "200%",
+    height: "200px",
+    boxSizing: "border-box",
+    borderLeft: "1px solid rgba(255,255,255,0.05)",
+  }}
+>
+            <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#ff5aa5', letterSpacing: '1px', marginBottom: '2px' }}>
               {t.currentBall}
             </span>
             
@@ -2708,480 +4729,176 @@ setCheckedCartela(verificationData.cartela);
           </div>
 
         </div>
-{/* --- CALLED BALL HISTORY --- */}
-<div
-  className="called-section"
-  style={{
-    width: "100%",
-    margin: "8px 0 0",
-    padding: "6px",
-    boxSizing: "border-box",
-    background: "rgba(0,0,0,0.25)",
-    borderRadius: "10px",
-  }}
->
-  <div
-    style={{
-      fontSize: "15px",
-      marginBottom: "5px",
-      color: "#8c9cb3",
-      fontWeight: "bold",
-      textAlign: "center",
-    }}
-  >
-    ({called.length}/75)
-  </div>
 
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "center",
-      gap: "6px",
-      alignItems: "center",
-      minHeight: "52px",
-      width: "100%",
-      overflow: "hidden",
-    }}
-  >
-    {incomingHistoryBalls.length > 0 ? (
-      incomingHistoryBalls.map((ballStr, idx) => {
-        const parts = String(ballStr).trim().split(/\s+/);
-        const letter = parts[0];
-        const num = parts[1];
-
-        const theme =
-          columnColorStyles[letter] || {
-            border: "2px solid #fff",
-            labelBg: "#fff",
-            textShadow: "0 0 5px #fff",
-          };
-
-        return (
-          <div
-            key={`${ballStr}-${idx}`}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              background: "#0d162d",
-              border: theme.border,
-              borderRadius: "5px",
-              width: "60px",
-              height: "60px",
-              flexShrink: 0,
-              position: "relative",
-              opacity: Math.max(0.45, 1 - idx * 0.12),
-              boxSizing: "border-box",
-            }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                background: theme.labelBg,
-                color: "#000",
-                fontSize: "18px",
-                fontWeight: "900",
-                textAlign: "center",
-                lineHeight: "15px",
-                borderRadius: "3px 3px 0 0",
-              }}
-            >
-              {letter}
-            </div>
-
-            <div
-              style={{
-                fontSize: "40px",
-                fontWeight: "900",
-                color: "#fff",
-                textShadow: theme.textShadow,
-                marginTop: "8px",
-              }}
-            >
-              {num}
-            </div>
-          </div>
-        );
-      })
-    ) : (
-      <div
-        style={{
-          fontSize: "15px",
-          color: "#4b5970",
-          fontStyle: "italic",
-        }}
-      >
-        {t.waitingToBegin}
-      </div>
-    )}
-  </div>
-</div>
-        
-
-{checkedCartela && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 9999,
-      background: "rgba(0, 0, 0, 0.65)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      padding: "8px",
-      boxSizing: "border-box",
-    }}
-  >
-    {/* MEDIUM VERIFICATION CARTELA */}
-    <div
-      style={{
-        position: "relative",
-        width: "min(92vw, 480px)",
-        background: "#090f1d",
-      border:
-  verificationStatus === "WINNER"
-    ? "3px solid #00ff66"
-    : verificationStatus === "CHECKING"
-      ? "3px solid #00c8ff"
-      : "3px solid #ff3344",
-        borderRadius: "14px",
-        padding: "10px 12px 10px",
-        boxSizing: "border-box",
-        boxShadow:
-          verificationStatus === "WINNER"
-            ? "0 0 30px rgba(0,255,102,0.3)"
-            : "0 0 30px rgba(255,51,68,0.25)",
-      }}
-    >
-      {/* CLOSE */}
-      <button
-        onClick={closeVerificationBoard}
-        style={{
-          position: "absolute",
-          top: "8px",
-          right: "9px",
-          width: "30px",
-          height: "30px",
-          borderRadius: "50%",
-          background: "#182236",
-          border: "1px solid #475569",
-          color: "#fff",
-          fontSize: "16px",
-          fontWeight: "900",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        ✕
-      </button>
-
-      {/* STATUS */}
-      <div
-        style={{
-          textAlign: "center",
-          marginBottom: "6px",
-          paddingRight: "30px",
-        }}
-      >
+        {/* --- 3. CALLED BALL HISTORY (TOUCHES DASHBOARD IMMEDIATELY) --- */}
         <div
+          className="called-section"
           style={{
-            fontSize: "16px",
-            fontWeight: "900",
-            color:
-              verificationStatus === "WINNER"
-                ? "#00ff66"
-                : "#ff3344",
+            width: "100%",
+            margin: "0",
+            padding: "6px",
+            boxSizing: "border-box",
+            background: "rgba(0,0,0,0.25)",
+            borderRadius: "0 0 10px 10px",
           }}
         >
-          {verificationStatus === "WINNER"
-            ? `🎉 ${t.winner}!`
-            : "❌ NO BINGO YET"}
-        </div>
-
-        <div
-          style={{
-            marginTop: "1px",
-            fontSize: "12px",
-            color: "#94a3b8",
-            fontWeight: "700",
-          }}
-        >
-          Cartela #{checkedCartela.id || checkedCartela.cartelaId}
-        </div>
-      </div>
-
-      {/* B I N G O HEADER */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: "4px",
-          marginBottom: "4px",
-        }}
-      >
-        {["B", "I", "N", "G", "O"].map((letter, index) => (
           <div
-            key={index}
             style={{
-              height: "26px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "6px",
-              background: "#111c31",
-              border: "2px solid #00c8ff",
-              color: "#00c8ff",
-              fontSize: "16px",
-              fontWeight: "900",
+              fontSize: "15px",
+              marginBottom: "5px",
+              color: "#8c9cb3",
+              fontWeight: "bold",
+              textAlign: "center",
             }}
           >
-            {letter}
+            ({called.length}/75)
           </div>
-        ))}
-      </div>
 
-      {/* CARTELA */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: "4px",
-        }}
-      >
-        {checkedCartela.matrix.map((row, rIdx) =>
-          row.map((cell, cIdx) => {
-            const isFree = cell === "FREE";
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: "6px",
+              alignItems: "center",
+              minHeight: "52px",
+              width: "100%",
+              overflow: "hidden",
+            }}
+          >
+            {incomingHistoryBalls.length > 0 ? (
+              incomingHistoryBalls.map((ballStr, idx) => {
+                const parts = String(ballStr).trim().split(/\s+/);
+                const letter = parts[0];
+                const num = parts[1];
 
-            let num = cell;
+                const theme =
+                  columnColorStyles[letter] || {
+                    border: "2px solid #fff",
+                    labelBg: "#fff",
+                    textShadow: "0 0 5px #fff",
+                  };
 
-            if (!isFree) {
-              if (typeof cell === "string") {
-                const parts = cell.trim().split(/\s+/);
-                num = parts[1] || cell;
-              }
-
-              num = Number(num);
-            }
-
-            const isCalled =
-              !isFree &&
-              called.some((item) => {
-                const parts = String(item).trim().split(/\s+/);
-
-                const calledNumber =
-                  parts.length > 1
-                    ? Number(parts[1])
-                    : Number(parts[0]);
-
-                return calledNumber === num;
-              });
-
-            return (
-              <div
-                key={`${rIdx}-${cIdx}`}
-                style={{
-                  height: "38px",
-                  background: isFree
-                    ? "#FFD700"
-                    : isCalled
-                    ? "#00C853"
-                    : "#1E293B",
-                  color: isFree ? "#000" : "#fff",
-                  border: isCalled
-                    ? "2px solid #00ff66"
-                    : isFree
-                    ? "2px solid #FFD700"
-                    : "1px solid #334155",
-                  borderRadius: "6px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  position: "relative",
-                  boxSizing: "border-box",
-                  boxShadow: isCalled
-                    ? "0 0 10px rgba(0,255,102,0.5)"
-                    : "none",
-                }}
-              >
-                {/* CHECK MARK */}
-                {isCalled && (
+                return (
                   <div
+                    key={`${ballStr}-${idx}`}
                     style={{
-                      position: "absolute",
-                      top: "2px",
-                      right: "3px",
-                      width: "13px",
-                      height: "13px",
-                      borderRadius: "50%",
-                      background: "#00ff66",
-                      color: "#000",
                       display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: "9px",
-                      fontWeight: "900",
+                      background: "#0d162d",
+                      border: theme.border,
+                      borderRadius: "5px",
+                      width: "60px",
+                      height: "60px",
+                      flexShrink: 0,
+                      position: "relative",
+                      opacity: Math.max(0.45, 1 - idx * 0.12),
+                      boxSizing: "border-box",
                     }}
                   >
-                    ✓
-                  </div>
-                )}
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        background: theme.labelBg,
+                        color: "#000",
+                        fontSize: "18px",
+                        fontWeight: "900",
+                        textAlign: "center",
+                        lineHeight: "15px",
+                        borderRadius: "3px 3px 0 0",
+                      }}
+                    >
+                      {letter}
+                    </div>
 
-                {/* NUMBER */}
-                <span
-                  style={{
-                    fontSize: isFree ? "11px" : "18px",
-                    fontWeight: "900",
-                    lineHeight: "1",
+                    <div
+                      style={{
+                        fontSize: "40px",
+                        fontWeight: "900",
+                        color: "#fff",
+                        textShadow: theme.textShadow,
+                        marginTop: "8px",
+                      }}
+                    >
+                      {num}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div
+                style={{
+                  fontSize: "15px",
+                  color: "#4b5970",
+                  fontStyle: "italic",
+                }}
+              >
+                {t.waitingToBegin}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* --- 4. REMAINING UI / FOOTER CONSOLE BAR (TOUCHES CALLED BALLS IMMEDIATELY) --- */}
+        <footer 
+          className="game-top-bar" 
+          style={{ 
+            display: 'flex', 
+            justify: 'space-between', 
+            alignItems: 'center', 
+            background: 'rgba(0,0,0,0.3)',
+            margin: '0',
+            padding: '6px'
+          }}
+        >
+          <div className="call-interval-control">
+            <div className="call-interval-header">
+              <span>CALL SPEED</span>
+              <div className="call-interval-adjust">
+                {/* MINUS */}
+                <button
+                  type="button"
+                  className="interval-minus"
+                  onClick={() => {
+                    const current = Number(callInterval);
+                    const safeCurrent = Number.isFinite(current) ? current : 5;
+                    const newValue = Math.max(0, safeCurrent - 1);
+                    setCallInterval(newValue);
+                    console.log("➖ CALL SPEED:", newValue, "SECONDS");
                   }}
                 >
-                  {isFree ? "FREE" : num}
-                </span>
+                  −
+                </button>
+
+                {/* VALUE */}
+                <strong className="interval-value">
+                  {Number(callInterval)}s
+                </strong>
+
+                {/* PLUS */}
+                <button
+                  type="button"
+                  className="interval-plus"
+                  onClick={() => {
+                    const current = Number(callInterval);
+                    const safeCurrent = Number.isFinite(current) ? current : 5;
+                    const newValue = Math.min(15, safeCurrent + 1);
+                    setCallInterval(newValue);
+                    console.log("➕ CALL SPEED:", newValue, "SECONDS");
+                  }}
+                >
+                  +
+                </button>
               </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* LEGEND */}
-      <div
-        style={{
-          marginTop: "8px",
-          display: "flex",
-          justifyContent: "center",
-          gap: "12px",
-          flexWrap: "wrap",
-          fontSize: "11px",
-          fontWeight: "700",
-          color: "#cbd5e1",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <span
-            style={{
-              width: "10px",
-              height: "10px",
-              background: "#00C853",
-              border: "1.5px solid #00ff66",
-              borderRadius: "2px",
-            }}
-          />
-          Called
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <span
-            style={{
-              width: "10px",
-              height: "10px",
-              background: "#1E293B",
-              border: "1px solid #334155",
-              borderRadius: "2px",
-            }}
-          />
-          Not Called
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <span
-            style={{
-              width: "10px",
-              height: "10px",
-              background: "#FFD700",
-              borderRadius: "2px",
-            }}
-          />
-          Free
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-        {/* --- Bottom Footer Console Bar --- */}
-        <footer className="game-top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.3)' }}>
-    <div className="call-interval-control">
-
-  <div className="call-interval-header">
-
-    <span>CALL SPEED</span>
-
-    <div className="call-interval-adjust">
-
-      {/* MINUS */}
-      <button
-        type="button"
-        className="interval-minus"
-      onClick={() => {
-  const current = Number(callInterval);
-
-  const safeCurrent = Number.isFinite(current)
-    ? current
-    : 5;
-
-  const newValue = Math.max(0, safeCurrent - 1);
-
-  setCallInterval(newValue);
-
-  console.log(
-    "➖ CALL SPEED:",
-    newValue,
-    "SECONDS"
-  );
-}}
-      >
-        −
-      </button>
-
-
-      {/* VALUE */}
-      <strong className="interval-value">
-       {Number(callInterval)}s
-      </strong>
-
-
-      {/* PLUS */}
-      <button
-        type="button"
-        className="interval-plus"
-       onClick={() => {
-  const current = Number(callInterval);
-
-  const safeCurrent = Number.isFinite(current)
-    ? current
-    : 5;
-
-  const newValue = Math.min(15, safeCurrent + 1);
-
-  setCallInterval(newValue);
-
-  console.log(
-    "➕ CALL SPEED:",
-    newValue,
-    "SECONDS"
-  );
-}}
-      >
-        +
-      </button>
-
-    </div>
-
-  </div>
-
-</div>
+            </div>
+          </div>
           
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span>🔊 Volume</span>
-
             <input
               type="range"
               min="0"
@@ -3190,12 +4907,8 @@ setCheckedCartela(verificationData.cartela);
               value={Math.round(volume * 100)}
               onChange={(e) => {
                 const newVolume = Number(e.target.value) / 100;
-
-                // Update both state and ref
                 setVolume(newVolume);
                 volumeRef.current = newVolume;
-
-                // Change currently playing recorded voice immediately
                 if (activeAudioRef.current) {
                   activeAudioRef.current.volume = newVolume;
                 }
@@ -3205,86 +4918,133 @@ setCheckedCartela(verificationData.cartela);
                 cursor: "pointer",
               }}
             />
-
             <span style={{ minWidth: "45px" }}>
               {Math.round(volume * 100)}%
             </span>
           </div>
-          <div style={{
+ <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ color: "#fff", fontWeight: "600" }}>
+              Voice Speed
+            </span>
+            <button
+              onClick={decreaseVoiceSpeed}
+              style={{
+                padding: "6px 12px",
+                fontSize: "18px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              −
+            </button>
+            <span style={{
+              minWidth: "50px",
+              textAlign: "center",
+              color: "#fff",
+              fontWeight: "bold"
+            }}>
+              {voiceSpeed.toFixed(1)}×
+            </span>
+            <button
+              onClick={increaseVoiceSpeed}
+              style={{
+                padding: "6px 12px",
+                fontSize: "18px",
+                fontWeight: "bold",
+                cursor: "pointer"
+              }}
+            >
+              +
+            </button>
+          </div>
+
+         
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+           <div style={{
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  gap: "8px",
-  marginTop: "10px"
+  gap: "4px"
 }}>
-  <span style={{ color: "#fff", fontWeight: "600" }}>
-    Voice Speed
+  <span style={{
+    fontSize: "11px",
+    fontWeight: "bold",
+    color: "#00f0ff"
+  }}>
+    🎙️ VOICE DEPTH
   </span>
 
-  <button
-    onClick={decreaseVoiceSpeed}
+  <input
+    type="range"
+    min="-20"
+    max="40"
+    step="1"
+    value={voiceDepth}
+    onChange={(e) => {
+      const value = Number(e.target.value);
+
+      setVoiceDepth(value);
+      voiceDepthRef.current = value;
+
+      const cashierId =
+        localStorage.getItem("logged_in_cashier");
+
+      if (cashierId) {
+        localStorage.setItem(
+          `cashier_voice_depth_${cashierId}`,
+          String(value)
+        );
+      }
+
+      console.log("🎙️ NEW VOICE DEPTH:", value);
+    }}
     style={{
-      padding: "6px 12px",
-      fontSize: "18px",
-      fontWeight: "bold",
+      width: "120px",
+      height: "6px",
       cursor: "pointer"
     }}
-  >
-    −
-  </button>
+  />
 
   <span style={{
-    minWidth: "50px",
-    textAlign: "center",
-    color: "#fff",
-    fontWeight: "bold"
+    fontSize: "10px",
+    color: "#ffd700"
   }}>
-    {voiceSpeed.toFixed(1)}×
+    {voiceDepth > 0
+      ? `Deep +${voiceDepth}`
+      : voiceDepth < 0
+      ? `High ${voiceDepth}`
+      : "Normal"}
   </span>
-
-  <button
-    onClick={increaseVoiceSpeed}
-    style={{
-      padding: "6px 12px",
-      fontSize: "18px",
-      fontWeight: "bold",
-      cursor: "pointer"
-    }}
-  >
-    +
-  </button>
 </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-          {/* Voice Mode Selector */}
-<select
-  value="recorded-oromo"
-  onChange={() => {
-    setGame(prev => ({
-      ...prev,
-      voiceMode: "recorded-oromo",
-      speechLang: "oromo"
-    }));
-  }}
-  style={{
-    background: '#0c162d',
-    border: '1px solid #00c8ff',
-    color: '#fff',
-    borderRadius: '4px',
-    padding: '2px 4px',
-    fontSize: '9px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    outline: 'none'
-  }}
->
-  <option value="recorded-oromo">
-    🟢 voice
-  </option>
-</select>
-           
+            {/* Voice Mode Selector */}
+            <select
+              value="recorded-oromo"
+              onChange={() => {
+                setGame(prev => ({
+                  ...prev,
+                  voiceMode: "recorded-oromo",
+                  speechLang: "oromo"
+                }));
+              }}
+              style={{
+                background: '#0c162d',
+                border: '1px solid #00c8ff',
+                color: '#fff',
+                borderRadius: '4px',
+                padding: '2px 4px',
+                fontSize: '9px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                outline: 'none'
+              }}
+            >
+              <option value="recorded-oromo">
+                🟢 voice
+              </option>
+            </select>
           </div>
         </footer>
 
-      </div>
     </div>
-  );
-}
+  </div>
+);   } 

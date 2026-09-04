@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-
 import { useParams, Link, useNavigate } from "react-router-dom";
 
 export default function HouseDashboard() {
   const { id } = useParams(); 
   const navigate = useNavigate();
+ 
   // Identifier passed in the URL (e.g., house id or username)
   console.log("House Dashboard ID:", id);
   
@@ -12,6 +12,9 @@ export default function HouseDashboard() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [showFinance, setShowFinance] = useState(false);
+
+  const [commission, setCommission] = useState(15);
   console.log("CURRENT FORM:", username, password, phone);
 
   // Show More state for detailed game logs
@@ -76,8 +79,32 @@ export default function HouseDashboard() {
           remainingAmount: Number(pkgData.remaining_package ?? pkgData.remainingAmount ?? 0),
         });
       }
+// 5. Fetch commission controlled by this house
+try {
+  const commissionRes = await fetch(
+    `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${id}`
+  );
 
-      // 5. Fetch Super Admin tier packages config
+  if (commissionRes.ok) {
+    const commissionData = await commissionRes.json();
+
+    console.log(
+      "🏠 DATABASE COMMISSION:",
+      commissionData.value
+    );
+
+    setCommission(Number(commissionData.value));
+
+  } else if (commissionRes.status === 404) {
+    console.log(
+      `⚠️ No commission setting found for house ${id}`
+    );
+  }
+
+} catch (err) {
+  console.error("Failed to load house commission:", err);
+}
+      // 6. Fetch Super Admin tier packages config
       const tiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers`);
       if (tiersRes.ok) {
         const tiersData = await tiersRes.json();
@@ -92,6 +119,8 @@ export default function HouseDashboard() {
     }
   };
 
+ 
+
   useEffect(() => {
     refreshDashboardData();
 
@@ -102,15 +131,66 @@ export default function HouseDashboard() {
     };
   }, [id]);
 
+ async function updateSetting(key, value) {
+  try {
+    console.log(`💾 SAVING SETTING: ${key} = ${value}`);
+
+    const response = await fetch(
+  
+  "https://bingo-backend-ccn6.onrender.com/api/settings",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          key,
+          value,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ SAVE SETTING FAILED:", data);
+      return false;
+    }
+
+    console.log(`✅ SAVED ${key} = ${value}`, data);
+
+    return true;
+  } catch (err) {
+    console.error("❌ Error updating setting:", err);
+    return false;
+  }
+}
   // ==========================================================================
   // FETCH PERIODIC STATS FROM BACKEND PERFORMANCE API
   // ==========================================================================
   useEffect(() => {
     async function loadPerformance() {
       try {
-        const response = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`);
+       const response = await fetch(
+  `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`
+);
         const data = await response.json();
+console.log("🔥 FULL PERFORMANCE RESPONSE:", data);
+console.log("📅 DAILY:", data.performance?.daily_cards,
+  data.performance?.daily_commission,
+  data.performance?.daily_games);
 
+console.log("📅 WEEKLY:", data.performance?.weekly_cards,
+  data.performance?.weekly_commission,
+  data.performance?.weekly_games);
+
+console.log("📅 MONTHLY:", data.performance?.monthly_cards,
+  data.performance?.monthly_commission,
+  data.performance?.monthly_games);
+
+console.log("📅 YEARLY:", data.performance?.yearly_cards,
+  data.performance?.yearly_commission,
+  data.performance?.yearly_games);
         if (data.success && data.performance) {
           setPeriodicStats({
             daily: {
@@ -143,7 +223,7 @@ export default function HouseDashboard() {
     if (id) {
       loadPerformance();
     }
-  }, [id, houseGames]);
+ }, [id]);
 
   // SORT GAMES: From Current/Newest Date & Time to Oldest
   const sortedHouseGames = [...houseGames].sort((a, b) => {
@@ -557,47 +637,54 @@ export default function HouseDashboard() {
     );
   };
 
+  // Calculated gross income from total house games
+  const grossIncome = houseGames.reduce((acc, game) => {
+    const cartelasCount = Number(game.cards_sold ?? game.cardsSold ?? game.soldCartelas?.length ?? 0);
+    const betAmount = Number(game.bet) || 50;
+    return acc + (betAmount * cartelasCount);
+  }, 0);
+
   return (
     <div style={styles.container}>
-     {/* Top Header */}
-<div
-  style={{
-    ...styles.headerSection,
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    position: "relative",
-  }}
->
-  <button
-    type="button"
-    onClick={() => navigate("/")}
-    title="Back to Login"
-    style={{
-      border: "none",
-      background: "transparent",
-      color: "inherit",
-      cursor: "pointer",
-      fontSize: "30px",
-      fontWeight: "700",
-      lineHeight: "1",
-      padding: "2px 8px",
-      margin: 0,
-    }}
-  >
-    ←
-  </button>
+      {/* Top Header */}
+      <div
+        style={{
+          ...styles.headerSection,
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          position: "relative",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          title="Back to Login"
+          style={{
+            border: "none",
+            background: "transparent",
+            color: "inherit",
+            cursor: "pointer",
+            fontSize: "30px",
+            fontWeight: "700",
+            lineHeight: "1",
+            padding: "2px 8px",
+            margin: 0,
+          }}
+        >
+          ←
+        </button>
 
-  <div>
-    <h1 style={styles.mainTitle}>
-      HOUSE DASHBOARD ({currentHouseUser.name || id})
-    </h1>
+        <div>
+          <h1 style={styles.mainTitle}>
+            HOUSE DASHBOARD ({currentHouseUser.name || id})
+          </h1>
 
-    <span style={styles.houseBadge}>
-      House ID: {id}
-    </span>
-  </div>
-</div>
+          <span style={styles.houseBadge}>
+            House ID: {id}
+          </span>
+        </div>
+      </div>
 
       {/* Top Overview Cards Grid */}
       <div style={styles.grid}>
@@ -636,6 +723,19 @@ export default function HouseDashboard() {
           </div>
         </div>
 
+        <button
+          onClick={() => setShowFinance(!showFinance)}
+          className="btn btn-neutral"
+          style={{
+            padding: "3px 8px",
+            fontSize: "11px",
+            lineHeight: 1.2,
+            textTransform: "none"
+          }}
+        >
+         FINANCE
+        </button>
+
         {/* Navigation / Actions Card */}
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>House Actions</h2>
@@ -646,6 +746,51 @@ export default function HouseDashboard() {
         </div>
       </div>
 
+     {showFinance && (
+  <div
+    className="finance-panel"
+    style={{ padding: "4px", marginTop: "2px" }}
+  >
+    <label style={{ fontSize: "11px" }}>
+      Commission %:{" "}
+    </label>
+
+    <input
+      type="number"
+      min="0"
+      max="100"
+      value={commission}
+      onChange={(e) => {
+        const val = Number(e.target.value);
+
+        if (val < 0 || val > 100) {
+          return;
+        }
+
+        setCommission(val);
+      }}
+      onBlur={async () => {
+        const saved = await updateSetting(
+          `house_commission_${id}`,
+          commission
+        );
+
+        if (saved) {
+          console.log(
+            `✅ HOUSE ${id} COMMISSION UPDATED TO ${commission}%`
+          );
+        }
+      }}
+      className="finance-input"
+      style={{
+        padding: "1px 4px",
+        fontSize: "11px"
+      }}
+    />
+
+   
+  </div>
+)}
       {/* DETAILED HOUSE GAME HISTORY LOG */}
       <h2 style={styles.sectionTitle}>Detailed Game History Logs</h2>
       <div style={styles.tableWrapper}>
@@ -668,7 +813,6 @@ export default function HouseDashboard() {
                 const grossPool = betAmount * cartelasCount;
                 const commissionRate = Number(game.commission) || 15; 
                 
-                // FIXED: Uses stored database commission field if available, aligning table row values with backend summaries
                 const houseEarned = Number(game.house_commission ?? game.commission_earned ?? (grossPool * (commissionRate / 100))).toFixed(2);
 
                 const formattedDate = new Date(
