@@ -761,14 +761,21 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
       max="100"
       value={commission}
       onChange={(e) => {
-        const val = Number(e.target.value);
+  const value = e.target.value;
 
-        if (val < 0 || val > 100) {
-          return;
-        }
+  if (value === "") {
+    setCommission("");
+    return;
+  }
 
-        setCommission(val);
-      }}
+  const val = Number(value);
+
+  if (val < 0 || val > 100) {
+    return;
+  }
+
+  setCommission(val);
+}}
       onBlur={async () => {
         const saved = await updateSetting(
           `house_commission_${id}`,
