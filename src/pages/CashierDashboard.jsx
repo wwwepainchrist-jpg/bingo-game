@@ -94,24 +94,26 @@ const startingGameRef = useRef(false);
   const [startClicked, setStartClicked] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [winningPatternCount, setWinningPatternCount] = useState(1);
-  useEffect(() => {
-
+ useEffect(() => {
   const saved = localStorage.getItem(
     `winning_pattern_count_${id}`
   );
 
-  if (saved) {
+  if (saved === "FULL_HOUSE") {
+    setWinningPatternCount("FULL_HOUSE");
 
-    setWinningPatternCount(
-      Number(saved)
+    console.log(
+      "🏆 LOADED SAVED WINNING PATTERN:",
+      "FULL_HOUSE"
     );
+  } else if (saved) {
+    setWinningPatternCount(Number(saved));
 
     console.log(
       "🏆 LOADED SAVED WINNING PATTERN:",
       saved
     );
   }
-
 }, [id]);
   const [showWinningPattern, setShowWinningPattern] = useState(false);
   const passedGame = location.state?.game;
