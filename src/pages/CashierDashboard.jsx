@@ -787,254 +787,356 @@ async function startGame() {
       cursor: "pointer"
     }}
   >
-    <span>🏆 WINNING PATTERNS / PATTERNOOTA MO'AA / የማሸነፊያ ንድፎች</span>
+<span>🏆 WINNING PATTERNS / PATTERNOOTA MO'AA /የማሸነፊያ ዝጎች</span> 
 
-    <span
-      style={{
-        fontSize: "14px",
-        color: "#ffffff"
-      }}
-    >
-      {showWinningPattern ? "▲" : "▼"}
-    </span>
-  </button>
+    <span 
+      style={{ 
+        fontSize: "14px", 
+        color: "#ffffff" 
+      }} 
+    > 
+      {showWinningPattern ? "▲" : "▼"} 
+    </span> 
+  </button> 
 
-  {/* EXPANDED CONTENT */}
-  {showWinningPattern && (
-    <div
-      style={{
-        padding: "0 10px 10px 10px"
-      }}
-    >
+  {/* EXPANDED CONTENT */} 
+  {showWinningPattern && ( 
+    <div 
+      style={{ 
+        padding: "0 10px 10px 10px" 
+      }} 
+    > 
 
-      {/* 10 PATTERN OPTIONS */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: "6px",
-          justifyContent: "center"
-        }}
-      >
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
-          function (count) {
+      {/* WINNING PATTERN OPTIONS */} 
+      <div 
+        style={{ 
+          display: "grid", 
+          gridTemplateColumns: "repeat(5, 1fr)", 
+          gap: "6px", 
+          justifyContent: "center" 
+        }} 
+      > 
+        {[ 
+          { number: 1, oromo: "TOKKO", amharic: "አንድ" }, 
+          { number: 2, oromo: "LAMA", amharic: "ሁለት" }, 
+          { number: 3, oromo: "SADII", amharic: "ሶስት" }, 
+          { number: 4, oromo: "AFUR", amharic: "አራት" }, 
+          { number: 5, oromo: "SHAN", amharic: "አምስት" }, 
+          { number: 6, oromo: "JAHA", amharic: "ስድስት" }, 
+          { number: 7, oromo: "TORBA", amharic: "ሰባት" }, 
+          { number: 8, oromo: "SADDEET", amharic: "ስምንት" }, 
+          { number: 9, oromo: "SAGAL", amharic: "ዘጠኝ" }, 
+          { number: 10, oromo: "KUDHAN", amharic: "አስር" } 
+        ].map(function (item) { 
 
-            const selected =
-              winningPatternCount === count;
+          const count = item.number; 
+          const selected = winningPatternCount === count; 
 
-            return (
-              <button
-                key={count}
-                type="button"
-                disabled={gameStarted}
+          return ( 
+            <button 
+              key={count} 
+              type="button" 
+              disabled={gameStarted} 
 
-                onClick={() => {
-                  if (gameStarted) return;
+              onClick={() => { 
+                if (gameStarted) return; 
 
-                  setWinningPatternCount(count);
+                setWinningPatternCount(count); 
 
-                  console.log(
-                    `🏆 WINNING PATTERN REQUIREMENT CHANGED TO ${count}`
-                  );
+                console.log( 
+                  `🏆 WINNING PATTERN REQUIREMENT CHANGED TO ${count}` 
+                ); 
 
-                  // Save locally as backup
-                  localStorage.setItem(
-                    `winning_pattern_count_${id}`,
-                    String(count)
-                  );
+                localStorage.setItem( 
+                  `winning_pattern_count_${id}`, 
+                  String(count) 
+                ); 
+              }} 
 
-                  // Send selected winning pattern to running game
-                  if (
-                    socketRef.current &&
-                    gameId
-                  ) {
-                    console.log(
-                      `🏆 WINNING PATTERN ${count} SENT TO GAME ${gameId}`
-                    );
-                  }
-                }}
+              style={{ 
+                padding: "7px 3px", 
+                borderRadius: "7px", 
 
-                style={{
-                  padding: "8px 5px",
-                  borderRadius: "7px",
+                border: selected 
+                  ? "2px solid #22d3ee" 
+                  : "1px solid #475569", 
 
-                  border: selected
-                    ? "2px solid #22d3ee"
-                    : "1px solid #475569",
+                background: selected 
+                  ? "#0284c7" 
+                  : "#1e293b", 
 
-                  background: selected
-                    ? "#0284c7"
-                    : "#1e293b",
+                color: "#ffffff", 
 
-                  color: "#ffffff",
+                fontSize: "9px", 
+                fontWeight: "900", 
 
-                  fontSize: "10px",
-                  fontWeight: "900",
+                cursor: gameStarted 
+                  ? "not-allowed" 
+                  : "pointer", 
 
-                  cursor: gameStarted
-                    ? "not-allowed"
-                    : "pointer",
+                opacity: gameStarted 
+                  ? 0.75 
+                  : 1, 
 
-                  opacity: gameStarted
-                    ? 0.75
-                    : 1
-                }}
-              >
-                {count}
-                {" "}
-                {count === 1
-                  ? "PATTERN"
-                  : "PATTERNS"}
-              </button>
-            );
-          }
-        )}
-      </div>
+                lineHeight: "1.35" 
+              }} 
+            > 
+              <div> 
+                {count}{" "} 
+                {count === 1 ? "PATTERN" : "PATTERNS"} 
+              </div> 
 
-      {/* CURRENT SELECTION */}
-      <div
-        style={{
-          marginTop: "8px",
-          textAlign: "center",
-          color: "#22d3ee",
-          fontSize: "11px",
-          fontWeight: "900"
-        }}
-      >
-        🏆 {winningPatternCount} PATTERN
-        {winningPatternCount > 1 ? "S" : ""} SELECTED
-      </div>
+              <div style={{ fontSize: "8px" }}> 
+                {item.oromo} 
+              </div> 
 
-      {/* THREE LANGUAGES */}
-      <div
-        style={{
-          marginTop: "7px",
-          textAlign: "center",
-          color: "#cbd5e1",
-          fontSize: "10px",
-          lineHeight: "1.6"
-        }}
-      >
+              <div style={{ fontSize: "8px" }}> 
+                {item.amharic} 
+              </div> 
+            </button> 
+          ); 
+        })} 
+      </div> 
 
-        {winningPatternCount === 1 && (
-          <>
-            <div>
-              🇬🇧 Any ONE winning pattern = WINNER
-            </div>
+      {/* FULL HOUSE OPTION BUTTON */} 
+      <div style={{ marginTop: "6px" }}> 
+        <button 
+          type="button" 
+          disabled={gameStarted} 
+          onClick={() => { 
+            if (gameStarted) return; 
 
-            <div>
-              🇪🇹 Afaan Oromo: Mo'achuuf patternii TOKKO qofa guutuun ga'a
-            </div>
+            setWinningPatternCount("FULL_HOUSE"); 
 
-            <div>
-              🇪🇹 አማርኛ: ለማሸነፍ አንድ የማሸነፊያ ንድፍ ብቻ መሙላት በቂ ነው
-            </div>
-          </>
-        )}
+            console.log( 
+              `🏆 WINNING PATTERN REQUIREMENT CHANGED TO FULL_HOUSE` 
+            ); 
 
-        {winningPatternCount === 2 && (
-          <>
-            <div>
-              🇬🇧 Any TWO different winning patterns = WINNER
-            </div>
+            localStorage.setItem( 
+              `winning_pattern_count_${id}`, 
+              "FULL_HOUSE" 
+            ); 
+          }} 
+          style={{ 
+            width: "100%", 
+            padding: "8px 5px", 
+            borderRadius: "7px", 
+            border: winningPatternCount === "FULL_HOUSE" 
+              ? "2px solid #22d3ee" 
+              : "1px solid #475569", 
+            background: winningPatternCount === "FULL_HOUSE" 
+              ? "#0284c7" 
+              : "#1e293b", 
+            color: "#ffffff", 
+            fontSize: "10px", 
+            fontWeight: "900", 
+            cursor: gameStarted ? "not-allowed" : "pointer", 
+            opacity: gameStarted ? 0.75 : 1, 
+            textAlign: "center" 
+          }} 
+        > 
+          🏠 FULL HOUSE / MANA GUUTUU / ሙሉ ቤት 
+        </button> 
+      </div> 
 
-            <div>
-              🇪🇹 Afaan Oromo: Patternoota MO'AA LAMA adda addaa guutuu qaba
-            </div>
+      {/* CURRENT SELECTION */} 
+      <div 
+        style={{ 
+          marginTop: "8px", 
+          textAlign: "center", 
+          color: "#22d3ee", 
+          fontSize: "11px", 
+          fontWeight: "900" 
+        }} 
+      > 
+        {winningPatternCount === "FULL_HOUSE" ? ( 
+          <> 
+            🏆 FULL HOUSE SELECTED 
+            <br /> 
+            🇪🇹 Mana Guutuu 
+            <br /> 
+            🇪🇹 ሙሉ ቤት 
+          </> 
+        ) : ( 
+          <> 
+            🏆 {winningPatternCount} PATTERN 
+            {winningPatternCount > 1 ? "S" : ""} SELECTED 
+            <br /> 
+            🇪🇹 {winningPatternCount === 1 ? "TOKKO" : "PATTERN"} • 
+            {winningPatternCount === 2 ? " LAMA" : ""} 
+            {winningPatternCount === 3 ? " SADII" : ""} 
+            {winningPatternCount === 4 ? " AFUR" : ""} 
+            {winningPatternCount === 5 ? " SHAN" : ""} 
+            {winningPatternCount === 6 ? " JAHA" : ""} 
+            {winningPatternCount === 7 ? " TORBA" : ""} 
+            {winningPatternCount === 8 ? " SADDEET" : ""} 
+            {winningPatternCount === 9 ? " SAGAL" : ""} 
+            {winningPatternCount === 10 ? " KUDHAN" : ""} 
+            <br /> 
+            🇪🇹 { 
+              [ 
+                "", 
+                "አንድ", 
+                "ሁለት", 
+                "ሶስት", 
+                "አራት", 
+                "አምስት", 
+                "ስድስት", 
+                "ሰባት", 
+                "ስምንት", 
+                "ዘጠኝ", 
+                "አስር" 
+              ][winningPatternCount] 
+            } 
+          </> 
+        )} 
+      </div> 
 
-            <div>
-              🇪🇹 አማርኛ: ሁለት የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት
-            </div>
-          </>
-        )}
+      {/* THREE LANGUAGES */} 
+      <div 
+        style={{ 
+          marginTop: "7px", 
+          textAlign: "center", 
+          color: "#cbd5e1", 
+          fontSize: "10px", 
+          lineHeight: "1.6" 
+        }} 
+      > 
 
-        {winningPatternCount === 3 && (
-          <>
-            <div>
-              🇬🇧 Any THREE different winning patterns = WINNER
-            </div>
+        {winningPatternCount === "FULL_HOUSE" && ( 
+          <> 
+            <div> 
+              🇬🇧 Complete FULL HOUSE (All Numbers) = WINNER 
+            </div> 
 
-            <div>
-              🇪🇹 Afaan Oromo: Patternoota MO'AA SADII adda addaa guutuu qaba
-            </div>
+            <div> 
+              🇪🇹 Afaan Oromo: Mo'achuuf lakkoofsa hundumaa (Mana Guutuu) guutuu qaba 
+            </div> 
 
-            <div>
-              🇪🇹 አማርኛ: ሶስት የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት
-            </div>
-          </>
-        )}
+            <div> 
+              🇪🇹 አማርኛ: ለማሸነፍ ሙሉ ቤቱን (ሁሉንም ቁጥሮች) መሙላት አለበት 
+            </div> 
+          </> 
+        )} 
 
-        {winningPatternCount >= 4 && (
-          <>
-            <div>
-              🇬🇧 Complete {winningPatternCount} different winning patterns = WINNER
-            </div>
+        {winningPatternCount === 1 && ( 
+          <> 
+            <div> 
+              🇬🇧 Any ONE winning pattern = WINNER 
+            </div> 
 
-            <div>
-              🇪🇹 Afaan Oromo: Patternoota MO'AA {winningPatternCount} adda addaa guutuu qaba
-            </div>
+            <div> 
+              🇪🇹 Afaan Oromo: Mo'achuuf patternii TOKKO qofa guutuun ga'a 
+            </div> 
 
-            <div>
-              🇪🇹 አማርኛ: {winningPatternCount} የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት
-            </div>
-          </>
-        )}
+            <div> 
+              🇪🇹 አማርኛ: ለማሸነፍ አንድ የማሸነፊያ ንድፍ ብቻ መሙላት በቂ ነው 
+            </div> 
+          </> 
+        )} 
 
-      </div>
+        {winningPatternCount === 2 && ( 
+          <> 
+            <div> 
+              🇬🇧 Any TWO different winning patterns = WINNER 
+            </div> 
 
-      {/* AVAILABLE PATTERNS */}
-      <div
-        style={{
-          marginTop: "7px",
-          textAlign: "center",
-          color: "#94a3b8",
-          fontSize: "9px",
-          lineHeight: "1.5"
-        }}
-      >
-        🇬🇧 Four Corners Near Star • Four Corners • Horizontal • Vertical • Diagonal • Full House
+            <div> 
+              🇪🇹 Afaan Oromo: Patternoota MO'AA LAMA adda addaa guutuu qaba 
+            </div> 
 
-        <br />
+            <div> 
+              🇪🇹 አማርኛ: ሁለት የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት 
+            </div> 
+          </> 
+        )} 
 
-        🇪🇹 Afaan Oromo: Koona Afur Star bira • Koona Afur • Sarara Horiizontaal • Sarara Vertikaal • Diagonaalii • Mana Guutuu
+        {winningPatternCount === 3 && ( 
+          <> 
+            <div> 
+              🇬🇧 Any THREE different winning patterns = WINNER 
+            </div> 
 
-        <br />
+            <div> 
+              🇪🇹 Afaan Oromo: Patternoota MO'AA SADII adda addaa guutuu qaba 
+            </div> 
 
-        🇪🇹 አማርኛ: ከኮከቡ አጠገብ አራት ማዕዘኖች • አራት ማዕዘኖች • አግድም • ቁመት • ዲያጎናል • ሙሉ ቤት
-      </div>
+            <div> 
+              🇪🇹 አማርኛ: ሶስት የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት 
+            </div> 
+          </> 
+        )} 
 
-      {/* LOCK STATUS */}
-      {gameStarted && (
-        <div
-          style={{
-            marginTop: "8px",
-            padding: "6px",
-            borderRadius: "6px",
-            background: "rgba(34, 197, 94, 0.12)",
-            border: "1px solid rgba(34, 197, 94, 0.35)",
-            textAlign: "center",
-            color: "#86efac",
-            fontSize: "9px",
-            fontWeight: "900"
-          }}
-        >
-          🔒 LOCKED — {winningPatternCount} PATTERN
-          {winningPatternCount > 1 ? "S" : ""}
+        {typeof winningPatternCount === "number" && winningPatternCount >= 4 && ( 
+          <> 
+            <div> 
+              🇬🇧 Complete {winningPatternCount} different winning patterns = WINNER 
+            </div> 
 
-          <br />
+            <div> 
+              🇪🇹 Afaan Oromo: Patternoota MO'AA {winningPatternCount} adda addaa guutuu qaba 
+            </div> 
 
-          🇪🇹 Afaan Oromo:
-          Patternichi hanga Cashier jijjiirutti ni tura
+            <div> 
+              🇪🇹 አማርኛ: {winningPatternCount} የተለያዩ የማሸነፊያ ንድፎችን መሙላት አለበት 
+            </div> 
+          </> 
+        )} 
 
-          <br />
+      </div> 
 
-          🇪🇹 አማርኛ:
-          ይህ ንድፍ ካሺየሩ እስኪቀይረው ድረስ ይቆያል
-        </div>
-      )}
+      {/* AVAILABLE PATTERNS */} 
+      <div 
+        style={{ 
+          marginTop: "7px", 
+          textAlign: "center", 
+          color: "#94a3b8", 
+          fontSize: "9px", 
+          lineHeight: "1.5" 
+        }} 
+      > 
+        🇬🇧 Four Corners Near Star • Four Corners • Horizontal • Vertical • Diagonal • Full House 
 
-    </div>
-  )}
+        <br /> 
+
+        🇪🇹 Afaan Oromo: Koona Afur Star bira • Koona Afur • Sarara Horiizontaal • Sarara Vertikaal • Diagonaalii • Mana Guutuu 
+
+        <br /> 
+
+        🇪🇹 አማርኛ: ከኮከቡ አጠገብ አራት ማዕዘኖች • አራት ማዕዘኖች • አግድም • ቁመት • ዲያጎናል • ሙሉ ቤት 
+      </div> 
+
+      {/* LOCK STATUS */} 
+      {gameStarted && ( 
+        <div 
+          style={{ 
+            marginTop: "8px", 
+            padding: "6px", 
+            borderRadius: "6px", 
+            background: "rgba(34, 197, 94, 0.12)", 
+            border: "1px solid rgba(34, 197, 94, 0.35)", 
+            textAlign: "center", 
+            color: "#86efac", 
+            fontSize: "9px", 
+            fontWeight: "900" 
+          }} 
+        > 
+          🔒 LOCKED — {winningPatternCount === "FULL_HOUSE" ? "FULL HOUSE" : `${winningPatternCount} PATTERN${winningPatternCount > 1 ? "S" : ""}`} 
+
+          <br /> 
+
+          🇪🇹 Afaan Oromo: 
+          Patternichi hanga Cashier jijjiirutti ni tura 
+
+          <br /> 
+
+          🇪🇹 አማርኛ: 
+          ይህ ንድፍ ካሺየሩ እስኪቀይረው ድረስ ይቆያል 
+        </div> 
+      )} 
+
+    </div> 
+  )} 
 </div>
         {/* QR MODAL */}
         {showQrModal && (

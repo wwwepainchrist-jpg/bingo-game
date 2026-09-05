@@ -229,7 +229,7 @@ export default function BingoGame() {
   const [tvMode, setTvMode] = useState(false);
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
   const [voices, setVoices] = useState([]);
- 
+
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
@@ -311,272 +311,131 @@ const winningPatternIndexRef = useRef(0);
 // 🏆 WINNING PATTERN PREVIEW ANIMATION
 // Shows EVERY possible winning pattern combination
 // ============================================================
-
-
 useEffect(() => {
   if (!activeWinningPattern) {
     setDisplayedWinningPatterns([]);
-
     winningPatternIndexRef.current = 0;
 
     if (winningPatternAnimationRef.current !== null) {
       clearTimeout(winningPatternAnimationRef.current);
-
       winningPatternAnimationRef.current = null;
     }
-
     return;
   }
 
   // ============================================================
-  // ALL POSSIBLE WINNING PATTERNS
+  // 1. BASE PATTERNS GENERATION
   // ============================================================
 
-  const allPatterns = [];
-
-  // ----------------------------
-  // HORIZONTAL
-  // ----------------------------
+  const horizontalPatterns = [];
   for (let row = 0; row < 5; row++) {
     const cells = [];
-
     for (let col = 0; col < 5; col++) {
       cells.push(`${row}-${col}`);
     }
-
-    allPatterns.push(cells);
+    horizontalPatterns.push(cells);
   }
 
-  // ----------------------------
-  // VERTICAL
-  // ----------------------------
+  const verticalPatterns = [];
   for (let col = 0; col < 5; col++) {
     const cells = [];
-
     for (let row = 0; row < 5; row++) {
       cells.push(`${row}-${col}`);
     }
-
-    allPatterns.push(cells);
+    verticalPatterns.push(cells);
   }
 
-  // ----------------------------
-  // DIAGONAL 1
-  // ----------------------------
-  allPatterns.push([
-    "0-0",
-    "1-1",
-    "2-2",
-    "3-3",
-    "4-4",
-  ]);
+  const diagonalPatterns = [
+    ["0-0", "1-1", "2-2", "3-3", "4-4"],
+    ["0-4", "1-3", "2-2", "3-1", "4-0"],
+  ];
 
-  // ----------------------------
-  // DIAGONAL 2
-  // ----------------------------
-  allPatterns.push([
-    "0-4",
-    "1-3",
-    "2-2",
-    "3-1",
-    "4-0",
-  ]);
+  const cornerPatterns = [
+    ["0-0", "0-4", "4-0", "4-4"],
+    ["1-1", "1-3", "3-1", "3-3"],
+  ];
 
-  // ----------------------------
-  // FOUR CORNERS
-  // ----------------------------
-  allPatterns.push([
-    "0-0",
-    "0-4",
-    "4-0",
-    "4-4",
-  ]);
-
-  // ----------------------------
-  // FOUR CORNERS NEAR STAR
-  // ----------------------------
-  allPatterns.push([
-    "1-1",
-    "1-3",
-    "3-1",
-    "3-3",
-  ]);
-
-  // ----------------------------
-  // FULL HOUSE
-  // ----------------------------
-  const fullHouse = [];
-
+  const fullHousePattern = [];
   for (let row = 0; row < 5; row++) {
     for (let col = 0; col < 5; col++) {
-      fullHouse.push(`${row}-${col}`);
+      fullHousePattern.push(`${row}-${col}`);
     }
   }
 
-  allPatterns.push(fullHouse);
+  // 14 distinct patterns total in the pool
+  const basePatternsPool = [
+    ...horizontalPatterns,
+    ...verticalPatterns,
+    ...diagonalPatterns,
+    ...cornerPatterns,
+  ];
 
   // ============================================================
-  // REQUIRED NUMBER OF PATTERNS
+  // 2. DETERMINE COMBINATIONS BASED ON SELECTION
   // ============================================================
 
-  const requiredCount = Math.min(
-    10,
-    Math.max(
-      1,
-      Number(activeWinningPattern) || 1
-    )
-  );
+  let combinations = [];
+  const choice = String(activeWinningPattern).toLowerCase().trim();
 
-  console.log(
-    "🏆 REQUIRED WINNING PATTERNS:",
-    requiredCount
-  );
+  if (choice === "horizontal" || choice === "row" || choice === "rows") {
+    combinations = horizontalPatterns;
+  } else if (choice === "vertical" || choice === "column" || choice === "columns") {
+    combinations = verticalPatterns;
+  } else if (choice === "diagonal" || choice === "diagonals") {
+    combinations = diagonalPatterns;
+  } else if (choice === "corners" || choice === "corner") {
+    combinations = cornerPatterns;
+  } else if (choice === "full_house" || choice === "fullhouse") {
+    combinations = [fullHousePattern];
+  } else {
+    // ============================================================
+    // NUMERIC PATTERN CHOICE (Handles 1 to 10+ Patterns)
+    // ============================================================
+    const requiredCount = Math.max(1, Number(activeWinningPattern) || 1);
 
-  // ============================================================
-  // BUILD COMBINATIONS
-  //
-  // We only need enough combinations for the UI.
-  // DO NOT generate every possible combination.
-  // ============================================================
+    // Generate unique sliding combinations of size `requiredCount` (including 10)
+    for (let start = 0; start < basePatternsPool.length; start++) {
+      const combinedCells = [];
 
-  const combinations = [];
+      for (let offset = 0; offset < requiredCount; offset++) {
+        const index = (start + offset) % basePatternsPool.length;
+        combinedCells.push(...basePatternsPool[index]);
+      }
 
-  // First combination
-  const firstCombination = [];
-
-  for (
-    let i = 0;
-    i < requiredCount &&
-    i < allPatterns.length;
-    i++
-  ) {
-    firstCombination.push(i);
-  }
-
-  combinations.push(firstCombination);
-
-  // Additional combinations
-  // Rotate the patterns so the displayed pattern changes.
-  for (
-    let start = 1;
-    start < allPatterns.length;
-    start++
-  ) {
-    const combination = [];
-
-    for (let offset = 0; offset < requiredCount; offset++) {
-      const index =
-        (start + offset) %
-        allPatterns.length;
-
-      combination.push(index);
+      // De-duplicate cells for this specific combination
+      combinations.push([...new Set(combinedCells)]);
     }
-
-    combinations.push(combination);
   }
 
   console.log(
-    "🏆 UI COMBINATIONS:",
+    `🏆 PATTERN CHOICE: ${activeWinningPattern} | GENERATED COMBINATIONS:`,
     combinations.length
   );
 
   // ============================================================
-  // RESET ANIMATION INDEX
+  // 3. ANIMATION LOOP
   // ============================================================
 
   winningPatternIndexRef.current = 0;
 
-  // ============================================================
-  // SHOW NEXT COMBINATION
-  // ============================================================
-
   const showNextCombination = () => {
-
-    // ----------------------------------------------------------
-    // PAUSED = STOP TIMER
-    // ----------------------------------------------------------
-
-    if (stateRef.current.paused) {
-      console.log(
-        "⏸️ WINNING ANIMATION PAUSED"
-      );
-
+    if (stateRef.current.paused || !combinations.length) {
       winningPatternAnimationRef.current = null;
-
       return;
     }
 
-    if (!combinations.length) {
+    const currentIndex = winningPatternIndexRef.current;
+    const currentCombination = combinations[currentIndex];
+
+    setDisplayedWinningPatterns(currentCombination);
+
+    winningPatternIndexRef.current = (currentIndex + 1) % combinations.length;
+
+    winningPatternAnimationRef.current = setTimeout(() => {
       winningPatternAnimationRef.current = null;
-
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // CURRENT COMBINATION
-    // ----------------------------------------------------------
-
-    const currentIndex =
-      winningPatternIndexRef.current;
-
-    const indexes =
-      combinations[currentIndex];
-
-    // ----------------------------------------------------------
-    // GET CELLS
-    // ----------------------------------------------------------
-
-    const cells = indexes.flatMap(
-      patternIndex =>
-        allPatterns[patternIndex]
-    );
-
-    // Remove duplicate cells
-    const uniqueCells = [
-      ...new Set(cells)
-    ];
-
-    // ----------------------------------------------------------
-    // DISPLAY
-    // ----------------------------------------------------------
-
-    setDisplayedWinningPatterns(
-      uniqueCells
-    );
-
-    console.log(
-      `🏆 SHOWING ${requiredCount} PATTERNS — COMBINATION ${
-        currentIndex + 1
-      } / ${combinations.length}`,
-      uniqueCells
-    );
-
-    // ----------------------------------------------------------
-    // NEXT COMBINATION
-    // ----------------------------------------------------------
-
-    winningPatternIndexRef.current =
-      (currentIndex + 1) %
-      combinations.length;
-
-    // ----------------------------------------------------------
-    // ONE TIMER ONLY
-    // ----------------------------------------------------------
-
-    winningPatternAnimationRef.current =
-      setTimeout(() => {
-
-        winningPatternAnimationRef.current =
-          null;
-
-        showNextCombination();
-
-      }, 1000);
+      showNextCombination();
+    }, 1000);
   };
-
-  // ============================================================
-  // START
-  // ============================================================
 
   if (!stateRef.current.paused) {
     showNextCombination();
@@ -587,18 +446,11 @@ useEffect(() => {
   // ============================================================
 
   return () => {
-
-    if (
-      winningPatternAnimationRef.current !== null
-    ) {
-      clearTimeout(
-        winningPatternAnimationRef.current
-      );
-
+    if (winningPatternAnimationRef.current !== null) {
+      clearTimeout(winningPatternAnimationRef.current);
       winningPatternAnimationRef.current = null;
     }
   };
-
 }, [activeWinningPattern, paused]);
 
 
@@ -639,9 +491,7 @@ const generationCancelRef = useRef(0);
 // 🔄 LOAD CASHIER SPEED
 
 const gameRunIdRef = useRef(0);
-const hasPlayedShuffleRef = useRef(
-  sessionStorage.getItem("bingo_shuffle_played") === "true"
-);
+const hasPlayedShuffleRef = useRef(false);
 const callIntervalChangeRef = useRef(null);
   // ============================================
   // CALL NUMBER API (prevents spam)
@@ -675,6 +525,14 @@ useEffect(() => {
     callInterval
   );
 }, [callInterval, cashierId]);
+
+
+
+
+
+
+
+
   // ============================================
   // RETURN JSX
   // ============================================
@@ -2256,44 +2114,58 @@ function playShuffleSound(onComplete = () => {}) {
 
   console.log("🎵 OROMO SHUFFLE:", audioPath);
 
- const audio = new Audio(audioPath);
+  // Stop previous shuffle only
+  if (shuffleAudioRef.current) {
+    try {
+      shuffleAudioRef.current.pause();
+      shuffleAudioRef.current.currentTime = 0;
+    } catch (error) {
+      console.warn("⚠️ OLD SHUFFLE STOP ERROR:", error);
+    }
 
-// ==========================================================
-// 🎵 DEBUG AUDIO POSITION
-// ==========================================================
-
-audio.addEventListener("timeupdate", () => {
-
-  if (activeAudioRef.current === audio) {
-
-    console.log(
-      "🎵 AUDIO TIME:",
-      audio.currentTime
-    );
-
+    shuffleAudioRef.current = null;
   }
 
-});
+  const audio = new Audio(audioPath);
 
-// ==========================================================
-// AUDIO SETTINGS
-// ==========================================================
+  // ==========================================================
+  // 🎵 DEBUG AUDIO POSITION
+  // ==========================================================
 
-audio.volume =
-  Number(volumeRef.current) || 1;
+  audio.addEventListener("timeupdate", () => {
+    if (shuffleAudioRef.current === audio) {
+      console.log(
+        "🎵 SHUFFLE AUDIO TIME:",
+        audio.currentTime
+      );
+    }
+  });
 
-audio.playbackRate =
-  Number(voiceSpeedRef.current) || 1;
+  // ==========================================================
+  // AUDIO SETTINGS
+  // ==========================================================
 
-audio.preservesPitch = true;
+  audio.volume =
+    Number(volumeRef.current) || 1;
 
-  activeAudioRef.current = audio;
+  audio.playbackRate =
+    Number(voiceSpeedRef.current) || 1;
+
+  audio.preservesPitch = true;
+
+  // ==========================================================
+  // IMPORTANT:
+  // SHUFFLE HAS ITS OWN AUDIO REF.
+  // DO NOT TOUCH activeAudioRef HERE.
+  // ==========================================================
+
   shuffleAudioRef.current = audio;
 
+  // ==========================================================
+  // AUDIO FINISHED
+  // ==========================================================
+
   audio.onended = () => {
-    if (activeAudioRef.current === audio) {
-      activeAudioRef.current = null;
-    }
 
     if (shuffleAudioRef.current === audio) {
       shuffleAudioRef.current = null;
@@ -2304,19 +2176,27 @@ audio.preservesPitch = true;
     onComplete();
   };
 
+  // ==========================================================
+  // AUDIO ERROR
+  // ==========================================================
+
   audio.onerror = () => {
-    if (activeAudioRef.current === audio) {
-      activeAudioRef.current = null;
-    }
 
     if (shuffleAudioRef.current === audio) {
       shuffleAudioRef.current = null;
     }
 
-    console.error("❌ OROMO SHUFFLE ERROR:", audioPath);
+    console.error(
+      "❌ OROMO SHUFFLE ERROR:",
+      audioPath
+    );
 
     onComplete();
   };
+
+  // ==========================================================
+  // PLAY
+  // ==========================================================
 
   audio.play()
     .then(() => {
@@ -2326,14 +2206,11 @@ audio.preservesPitch = true;
       );
     })
     .catch((error) => {
+
       console.error(
         "❌ OROMO SHUFFLE PLAY ERROR:",
         error
       );
-
-      if (activeAudioRef.current === audio) {
-        activeAudioRef.current = null;
-      }
 
       if (shuffleAudioRef.current === audio) {
         shuffleAudioRef.current = null;
@@ -3343,6 +3220,7 @@ const togglePlayPause = () => {
 
   generateNumber();
 };
+
 
 // ==========================================
 // END PAUSE / PLAY
@@ -4587,7 +4465,8 @@ setWinningCells(
                 </div>
               </div>
             )}
-            {/* 1. LEFT SIDE: WINNING PATTERN PREVIEW */}
+           
+ {/* 1. LEFT SIDE: WINNING PATTERN PREVIEW */}
             {activeWinningPattern && (
               <div
                 style={{
@@ -4656,6 +4535,8 @@ setWinningCells(
                 </div>
               </div>
             )}
+
+
 
             {/* 2. RIGHT SIDE: ROLLING MACHINE CAGE */}
             <div className="cage-container">
