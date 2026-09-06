@@ -2108,6 +2108,111 @@ if (stateRef.current.paused) {
 }
  } // ==========================================================
 
+    // end of playCompleteRecording
+
+
+  // ==========================================================
+  // 🎵 VERIFICATION AUDIO
+  // ==========================================================
+
+  function playRecordedAudio(fileName, onComplete = () => {}) {
+
+    const folder =
+      stateRef.current.game?.voiceMode === "recorded-oromo"
+        ? "oromo"
+        : "amharic";
+
+    const audioPath = `/${folder}/${fileName}.mp3`;
+
+    console.log("🎵 VERIFICATION AUDIO:", audioPath);
+
+    // Stop ONLY currently playing audio
+    if (activeAudioRef.current) {
+      try {
+        activeAudioRef.current.pause();
+        activeAudioRef.current.currentTime = 0;
+      } catch (error) {
+        console.warn("⚠️ Could not stop previous audio:", error);
+      }
+
+      activeAudioRef.current = null;
+    }
+
+    const audio = new Audio(audioPath);
+
+    audio.volume =
+      Math.max(
+        1,
+        Math.min(
+          3,
+          Number(volumeRef.current) || 1* 1.2
+        )
+      );
+
+    audio.playbackRate =
+      Math.max(
+        1,
+        Math.min(
+          2,
+          Number(voiceSpeedRef.current) || 1* 1.15
+        )
+      );
+
+    activeAudioRef.current = audio;
+
+    audio.onended = () => {
+
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+
+      console.log(
+        "✅ VERIFICATION AUDIO FINISHED:",
+        audioPath
+      );
+
+      onComplete();
+    };
+
+    audio.onerror = (error) => {
+
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+
+      console.error(
+        "❌ VERIFICATION AUDIO ERROR:",
+        audioPath,
+        error
+      );
+
+      onComplete();
+    };
+
+    audio.play()
+      .then(() => {
+        console.log(
+          "▶️ VERIFICATION AUDIO PLAYING:",
+          audioPath
+        );
+      })
+      .catch((error) => {
+
+        console.error(
+          "❌ VERIFICATION AUDIO PLAY ERROR:",
+          audioPath,
+          error
+        );
+
+        if (activeAudioRef.current === audio) {
+          activeAudioRef.current = null;
+        }
+
+        onComplete();
+      });
+  }
+
+
  
 function playShuffleSound(onComplete = () => {}) {
   const audioPath = "/oromo/shuffle.mp3";

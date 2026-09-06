@@ -561,13 +561,15 @@ router.post("/:gameId/verify-cartela", async (req, res) => {
     }
 
     const gameDbId = gameResult.rows[0].id;
-    const winningPatternCount = Math.min(
-      3,
-      Math.max(
-        1,
-        Number(gameResult.rows[0].winning_pattern_count) || 1
-      )
-    );
+   const rawWinningPatternCount =
+  gameResult.rows[0].winning_pattern_count;
+
+const isFullHouseRequired =
+  String(rawWinningPatternCount).toUpperCase() === "FULL_HOUSE";
+
+const winningPatternCount = isFullHouseRequired
+  ? null
+  : Math.max(1, Number(rawWinningPatternCount) || 1);
 
     console.log(
       "🔒 WINNING PATTERN REQUIREMENT:",
@@ -969,8 +971,9 @@ const completedWinningPatterns =
 // 13B. FINAL WINNER
 // ============================================================
 
-const isWinner =
-  completedWinningPatterns >= winningPatternCount;
+const isWinner = isFullHouseRequired
+  ? fullHouseWinner
+  : completedWinningPatterns >= winningPatternCount;
 
 
 // ============================================================

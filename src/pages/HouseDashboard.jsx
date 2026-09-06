@@ -29,7 +29,7 @@ export default function HouseDashboard() {
   const [currentHouseUser, setCurrentHouseUser] = useState({ username: id, id: id, name: id });
   const [packageInfo, setPackageInfo] = useState({ totalAmount: 0, remainingAmount: 0 });
   const [editingCashierId, setEditingCashierId] = useState(null);
-  
+ 
   // Periodic stats state fetched directly from the backend API
   const [periodicStats, setPeriodicStats] = useState({
     daily: { cards: 0, commission: 0, games: 0 },
