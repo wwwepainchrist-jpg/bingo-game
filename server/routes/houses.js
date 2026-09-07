@@ -156,105 +156,252 @@ router.put("/:id/package", async (req, res) => {
 // GET HOUSE PERFORMANCE & LOGS
 // DAILY / WEEKLY / MONTHLY / YEARLY
 // ==========================================================================
-router.get("/:id/performance", async (req, res) => {
+// ==========================================================
+// 📊 HOUSE PERFORMANCE
+// 🇪🇹 ETHIOPIAN TIME — AFRICA/ADDIS_ABABA
+// ==========================================================
+router.get("/:id/performance", async (req, res) => {  console.log("🚨🚨🚨 NEW PERFORMANCE ROUTE IS RUNNING 🚨🚨🚨");
   try {
     const { id } = req.params;
+    const houseId = String(id);
 
-    const houseId = Number(id);
+    console.log("🔥 PERFORMANCE ROUTE HIT - NEW CODE");
+    console.log("🏠 HOUSE ID:", houseId);
 
-    // Get all games for this house from the last 365 days
     const result = await pool.query(
       `
+      WITH ethiopia_now AS (
+        SELECT
+          CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Addis_Ababa' AS now
+      ),
+
+      periods AS (
+        SELECT
+          now,
+
+          /* =========================
+             DAILY
+             Ethiopia calendar day
+             ========================= */
+          date_trunc('day', now) AS daily_start,
+          date_trunc('day', now) + INTERVAL '1 day' AS daily_end,
+
+          /* =========================
+             WEEKLY
+             Monday -> Sunday
+             ========================= */
+          date_trunc('week', now) AS weekly_start,
+          date_trunc('week', now) + INTERVAL '7 days' AS weekly_end,
+
+          /* =========================
+             MONTHLY
+             ========================= */
+          date_trunc('month', now) AS monthly_start,
+          date_trunc('month', now) + INTERVAL '1 month' AS monthly_end,
+
+          /* =========================
+             YEARLY
+             ========================= */
+          date_trunc('year', now) AS yearly_start,
+          date_trunc('year', now) + INTERVAL '1 year' AS yearly_end
+
+        FROM ethiopia_now
+      )
+
       SELECT
-        cartelas_sold,
-        commission,
-        created_at
-      FROM game_logs
-      WHERE house_id = $1
-        AND created_at >= NOW() - INTERVAL '365 days'
-      ORDER BY created_at DESC
+
+        /* =====================================================
+           DAILY
+           ===================================================== */
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.daily_start
+               AND g.created_at < p.daily_end
+              THEN COALESCE(g.cards_sold, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS daily_cards,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.daily_start
+               AND g.created_at < p.daily_end
+              THEN COALESCE(g.house_commission, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS daily_commission,
+
+        COUNT(*) FILTER (
+          WHERE g.created_at >= p.daily_start
+            AND g.created_at < p.daily_end
+        ) AS daily_games,
+
+
+        /* =====================================================
+           WEEKLY
+           ===================================================== */
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.weekly_start
+               AND g.created_at < p.weekly_end
+              THEN COALESCE(g.cards_sold, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS weekly_cards,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.weekly_start
+               AND g.created_at < p.weekly_end
+              THEN COALESCE(g.house_commission, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS weekly_commission,
+
+        COUNT(*) FILTER (
+          WHERE g.created_at >= p.weekly_start
+            AND g.created_at < p.weekly_end
+        ) AS weekly_games,
+
+
+        /* =====================================================
+           MONTHLY
+           ===================================================== */
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.monthly_start
+               AND g.created_at < p.monthly_end
+              THEN COALESCE(g.cards_sold, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS monthly_cards,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.monthly_start
+               AND g.created_at < p.monthly_end
+              THEN COALESCE(g.house_commission, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS monthly_commission,
+
+        COUNT(*) FILTER (
+          WHERE g.created_at >= p.monthly_start
+            AND g.created_at < p.monthly_end
+        ) AS monthly_games,
+
+
+        /* =====================================================
+           YEARLY
+           ===================================================== */
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.yearly_start
+               AND g.created_at < p.yearly_end
+              THEN COALESCE(g.cards_sold, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS yearly_cards,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN g.created_at >= p.yearly_start
+               AND g.created_at < p.yearly_end
+              THEN COALESCE(g.house_commission, 0)
+              ELSE 0
+            END
+          ),
+          0
+        ) AS yearly_commission,
+
+        COUNT(*) FILTER (
+          WHERE g.created_at >= p.yearly_start
+            AND g.created_at < p.yearly_end
+        ) AS yearly_games
+
+      FROM public.games g
+      CROSS JOIN periods p
+
+      WHERE g.house_id = $1
       `,
       [houseId]
     );
 
-    const rows = result.rows;
+    const stats = result.rows[0];
 
-    // Calculate each period independently
-    const now = Date.now();
+    console.log("🔥 PERFORMANCE RESULT FOR HOUSE:", houseId);
 
-    const dailyRows = rows.filter(
-      row =>
-        now - new Date(row.created_at).getTime() <=
-        24 * 60 * 60 * 1000
-    );
-
-    const weeklyRows = rows.filter(
-      row =>
-        now - new Date(row.created_at).getTime() <=
-        7 * 24 * 60 * 60 * 1000
-    );
-
-    const monthlyRows = rows.filter(
-      row =>
-        now - new Date(row.created_at).getTime() <=
-        30 * 24 * 60 * 60 * 1000
-    );
-
-    const yearlyRows = rows;
-
-    const calculateStats = (gameRows) => {
-      return {
-        cards: gameRows.reduce(
-          (total, row) =>
-            total + Number(row.cartelas_sold || 0),
-          0
-        ),
-
-        commission: gameRows.reduce(
-          (total, row) =>
-            total + Number(row.commission || 0),
-          0
-        ),
-
-        games: gameRows.length,
-      };
-    };
-
-    const daily = calculateStats(dailyRows);
-    const weekly = calculateStats(weeklyRows);
-    const monthly = calculateStats(monthlyRows);
-    const yearly = calculateStats(yearlyRows);
-
-    console.log("📊 HOUSE PERFORMANCE:", houseId);
-    console.log("DAILY:", daily);
-    console.log("WEEKLY:", weekly);
-    console.log("MONTHLY:", monthly);
-    console.log("YEARLY:", yearly);
-
-    res.json({
-      success: true,
-
-      performance: {
-        daily_cards: daily.cards,
-        daily_commission: daily.commission,
-        daily_games: daily.games,
-
-        weekly_cards: weekly.cards,
-        weekly_commission: weekly.commission,
-        weekly_games: weekly.games,
-
-        monthly_cards: monthly.cards,
-        monthly_commission: monthly.commission,
-        monthly_games: monthly.games,
-
-        yearly_cards: yearly.cards,
-        yearly_commission: yearly.commission,
-        yearly_games: yearly.games,
-      },
-
-      logs: rows,
+    console.log("📅 DAILY:", {
+      cards: stats.daily_cards,
+      commission: stats.daily_commission,
+      games: stats.daily_games,
     });
 
+    console.log("📅 WEEKLY:", {
+      cards: stats.weekly_cards,
+      commission: stats.weekly_commission,
+      games: stats.weekly_games,
+    });
+
+    console.log("📅 MONTHLY:", {
+      cards: stats.monthly_cards,
+      commission: stats.monthly_commission,
+      games: stats.monthly_games,
+    });
+
+    console.log("📅 YEARLY:", {
+      cards: stats.yearly_cards,
+      commission: stats.yearly_commission,
+      games: stats.yearly_games,
+    });
+
+  res.json({
+  success: true,
+  TEST: "NEW PERFORMANCE CODE 12345",
+  performance: {
+    daily_cards: Number(stats.daily_cards || 0),
+    daily_commission: Number(stats.daily_commission || 0),
+    daily_games: Number(stats.daily_games || 0),
+
+    weekly_cards: Number(stats.weekly_cards || 0),
+    weekly_commission: Number(stats.weekly_commission || 0),
+    weekly_games: Number(stats.weekly_games || 0),
+
+    monthly_cards: Number(stats.monthly_cards || 0),
+    monthly_commission: Number(stats.monthly_commission || 0),
+    monthly_games: Number(stats.monthly_games || 0),
+
+    yearly_cards: Number(stats.yearly_cards || 0),
+    yearly_commission: Number(stats.yearly_commission || 0),
+    yearly_games: Number(stats.yearly_games || 0),
+  },
+});
   } catch (err) {
     console.error("❌ HOUSE PERFORMANCE ERROR:", err);
 
@@ -267,35 +414,85 @@ router.get("/:id/performance", async (req, res) => {
 // ==========================================================================
 // DELETE RECORDS BY PERIOD TYPE (DAILY, WEEKLY, MONTHLY, YEARLY)
 // ==========================================================================
+// ==========================================================================
+// DELETE HOUSE RECORDS BY PERIOD
+// 🇪🇹 ETHIOPIAN TIME
+// ==========================================================================
+
 router.delete("/:id/records", async (req, res) => {
   try {
     const { id } = req.params;
-    const type = String(req.query.type || "").toUpperCase(); 
+    const type = String(req.query.type || "").toUpperCase();
 
-    let timeInterval = "24 hours";
-    if (type === "WEEKLY") timeInterval = "7 days";
-    if (type === "MONTHLY") timeInterval = "30 days";
-    if (type === "YEARLY") timeInterval = "365 days";
+    let condition;
 
-    const deleteQuery = `
-      DELETE FROM game_logs 
-      WHERE house_id = $1 
-      AND created_at < NOW() - $2::INTERVAL
-    `;
+    if (type === "DAILY") {
+      condition = `
+        created_at >=
+        date_trunc(
+          'day',
+          CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Addis_Ababa'
+        ) AT TIME ZONE 'Africa/Addis_Ababa'
+      `;
+    } else if (type === "WEEKLY") {
+      condition = `
+        created_at >=
+        date_trunc(
+          'week',
+          CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Addis_Ababa'
+        ) AT TIME ZONE 'Africa/Addis_Ababa'
+      `;
+    } else if (type === "MONTHLY") {
+      condition = `
+        created_at >=
+        date_trunc(
+          'month',
+          CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Addis_Ababa'
+        ) AT TIME ZONE 'Africa/Addis_Ababa'
+      `;
+    } else if (type === "YEARLY") {
+      condition = `
+        created_at >=
+        date_trunc(
+          'year',
+          CURRENT_TIMESTAMP AT TIME ZONE 'Africa/Addis_Ababa'
+        ) AT TIME ZONE 'Africa/Addis_Ababa'
+      `;
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid period type",
+      });
+    }
 
-    const result = await pool.query(deleteQuery, [Number(id), timeInterval]);
+    const result = await pool.query(
+      `
+      DELETE FROM game_logs
+      WHERE house_id = $1
+      AND ${condition}
+      `,
+      [Number(id)]
+    );
+
+    console.log(
+      `🗑️ DELETED ${result.rowCount} ${type} RECORDS FOR HOUSE ${id}`
+    );
 
     res.json({
       success: true,
       deletedCount: result.rowCount,
-      message: `Successfully deleted expired ${type} records.`,
+      message: `Successfully deleted ${type} records.`,
     });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, error: err.message });
+    console.error("❌ DELETE PERIOD ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
-
 // ==========================================================================
 // GET CASHIERS FOR A SPECIFIC HOUSE
 // ==========================================================================

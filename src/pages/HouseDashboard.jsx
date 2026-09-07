@@ -79,31 +79,33 @@ export default function HouseDashboard() {
           remainingAmount: Number(pkgData.remaining_package ?? pkgData.remainingAmount ?? 0),
         });
       }
-// 5. Fetch commission controlled by this house
-try {
-  const commissionRes = await fetch(
-    `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${id}`
-  );
 
-  if (commissionRes.ok) {
-    const commissionData = await commissionRes.json();
+      // 5. Fetch commission controlled by this house
+      try {
+        const commissionRes = await fetch(
+          `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${id}`
+        );
 
-    console.log(
-      "🏠 DATABASE COMMISSION:",
-      commissionData.value
-    );
+        if (commissionRes.ok) {
+          const commissionData = await commissionRes.json();
 
-    setCommission(Number(commissionData.value));
+          console.log(
+            "🏠 DATABASE COMMISSION:",
+            commissionData.value
+          );
 
-  } else if (commissionRes.status === 404) {
-    console.log(
-      `⚠️ No commission setting found for house ${id}`
-    );
-  }
+          setCommission(Number(commissionData.value));
 
-} catch (err) {
-  console.error("Failed to load house commission:", err);
-}
+        } else if (commissionRes.status === 404) {
+          console.log(
+            `⚠️ No commission setting found for house ${id}`
+          );
+        }
+
+      } catch (err) {
+        console.error("Failed to load house commission:", err);
+      }
+
       // 6. Fetch Super Admin tier packages config
       const tiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers`);
       if (tiersRes.ok) {
@@ -119,8 +121,6 @@ try {
     }
   };
 
- 
-
   useEffect(() => {
     refreshDashboardData();
 
@@ -131,66 +131,52 @@ try {
     };
   }, [id]);
 
- async function updateSetting(key, value) {
-  try {
-    console.log(`💾 SAVING SETTING: ${key} = ${value}`);
+  async function updateSetting(key, value) {
+    try {
+      console.log(`💾 SAVING SETTING: ${key} = ${value}`);
 
-    const response = await fetch(
-  
-  "https://bingo-backend-ccn6.onrender.com/api/settings",
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          key,
-          value,
-        }),
+      const response = await fetch(
+        "https://bingo-backend-ccn6.onrender.com/api/settings",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            key,
+            value,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("❌ SAVE SETTING FAILED:", data);
+        return false;
       }
-    );
 
-    const data = await response.json();
+      console.log(`✅ SAVED ${key} = ${value}`, data);
 
-    if (!response.ok) {
-      console.error("❌ SAVE SETTING FAILED:", data);
+      return true;
+    } catch (err) {
+      console.error("❌ Error updating setting:", err);
       return false;
     }
-
-    console.log(`✅ SAVED ${key} = ${value}`, data);
-
-    return true;
-  } catch (err) {
-    console.error("❌ Error updating setting:", err);
-    return false;
   }
-}
+
   // ==========================================================================
   // FETCH PERIODIC STATS FROM BACKEND PERFORMANCE API
   // ==========================================================================
   useEffect(() => {
     async function loadPerformance() {
       try {
-       const response = await fetch(
-  `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`
-);
+        const response = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`
+        );
         const data = await response.json();
-console.log("🔥 FULL PERFORMANCE RESPONSE:", data);
-console.log("📅 DAILY:", data.performance?.daily_cards,
-  data.performance?.daily_commission,
-  data.performance?.daily_games);
+        console.log("🔥 FULL PERFORMANCE RESPONSE:", data);
 
-console.log("📅 WEEKLY:", data.performance?.weekly_cards,
-  data.performance?.weekly_commission,
-  data.performance?.weekly_games);
-
-console.log("📅 MONTHLY:", data.performance?.monthly_cards,
-  data.performance?.monthly_commission,
-  data.performance?.monthly_games);
-
-console.log("📅 YEARLY:", data.performance?.yearly_cards,
-  data.performance?.yearly_commission,
-  data.performance?.yearly_games);
         if (data.success && data.performance) {
           setPeriodicStats({
             daily: {
@@ -223,7 +209,7 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     if (id) {
       loadPerformance();
     }
- }, [id]);
+  }, [id]);
 
   // SORT GAMES: From Current/Newest Date & Time to Oldest
   const sortedHouseGames = [...houseGames].sort((a, b) => {
@@ -231,7 +217,126 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     const dateB = b.date ? new Date(b.date).getTime() : 0;
     return dateB - dateA;
   });
+// ==========================================================================
+// FILTER GAME HISTORY BY SELECTED CALENDAR PERIOD
+// ==========================================================================
 
+const getEthiopiaDateParts = (dateValue) => {
+  if (!dateValue) return null;
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Africa/Addis_Ababa",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(dateValue));
+
+  return {
+    year: Number(parts.find(p => p.type === "year")?.value),
+    month: Number(parts.find(p => p.type === "month")?.value),
+    day: Number(parts.find(p => p.type === "day")?.value),
+  };
+};
+
+const getEthiopiaToday = () => {
+  return getEthiopiaDateParts(new Date());
+};
+
+const getGameDateParts = (game) => {
+  const value =
+    game.created_at ||
+    game.finished_at ||
+    game.started_at ||
+    game.game_date ||
+    game.date;
+
+  return getEthiopiaDateParts(value);
+};
+
+const isSameDate = (a, b) => {
+  return (
+    a &&
+    b &&
+    a.year === b.year &&
+    a.month === b.month &&
+    a.day === b.day
+  );
+};
+
+const filteredHouseGames = sortedHouseGames.filter((game) => {
+  const gameDate = getGameDateParts(game);
+
+  if (!gameDate) return false;
+
+  const today = getEthiopiaToday();
+
+  // ============================================================
+  // DAILY
+  // TODAY'S CALENDAR DAY ONLY
+  // ============================================================
+
+  if (selectedPeriod === "daily") {
+    return isSameDate(gameDate, today);
+  }
+
+  // ============================================================
+  // WEEKLY
+  // CURRENT CALENDAR WEEK
+  // ============================================================
+
+  if (selectedPeriod === "weekly") {
+    const gameDateObj = new Date(
+      Date.UTC(gameDate.year, gameDate.month - 1, gameDate.day)
+    );
+
+    const todayObj = new Date(
+      Date.UTC(today.year, today.month - 1, today.day)
+    );
+
+    const day = todayObj.getUTCDay();
+
+    // Monday = first day of week
+    const daysFromMonday = day === 0 ? 6 : day - 1;
+
+    const weekStart = new Date(todayObj);
+    weekStart.setUTCDate(
+      weekStart.getUTCDate() - daysFromMonday
+    );
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setUTCDate(
+      weekEnd.getUTCDate() + 7
+    );
+
+    return (
+      gameDateObj >= weekStart &&
+      gameDateObj < weekEnd
+    );
+  }
+
+  // ============================================================
+  // MONTHLY
+  // CURRENT CALENDAR MONTH
+  // ============================================================
+
+  if (selectedPeriod === "monthly") {
+    return (
+      gameDate.year === today.year &&
+      gameDate.month === today.month
+    );
+  }
+
+  // ============================================================
+  // YEARLY
+  // CURRENT CALENDAR YEAR
+  // ============================================================
+
+  if (selectedPeriod === "yearly") {
+    return gameDate.year === today.year;
+  }
+
+  return false;
+});
   // ==========================================================================
   // ISOLATED DELETE FUNCTION FOR THE SELECTED PERIOD ONLY (VIA BACKEND)
   // ==========================================================================
@@ -292,7 +397,6 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     const grossPool = betAmount * cartelasCount;
     const commissionRate = Number(game.commission) || 15;
     
-    // Utilize stored database commission if present, avoiding row calculation discrepancies
     const calculatedCommission = Number(game.house_commission ?? game.commission_earned ?? (grossPool * (commissionRate / 100)));
 
     if (!acc[dateKey]) {
@@ -306,7 +410,6 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     return acc;
   }, {});
 
-  // Chronological order for XY Graph plot (Old to New)
   const sortedDailyGraph = Object.values(dailyGraphData).sort((a, b) => new Date(a.date) - new Date(b.date));
 
   function editCashier(cashier) {
@@ -456,6 +559,7 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
       borderRadius: "16px",
       boxShadow: "0 10px 25px rgba(2, 132, 199, 0.25)",
       border: "1px solid rgba(255,255,255,0.1)",
+      overflow: "visible",
     },
     buyPackageBtn: {
       width: "100%",
@@ -471,20 +575,37 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
       boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
       transition: "all 0.2s ease",
     },
+    financeToggleBtn: {
+      padding: "6px 14px",
+      backgroundColor: "rgba(14, 165, 233, 0.2)",
+      color: colors.accentSky,
+      border: `1px solid ${colors.accentSky}`,
+      borderRadius: "8px",
+      fontWeight: "600",
+      fontSize: "12px",
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    },
     tierDisplayContainer: {
-      display: "grid",
-      gridTemplateColumns: "repeat(3, 1fr)",
-      gap: "10px",
+      display: "flex",
+      justifyContent: "space-between",
+      gap: "8px",
       marginTop: "16px",
       paddingTop: "14px",
       borderTop: "1px solid rgba(255, 255, 255, 0.2)",
+      width: "100%",
+      boxSizing: "border-box",
+      flexWrap: "wrap",
     },
     tierBadge: {
+      flex: "1 1 30%",
       backgroundColor: "rgba(0, 0, 0, 0.25)",
       borderRadius: "10px",
       padding: "8px 6px",
       textAlign: "center",
       border: "1px solid rgba(255, 255, 255, 0.15)",
+      minWidth: "80px",
+      boxSizing: "border-box",
     },
     cardTitle: {
       margin: "0 0 20px 0",
@@ -497,8 +618,7 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     sectionTitle: {
       fontSize: "20px",
       color: colors.accentSky,
-      marginBottom: "15px",
-      marginTop: "45px",
+      marginBottom: "0px",
       fontWeight: "600",
       letterSpacing: "0.5px",
     },
@@ -637,13 +757,6 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
     );
   };
 
-  // Calculated gross income from total house games
-  const grossIncome = houseGames.reduce((acc, game) => {
-    const cartelasCount = Number(game.cards_sold ?? game.cardsSold ?? game.soldCartelas?.length ?? 0);
-    const betAmount = Number(game.bet) || 50;
-    return acc + (betAmount * cartelasCount);
-  }, 0);
-
   return (
     <div style={styles.container}>
       {/* Top Header */}
@@ -709,32 +822,19 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
 
           <div style={styles.tierDisplayContainer}>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
-              <div style={{ fontSize: "16px", fontWeight: "800", marginTop: "2px" }}>{tierPackages.silver}</div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
+              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.silver}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
-              <div style={{ fontSize: "16px", fontWeight: "800", marginTop: "2px" }}>{tierPackages.gold}</div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
+              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.gold}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
-              <div style={{ fontSize: "16px", fontWeight: "800", marginTop: "2px" }}>{tierPackages.diamond}</div>
+              <div style={{ fontSize: "10px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
+              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.diamond}</div>
             </div>
           </div>
         </div>
-
-        <button
-          onClick={() => setShowFinance(!showFinance)}
-          className="btn btn-neutral"
-          style={{
-            padding: "3px 8px",
-            fontSize: "11px",
-            lineHeight: 1.2,
-            textTransform: "none"
-          }}
-        >
-         FINANCE
-        </button>
 
         {/* Navigation / Actions Card */}
         <div style={styles.card}>
@@ -746,60 +846,92 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
         </div>
       </div>
 
-     {showFinance && (
-  <div
-    className="finance-panel"
-    style={{ padding: "4px", marginTop: "2px" }}
-  >
-    <label style={{ fontSize: "11px" }}>
-      Commission %:{" "}
-    </label>
-
-    <input
-      type="number"
-      min="0"
-      max="100"
-      value={commission}
-      onChange={(e) => {
-  const value = e.target.value;
-
-  if (value === "") {
-    setCommission("");
-    return;
-  }
-
-  const val = Number(value);
-
-  if (val < 0 || val > 100) {
-    return;
-  }
-
-  setCommission(val);
-}}
-      onBlur={async () => {
-        const saved = await updateSetting(
-          `house_commission_${id}`,
-          commission
-        );
-
-        if (saved) {
-          console.log(
-            `✅ HOUSE ${id} COMMISSION UPDATED TO ${commission}%`
-          );
-        }
-      }}
-      className="finance-input"
-      style={{
-        padding: "1px 4px",
-        fontSize: "11px"
-      }}
-    />
-
-   
-  </div>
+      {/* FINANCE CONTROLS - Directly Above Game History Logs */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "15px", marginTop: "45px", marginBottom: "15px", flexWrap: "wrap" }}>
+        <h2 style={styles.sectionTitle}>Detailed Game History Logs</h2>
+        
+        <button
+          onClick={() => setShowFinance(!showFinance)}
+          style={styles.financeToggleBtn}
+        >
+         {showFinance ? (
+  "BACK"
+) : (
+  <>
+    <span>Koomishinicha  jijjiiri \</span>
+    <span>ኮሚሽኑን ይቀይሩ</span>
+  </>
 )}
+        </button>
+      </div>
+
+      {showFinance && (
+        <div
+          className="finance-panel"
+          style={{
+            padding: "30px 23px",
+            marginBottom: "20px",
+            backgroundColor: "rgba(30, 41, 59, 0.45)",
+            borderRadius: "12px",
+            border: `1px solid ${colors.cardBorder}`,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px"
+          }}
+        >
+          <label style={{ fontSize: "13px", color: colors.textMain, fontWeight: "600" }}>
+            Commission %:{" "}
+          </label>
+
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={commission}
+            onChange={(e) => {
+              const value = e.target.value;
+
+              if (value === "") {
+                setCommission("");
+                return;
+              }
+
+              const val = Number(value);
+
+              if (val < 0 || val > 100) {
+                return;
+              }
+
+              setCommission(val);
+            }}
+            onBlur={async () => {
+              const saved = await updateSetting(
+                `house_commission_${id}`,
+                commission
+              );
+
+              if (saved) {
+                console.log(
+                  `✅ HOUSE ${id} COMMISSION UPDATED TO ${commission}%`
+                );
+              }
+            }}
+            className="finance-input"
+            style={{
+              padding: "6px 10px",
+              fontSize: "13px",
+              borderRadius: "6px",
+              border: "1px solid rgba(255, 255, 255, 0.15)",
+              background: "rgba(15, 23, 42, 0.8)",
+              color: "#fff",
+              width: "80px",
+              outline: "none"
+            }}
+          />
+        </div>
+      )}
+
       {/* DETAILED HOUSE GAME HISTORY LOG */}
-      <h2 style={styles.sectionTitle}>Detailed Game History Logs</h2>
       <div style={styles.tableWrapper}>
         <table style={styles.table}>
           <thead>
@@ -812,68 +944,195 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
               <th style={styles.th}>House Commission Earned</th>
             </tr>
           </thead>
-          <tbody>
-            {sortedHouseGames.length > 0 ? (
-              sortedHouseGames.slice(0, visibleGameLogsCount).map((game, index) => {
-                const cartelasCount = Number(game.cards_sold ?? game.cardsSold ?? game.soldCartelas?.length ?? 0);
-                const betAmount = Number(game.bet) || 50;
-                const grossPool = betAmount * cartelasCount;
-                const commissionRate = Number(game.commission) || 15; 
-                
-                const houseEarned = Number(game.house_commission ?? game.commission_earned ?? (grossPool * (commissionRate / 100))).toFixed(2);
+         <tbody>
+  {filteredHouseGames.length > 0 ? (
+    <>
+      {filteredHouseGames
+        .slice(0, visibleGameLogsCount)
+        .map((game, index) => {
 
-                const formattedDate = new Date(
-                  game.created_at || game.finished_at || game.started_at || game.date
-                ).toLocaleString();
+          const cartelasCount = Number(
+            game.cards_sold ??
+            game.cardsSold ??
+            game.soldCartelas?.length ??
+            0
+          );
 
-                return (
-                  <tr key={index} style={{ backgroundColor: index % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent" }}>
-                    <td style={{ ...styles.td, color: colors.textMuted }}>
-                      {formattedDate}
-                    </td>
-                    <td style={styles.td}><strong>#{game.game_id || game.id || index + 1}</strong></td>
-                    <td style={styles.td}>
-                      {game.cashier || game.cashier_id || "System"}
-                    </td>
-                    <td style={{ ...styles.td, color: colors.accentSky, fontWeight: "600" }}>{cartelasCount} Cards</td>
-                    <td style={styles.td}>{grossPool} ETB</td>
-                    <td style={{ ...styles.td, fontWeight: "700", color: colors.accentCyan }}>
-                      {houseEarned} ETB <span style={{ fontSize: '12px', fontWeight: 'normal', color: colors.textMuted }}>({commissionRate}%)</span>
-                    </td>
-                  </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan="6" style={{ ...styles.td, textAlign: "center", color: colors.textMuted, padding: "30px" }}>
-                  No historical house game records available yet.
-                </td>
-              </tr>
-            )}
-          </tbody>
+          const betAmount = Number(game.bet) || 50;
+          const grossPool = betAmount * cartelasCount;
+
+          const commissionRate = Number(game.commission) || 15;
+
+          const houseEarned = Number(
+            game.house_commission ??
+            game.commission_earned ??
+            (grossPool * (commissionRate / 100))
+          );
+
+          const formattedDate = new Date(
+            game.created_at ||
+            game.finished_at ||
+            game.started_at ||
+            game.date
+          ).toLocaleString();
+
+          return (
+            <tr
+              key={index}
+              style={{
+                backgroundColor:
+                  index % 2 === 0
+                    ? "rgba(255,255,255,0.01)"
+                    : "transparent"
+              }}
+            >
+              <td style={{ ...styles.td, color: colors.textMuted }}>
+                {formattedDate}
+              </td>
+
+              <td style={styles.td}>
+                <strong>
+                  #{game.game_id || game.id || index + 1}
+                </strong>
+              </td>
+
+              <td style={styles.td}>
+                {game.cashier || game.cashier_id || "System"}
+              </td>
+
+              <td
+                style={{
+                  ...styles.td,
+                  color: colors.accentSky,
+                  fontWeight: "600"
+                }}
+              >
+                {cartelasCount} Cards
+              </td>
+
+              <td style={styles.td}>
+                {grossPool} ETB
+              </td>
+
+              <td
+                style={{
+                  ...styles.td,
+                  fontWeight: "700",
+                  color: colors.accentCyan
+                }}
+              >
+                {houseEarned.toFixed(2)} ETB
+
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: "normal",
+                    color: colors.textMuted
+                  }}
+                >
+                  {" "}({commissionRate}%)
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+
+      {/* ============================
+          NET TOTAL
+          ============================ */}
+      <tr>
+        <td
+          colSpan="5"
+          style={{
+            ...styles.td,
+            textAlign: "right",
+            fontWeight: "800",
+            fontSize: "16px",
+            borderTop: `2px solid ${colors.accentCyan}`,
+            paddingTop: "14px"
+          }}
+        >
+          NET
+        </td>
+
+        <td
+          style={{
+            ...styles.td,
+            fontWeight: "800",
+            fontSize: "18px",
+            color: colors.accentCyan,
+            borderTop: `2px solid ${colors.accentCyan}`,
+            paddingTop: "14px"
+          }}
+        >
+          {filteredHouseGames
+            .slice(0, visibleGameLogsCount)
+            .reduce((total, game) => {
+
+              const cartelasCount = Number(
+                game.cards_sold ??
+                game.cardsSold ??
+                game.soldCartelas?.length ??
+                0
+              );
+
+              const betAmount = Number(game.bet) || 50;
+              const grossPool = betAmount * cartelasCount;
+
+              const commissionRate = Number(game.commission) || 15;
+
+              const houseEarned = Number(
+                game.house_commission ??
+                game.commission_earned ??
+                (grossPool * (commissionRate / 100))
+              );
+
+              return total + houseEarned;
+
+            }, 0)
+            .toFixed(2)} ETB
+        </td>
+      </tr>
+    </>
+  ) : (
+    <tr>
+      <td
+        colSpan="6"
+        style={{
+          ...styles.td,
+          textAlign: "center",
+          color: colors.textMuted,
+          padding: "30px"
+        }}
+      >
+        No historical house game records available yet.
+      </td>
+    </tr>
+  )}
+</tbody>
         </table>
       </div>
 
       {/* SHOW MORE / SHOW LESS BAR */}
-      {sortedHouseGames.length > 5 && (
+    {filteredHouseGames.length > 5 && (
         <button 
           style={styles.showMoreBtn}
           onClick={() => {
-            if (visibleGameLogsCount >= sortedHouseGames.length) {
+         if (visibleGameLogsCount >= filteredHouseGames.length){
               setVisibleGameLogsCount(5);
             } else {
               setVisibleGameLogsCount(prev => prev + 10);
             }
           }}
         >
-          {visibleGameLogsCount >= sortedHouseGames.length 
+          {visibleGameLogsCount >= filteredHouseGames.length 
             ? "Show Less Logs" 
-            : `Show More Logs (${sortedHouseGames.length - visibleGameLogsCount} remaining)`}
+            : `Show More Logs (${filteredHouseGames.length - visibleGameLogsCount} remaining)`}
         </button>
       )}
 
       {/* Cashier Passwords and Details Section */}
-      <h2 style={styles.sectionTitle}>Cashier Passwords & Roster</h2>
+      <h2 style={{ ...styles.sectionTitle, marginTop: "45px", marginBottom: "15px" }}>Cashier Passwords & Roster</h2>
       
       <form onSubmit={handleCreateCashier} style={{
         display: "flex",
@@ -1023,7 +1282,7 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
 
       {/* PERFORMANCE SUMMARY SECTION */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "15px", marginTop: "45px", marginBottom: "15px" }}>
-        <h2 style={{ ...styles.sectionTitle, marginTop: 0, marginBottom: 0 }}>
+        <h2 style={{ ...styles.sectionTitle, marginTop: 0 }}>
           Performance Summary (Select Tab to Filter/Delete)
         </h2>
         <button 
@@ -1034,118 +1293,10 @@ console.log("📅 YEARLY:", data.performance?.yearly_cards,
         </button>
       </div>
 
-      <div style={{ ...styles.grid, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-        {/* Daily Summary Card */}
-        <div 
-          onClick={() => setSelectedPeriod("daily")}
-          style={{
-            ...styles.card,
-            cursor: "pointer",
-            border: `2px solid ${selectedPeriod === "daily" ? colors.activeCardBorder : colors.cardBorder}`,
-            backgroundColor: selectedPeriod === "daily" ? colors.activeCardBg : colors.cardBg,
-            boxShadow: selectedPeriod === "daily" ? "0 0 15px rgba(14, 165, 233, 0.3)" : "none",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", color: colors.accentSky }}>Daily Performance</h3>
-            {selectedPeriod === "daily" && <span style={{ fontSize: "11px", color: colors.accentSky, fontWeight: "bold" }}>● ACTIVE</span>}
-          </div>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Cartelas Sold: <strong style={{ color: colors.textMain }}>{periodicStats.daily.cards}</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Net Commission: <strong style={{ color: colors.accentCyan }}>{periodicStats.daily.commission.toFixed(2)} ETB</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Games Played: <strong style={{ color: colors.accentPurple }}>{periodicStats.daily.games}</strong>
-          </p>
-        </div>
-
-        {/* Weekly Summary Card */}
-        <div 
-          onClick={() => setSelectedPeriod("weekly")}
-          style={{
-            ...styles.card,
-            cursor: "pointer",
-            border: `2px solid ${selectedPeriod === "weekly" ? colors.activeCardBorder : colors.cardBorder}`,
-            backgroundColor: selectedPeriod === "weekly" ? colors.activeCardBg : colors.cardBg,
-            boxShadow: selectedPeriod === "weekly" ? "0 0 15px rgba(14, 165, 233, 0.3)" : "none",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", color: colors.accentSky }}>Weekly Performance</h3>
-            {selectedPeriod === "weekly" && <span style={{ fontSize: "11px", color: colors.accentSky, fontWeight: "bold" }}>● ACTIVE</span>}
-          </div>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Cartelas Sold: <strong style={{ color: colors.textMain }}>{periodicStats.weekly.cards}</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Net Commission: <strong style={{ color: colors.accentCyan }}>{periodicStats.weekly.commission.toFixed(2)} ETB</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Games Played: <strong style={{ color: colors.accentPurple }}>{periodicStats.weekly.games}</strong>
-          </p>
-        </div>
-
-        {/* Monthly Summary Card */}
-        <div 
-          onClick={() => setSelectedPeriod("monthly")}
-          style={{
-            ...styles.card,
-            cursor: "pointer",
-            border: `2px solid ${selectedPeriod === "monthly" ? colors.activeCardBorder : colors.cardBorder}`,
-            backgroundColor: selectedPeriod === "monthly" ? colors.activeCardBg : colors.cardBg,
-            boxShadow: selectedPeriod === "monthly" ? "0 0 15px rgba(14, 165, 233, 0.3)" : "none",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", color: colors.accentSky }}>Monthly Performance</h3>
-            {selectedPeriod === "monthly" && <span style={{ fontSize: "11px", color: colors.accentSky, fontWeight: "bold" }}>● ACTIVE</span>}
-          </div>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Cartelas Sold: <strong style={{ color: colors.textMain }}>{periodicStats.monthly.cards}</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Net Commission: <strong style={{ color: colors.accentCyan }}>{periodicStats.monthly.commission.toFixed(2)} ETB</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Games Played: <strong style={{ color: colors.accentPurple }}>{periodicStats.monthly.games}</strong>
-          </p>
-        </div>
-
-        {/* Yearly Summary Card */}
-        <div 
-          onClick={() => setSelectedPeriod("yearly")}
-          style={{
-            ...styles.card,
-            cursor: "pointer",
-            border: `2px solid ${selectedPeriod === "yearly" ? colors.activeCardBorder : colors.cardBorder}`,
-            backgroundColor: selectedPeriod === "yearly" ? colors.activeCardBg : colors.cardBg,
-            boxShadow: selectedPeriod === "yearly" ? "0 0 15px rgba(14, 165, 233, 0.3)" : "none",
-            transition: "all 0.2s ease",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h3 style={{ margin: 0, fontSize: "16px", color: colors.accentSky }}>Yearly Performance</h3>
-            {selectedPeriod === "yearly" && <span style={{ fontSize: "11px", color: colors.accentSky, fontWeight: "bold" }}>● ACTIVE</span>}
-          </div>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Cartelas Sold: <strong style={{ color: colors.textMain }}>{periodicStats.yearly.cards}</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Net Commission: <strong style={{ color: colors.accentCyan }}>{periodicStats.yearly.commission.toFixed(2)} ETB</strong>
-          </p>
-          <p style={{ margin: "6px 0", color: colors.textMuted, fontSize: "14px" }}>
-            Games Played: <strong style={{ color: colors.accentPurple }}>{periodicStats.yearly.games}</strong>
-          </p>
-        </div>
-      </div>
+     
 
       {/* DAILY PERFORMANCE XY GRAPH COMPONENT */}
-      <h2 style={{ ...styles.sectionTitle, marginTop: "25px" }}>Daily Performance Analytics (XY Plot)</h2>
+      <h2 style={{ ...styles.sectionTitle, marginTop: "45px", marginBottom: "15px" }}>Daily Performance Analytics (XY Plot)</h2>
       <div style={{ ...styles.card, marginBottom: "40px" }}>
         <div style={{ display: "flex", gap: "20px", marginBottom: "20px", fontSize: "13px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
