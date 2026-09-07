@@ -6,91 +6,7 @@ import "./BingoGame.css";
 import { io } from "socket.io-client";
   // Add this if not already imported
 // --- Phonetic & Legend Data ---
-const amharicPhoneticNumbers = {
-  1: "Aaaand",
-  2: "Hoooo-let",
-  3: "Sooost",
-  4: "Araaat",
-  5: "Aaaamist",
-  6: "Siiidist",
-  7: "Seeebat",
-  8: "Siiiimint",
-  9: "Zaaateñ",
-
-  10: "Asir",
-
-  11: "Asra Aand",
-  12: "Asra Hoo-let",
-  13: "Asra Sost",
-  14: "Asra Arat",
-  15: "Asra Amist",
-  16: "Asra Sidist",
-  17: "Asra Sebat",
-  18: "Asra Simint",
-  19: "Asra Zateñ",
-
-  20: "Haya",
-  21: "Haya Aand",
-  22: "Haya Hoo-let",
-  23: "Haya Sost",
-  24: "Haya Arat",
-  25: "Haya Amist",
-  26: "Haya Sidist",
-  27: "Haya Sebat",
-  28: "Haya Simint",
-  29: "Haya Zateñ",
-
-  30: "Selasa",
-  31: "Selasa Aand",
-  32: "Selasa Hoo-let",
-  33: "Selasa Sost",
-  34: "Selasa Arat",
-  35: "Selasa Amist",
-  36: "Selasa Sidist",
-  37: "Selasa Sebat",
-  38: "Selasa Simint",
-  39: "Selasa Zateñ",
-
-  40: "Arrba",
-  41: "Arba Aand",
-  42: "Arba Hoo-let",
-  43: "Arba Sost",
-  44: "Arba Arat",
-  45: "Arba Amist",
-  46: "Arba Sidist",
-  47: "Arba Sebat",
-  48: "Arba Simint",
-  49: "Arba Zateñ",
-
-  50: "Hamsa",
-  51: "Hamsa Aand",
-  52: "Hamsa Hoo-let",
-  53: "Hamsa Sost",
-  54: "Hamsa Arat",
-  55: "Hamsa Amist",
-  56: "Hamsa Sidist",
-  57: "Hamsa Sebat",
-  58: "Hamsa Simint",
-  59: "Hamsa Zateñ",
-
-  60: "Silsa",
-  61: "Silsa Aand",
-  62: "Silsa Hoo-let",
-  63: "Silsa Sost",
-  64: "Silsa Arat",
-  65: "Silsa Amist",
-  66: "Silsa Sidist",
-  67: "Silsa Sebat",
-  68: "Silsa Simint",
-  69: "Silsa Zateñ",
-
-70: "Säba",
-71: "Säba Aand",
-72: "Säba Hoo-let",
-73: "Säba Sost",
-74: "Säba Arat",
-75: "Säba Amist",
-};// ==========================================================
+// ==========================================================
 // 🎙️ DRAMATIC BINGO ANNOUNCER
 // Makes the existing pronunciation longer and more dramatic
 // ==========================================================
@@ -99,85 +15,15 @@ const amharicPhoneticNumbers = {
 // 🎙️ FAST BINGO ANNOUNCER
 // Short vowel extension — energetic, NOT slow
 // ==========================================================
-const makeDramaticBingoText = (text) => {
-  if (!text) return text;
 
-  return text
-    // Main Amharic number words
-    .replace(/\bAand\b/g, "Aaaand")
-    .replace(/\bHoo-let\b/g, "Hoooo-let")
-    .replace(/\bSost\b/g, "Sooost")
-    .replace(/\bArat\b/g, "Araaat")
-    .replace(/\bAmist\b/g, "Aaaamist")
-    .replace(/\bSidist\b/g, "Siiidist")
-    .replace(/\bSebat\b/g, "Seeebat")
-    .replace(/\bSimint\b/g, "Siiiimint")
-    .replace(/\bZateñ\b/g, "Zaaateñ")
-
-    // Tens
-    .replace(/\bAsir\b/g, "Aaaasir")
-    .replace(/\bAsra\b/g, "Aaaasraaa")
-    .replace(/\bHaya\b/g, "Haaayaa")
-    .replace(/\bSelasa\b/g, "Selaaasa")
-    .replace(/\bArba\b/g, "Aaarba")
-    .replace(/\bArrba\b/g, "Aaarrba")
-    .replace(/\bHamsa\b/g, "Haaamsa")
-    .replace(/\bSilsa\b/g, "Siiilsa")
-    .replace(/\bSäba\b/g, "Säääba");
-};
 // --- Afaan Oromo Number Words ---
-const afaanOromoNumbers = {
-  1: "Tookko", 2: "Lama", 3: "Sadii", 4: "Affuurr", 5: "Shaan",
-  6: "Jaha", 7: "Torba", 8: "Saaddeet", 9: "Sagal", 10: "Kuudhan",
-  11: "Kudha tokko", 12: "Kudha lama", 13: "Kudha sadii", 14: "Kudha affurii", 15: "Kudha shaan",
-  16: "Kudha jaha", 17: "Kudha torba", 18: "Kudha saaddeet", 19: "Kudha sagal", 20: "Digdama",
-  21: "Digdamii tokko", 22: "Digdamii lama", 23: "Digdamii sadii", 24: "Digdamii afurii", 25: "Digdamii shaan",
-  26: "Digdamii jaha", 27: "Digdamii torrba", 28: "Digdamii saaddeet", 29: "Digdamii sagal", 30: "Sooddoma",
-  31: "Soddomii tokko", 32: "Soddomii lama", 33: "Soddomii sadii", 34: "Soddomii afurii", 35: "Soddomii shan",
-  36: "Soddomii jaha", 37: "Soddomii torrba", 38: "Soddomii saaddeet", 39: "Soddomii sagal", 40: "Affuurtama",
-  41: "Affuurrtamii tokko", 42: "Affuurrtamii lama", 43: "Affuurrtamii sadii", 44: "Afurrtamii afuurii", 45: "Affuurrtamii shaan",
-  46: "Affuurrtamii jaha", 47: "Afurrtamii torrba", 48: "Afurrtamii saddeet", 49: "Afurtamii sagal", 50: "Shantama",
-  51: "Shantamii tokko", 52: "Shantamii lama", 53: "Shantamii sadii", 54: "Shantamii afuurii", 55: "Shantamii shaan",
-  56: "Shantamii jaha", 57: "Shantamii torba", 58: "Shantamii saaddeet", 59: "Shantamii sagal", 60: "Jahaatama",
-  61: "Jahaatamii tokko", 62: "Jahaatamii lama", 63: "Jahaatamii sadii", 64: "Jahaatamii afurii", 65: "Jahaatamii shaan",
-  66: "Jahaatamii jaha", 67: "Jahaatamii torrba", 68: "Jahaatamii saaddeet", 69: "Jahaatamii sagal", 70: "Torrbatama",
-  71: "Torrbatamii tokko", 72: "Torrbatamii lama", 73: "Torrbatamii sadii", 74: "Torbatamii afurii", 75: "Torrbatamii shan"
-};
-
-const afaanOromoDigitWords = { "0": "Zeeroo", "1": "Tokko", "2": "Lama", "3": "Sadii", "4": "Afuurr", "5": "Shaan", "6": "Jaha", "7": "Torrba", "8": "Saddeet", "9": "Sagal" };
 
 
-const footballLegends = {
-  1: "buffon",
-  2: "Cafu",
-  3: " Maldini",
-  4: " Ramos",
-  5: " madrid",
-  6: "Xavi Hernández",
-  7: "Cristiano Ronaldo",
-  8: " Iniesta",
-  9: "Ronaldo Nazário",
-  10: "Pelé",
-  11: "Neymar Jr.",
-  12: "Marcelo",
-  13: " arsenal",
-  14: "Johan Cruyff",
-  15: " Vidić",
-  16: "Roy Keane",
-  17: "Kevin De Bruyne",
-  18: "Paul Scholes",
-  19: "Lionel Messi",
-  20: "Luka Modrić"
-};
 
-const digitWords = { "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four", "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine" };
-const spokenLetter = {
-  B: "BEE",
-  I: "Iii",
-  N: "N",
-  G: "GE",
-  O: "OO"
-};
+
+
+
+
 
 const columnColorStyles = {
   B: { border: "2px solid #00c8ff", textShadow: "0 0 6px #00c8ff", labelBg: "#00c8ff" },
@@ -200,17 +46,24 @@ const INITIAL_BALLS = [
 ];
 
 export default function BingoGame() {
+
   const { id } = useParams();
+
   const navigate = useNavigate();
- 
-  const [game, setGame] = useState({ 
-    prize: "00 Birr", 
-    id: id || "101", 
-    soldCartelas: [], 
-    voiceMode: "recorded",
-    speechLang: "en-US",
-    language: "en" 
+
+  const location = useLocation();
+
+  const passedGame = location.state?.game;
+
+  const [game, setGame] = useState({
+    prize: "00 Birr",
+    id: id || "101",
+    soldCartelas: passedGame?.soldCartelas || [],
+   voiceMode: "recorded-oromo",
+speechLang: "om-ET",
+    language: "en"
   });
+  
   const [loading, setLoading] = useState(true);
 
   const { t } = useLanguage();
@@ -226,9 +79,9 @@ export default function BingoGame() {
   const [checkedCartela, setCheckedCartela] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(""); 
 
-  const [tvMode, setTvMode] = useState(false);
+
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
-  const [voices, setVoices] = useState([]);
+ 
 
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
@@ -238,7 +91,7 @@ export default function BingoGame() {
 const audioGenerationInProgressRef = useRef(false);
 const audioLoadingRef = useRef(false);
   const remainingNumbersRef = useRef(Array.from({ length: 75 }, (_, i) => i + 1));
-  const activeUtteranceRef = useRef(null);
+ 
   const activeAudioRef = useRef(null);
   const pausedAudioRef = useRef(null);
   const audioTimeoutRef = useRef(null);
@@ -247,14 +100,33 @@ const audioLoadingRef = useRef(false);
   const stateRef = useRef({ called, paused, speed, current, game });
   const [volume, setVolume] = useState(0.7);
   const volumeRef = useRef(0.7);
-  const location = useLocation();
+ 
   const selectedWinningPattern =
   location.state?.winningPatternCount ??
   location.state?.game?.winningPatternCount ??
   1;
   const [activeWinningPattern, setActiveWinningPattern] =
   useState(selectedWinningPattern);
-  const passedGame = location.state?.game;
+
+  const [showSoldCartelas, setShowSoldCartelas] = useState(false);
+
+const soldCartelaSource =
+  Array.isArray(passedGame?.soldCartelas)
+    ? passedGame.soldCartelas
+    : Array.isArray(game?.soldCartelas)
+      ? game.soldCartelas
+      : [];
+
+const soldCartelaIds = soldCartelaSource
+  .map(cartela =>
+    Number(
+      typeof cartela === "object"
+        ? cartela.id
+        : cartela
+    )
+  )
+  .filter(Number.isFinite)
+  .sort((a, b) => a - b);
 const [voiceSpeed, setVoiceSpeed] = useState(1.0);
 const voiceSpeedRef = useRef(1.0);
 const TARGET_GENERATION_INTERVAL_MS = 400;
@@ -263,7 +135,7 @@ const [displayedWinningPatterns, setDisplayedWinningPatterns] = useState([]);
 const audioContextRef = useRef(null);
 const audioSourceRef = useRef(null);
 const bassFilterRef = useRef(null);
-
+const [showGameControls, setShowGameControls] = useState(false);
 const SHUFFLE_PLAYED_KEY = "bingo_shuffle_played";
 const pendingBingoCallRef = useRef(null);
 const playPauseActionRef = useRef(0);
@@ -617,6 +489,13 @@ useEffect(() => {
               commission: data.commission,
               commissionDeducted: data.commission_deducted,
               status: data.status,
+               // ✅ KEEP SOLD CARTELAS
+  soldCartelas:
+  data.soldCartelas ??
+  data.sold_cartelas ??
+  prev.soldCartelas ??
+  passedGame?.soldCartelas ??
+  [],
               voiceMode: restoredVoiceMode,
               speechLang: restoredSpeechLang,
               voiceSpeed: restoredVoiceSpeed,
@@ -869,145 +748,124 @@ socket.on("winning-pattern-selected", handleWinningPattern);
 };
 }, [id]);
   // --- Audio & Voice Initialization ---
-  useEffect(() => {
-    const updateVoices = () => {
-      if (
-        typeof window !== "undefined" &&
-        window.speechSynthesis
-      ) {
-        setVoices(window.speechSynthesis.getVoices());
+ useEffect(() => {
+  try {
+    const AudioContext =
+      window.AudioContext || window.webkitAudioContext;
+
+    if (AudioContext) {
+      const ctx = new AudioContext();
+
+      shuffleAudioRef.current = {
+        play: () => {
+          if (ctx.state === "suspended") {
+            ctx.resume();
+          }
+
+          const bufferSize = Math.floor(ctx.sampleRate * 1.5);
+
+          const buffer = ctx.createBuffer(
+            1,
+            bufferSize,
+            ctx.sampleRate
+          );
+
+          const data = buffer.getChannelData(0);
+
+          for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+          }
+
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.value = 1000;
+          filter.Q.value = 3;
+
+          const gain = ctx.createGain();
+
+          gain.gain.setValueAtTime(
+            0.5,
+            ctx.currentTime
+          );
+
+          gain.gain.exponentialRampToValueAtTime(
+            0.01,
+            ctx.currentTime + 1.5
+          );
+
+          noise.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+
+          noise.start();
+
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              if (
+                typeof shuffleAudioRef.current?.onended ===
+                "function"
+              ) {
+                shuffleAudioRef.current.onended();
+              }
+
+              resolve();
+            }, 1500);
+          });
+        },
+
+        pause: () => {},
+
+        currentTime: 0,
+
+        onended: null
+      };
+    }
+  } catch (e) {
+    console.error(
+      "Audio initialization failed:",
+      e
+    );
+
+    shuffleAudioRef.current = null;
+  }
+
+  return () => {
+    // ==========================================
+    // STOP AFFAN RECORDED OROMO AUDIO
+    // ==========================================
+
+    if (activeAudioRef.current) {
+      try {
+        activeAudioRef.current.pause();
+        activeAudioRef.current.currentTime = 0;
+        activeAudioRef.current.onended = null;
+        activeAudioRef.current.onerror = null;
+      } catch (e) {
+        console.error("Audio cleanup error:", e);
       }
-    };
 
-    updateVoices();
-
-    if (
-      typeof window !== "undefined" &&
-      window.speechSynthesis
-    ) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+      activeAudioRef.current = null;
     }
 
-    try {
-      const AudioContext =
-        window.AudioContext || window.webkitAudioContext;
+    // ==========================================
+    // STOP SHUFFLE AUDIO
+    // ==========================================
 
-      if (AudioContext) {
-        const ctx = new AudioContext();
-
-        shuffleAudioRef.current = {
-          play: () => {
-            if (ctx.state === "suspended") {
-              ctx.resume();
-            }
-
-            const bufferSize = Math.floor(ctx.sampleRate * 1.5);
-
-            const buffer = ctx.createBuffer(
-              1,
-              bufferSize,
-              ctx.sampleRate
-            );
-
-            const data = buffer.getChannelData(0);
-
-            for (let i = 0; i < bufferSize; i++) {
-              data[i] = Math.random() * 2 - 1;
-            }
-
-            const noise = ctx.createBufferSource();
-            noise.buffer = buffer;
-
-            const filter = ctx.createBiquadFilter();
-            filter.type = "bandpass";
-            filter.frequency.value = 1000;
-            filter.Q.value = 3;
-
-            const gain = ctx.createGain();
-
-            gain.gain.setValueAtTime(
-              0.5,
-              ctx.currentTime
-            );
-
-            gain.gain.exponentialRampToValueAtTime(
-              0.01,
-              ctx.currentTime + 1.5
-            );
-
-            noise.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
-
-            noise.start();
-
-            return new Promise((resolve) => {
-              setTimeout(() => {
-                if (
-                  typeof shuffleAudioRef.current?.onended ===
-                  "function"
-                ) {
-                  shuffleAudioRef.current.onended();
-                }
-
-                resolve();
-              }, 1500);
-            });
-          },
-
-          pause: () => {},
-
-          currentTime: 0,
-
-          onended: null
-        };
+    if (shuffleAudioRef.current) {
+      try {
+        shuffleAudioRef.current.pause?.();
+        shuffleAudioRef.current.onended = null;
+      } catch (e) {
+        console.error("Shuffle cleanup error:", e);
       }
-    } catch (e) {
-      console.error(
-        "Audio initialization failed:",
-        e
-      );
 
       shuffleAudioRef.current = null;
     }
-
-    return () => {
-      // Stop browser speech immediately
-      if (
-        typeof window !== "undefined" &&
-        window.speechSynthesis
-      ) {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.onvoiceschanged = null;
-      }
-
-      // Stop recorded audio immediately
-      if (activeAudioRef.current) {
-        try {
-          activeAudioRef.current.pause();
-          activeAudioRef.current.currentTime = 0;
-          activeAudioRef.current.onended = null;
-          activeAudioRef.current.onerror = null;
-        } catch (e) {
-          console.error("Audio cleanup error:", e);
-        }
-
-        activeAudioRef.current = null;
-      }
-
-      // Stop shuffle audio
-      if (shuffleAudioRef.current) {
-        try {
-          shuffleAudioRef.current.pause?.();
-          shuffleAudioRef.current.onended = null;
-        } catch (e) {
-          console.error("Shuffle cleanup error:", e);
-        }
-
-        shuffleAudioRef.current = null;
-      }
-    };
-  }, []);
+  };
+}, []);
 
 // ============================================================
 // 🛑 AUDIO CLEANUP
@@ -1129,21 +987,41 @@ function stopAndResetAudio() {
 
 function applyVoiceDepth(audio) {
   try {
+    // ==========================================================
+    // SAFETY
+    // ==========================================================
+
+    if (!audio) {
+      console.warn("⚠️ NO AUDIO ELEMENT FOR VOICE DEPTH");
+      return null;
+    }
 
     // ==========================================================
-    // CREATE AUDIO CONTEXT
+    // CREATE ONE AUDIO CONTEXT
     // ==========================================================
 
     if (!audioContextRef.current) {
+      const AudioContextClass =
+        window.AudioContext ||
+        window.webkitAudioContext;
+
+      if (!AudioContextClass) {
+        console.warn(
+          "⚠️ WEB AUDIO NOT SUPPORTED — PLAYING OROMO AUDIO NORMALLY"
+        );
+
+        return null;
+      }
+
       audioContextRef.current =
-        new (window.AudioContext ||
-          window.webkitAudioContext)();
+        new AudioContextClass();
     }
 
-    const ctx = audioContextRef.current;
+    const ctx =
+      audioContextRef.current;
 
     // ==========================================================
-    // RESUME AUDIO CONTEXT
+    // RESUME CONTEXT
     // ==========================================================
 
     if (ctx.state === "suspended") {
@@ -1151,101 +1029,141 @@ function applyVoiceDepth(audio) {
     }
 
     // ==========================================================
-    // READ DEPTH
+    // SPEED
+    // ==========================================================
+
+    audio.preservesPitch = true;
+
+    const selectedSpeed =
+      Number(voiceSpeedRef.current) || 1;
+
+    audio.playbackRate =
+      Math.max(
+        0.5,
+        Math.min(
+          2.0,
+          selectedSpeed
+        )
+      );
+
+    // ==========================================================
+    // DEPTH
     // ==========================================================
 
     const rawDepth =
       Number(voiceDepthRef.current) || 0;
 
-    // Your slider is -20 → +20
     const depth =
-      Math.max(-20, Math.min(20, rawDepth));
+      Math.max(
+        -20,
+        Math.min(
+          20,
+          rawDepth
+        )
+      );
 
     // ==========================================================
-    // ⚠️ DO NOT TOUCH PLAYBACK RATE HERE
-    // ==========================================================
+    // IMPORTANT
     //
-    // The speed controller already controls:
+    // NEVER reuse an old MediaElementSource.
     //
-    // audio.playbackRate = voiceSpeedRef.current
-    //
-    // Voice depth must NEVER modify it.
-    //
+    // Each Audio element gets its own source.
     // ==========================================================
 
-    audio.preservesPitch = true;
+    if (audio._voiceNodes) {
+      console.log(
+        "⚠️ AUDIO ALREADY HAS VOICE NODES"
+      );
 
-    // Keep whatever speed the speed controller selected.
-    audio.playbackRate =
-      Number(voiceSpeedRef.current) || 1;
-
-    // ==========================================================
-    // CREATE MEDIA SOURCE
-    // ==========================================================
-
-    const source =
-      ctx.createMediaElementSource(audio);
+      return audio._voiceNodes;
+    }
 
     // ==========================================================
-    // 🎙️ BASS / LOW FREQUENCY
+    // MEDIA SOURCE
+    // ==========================================================
+
+    let source;
+
+    try {
+      source =
+        ctx.createMediaElementSource(audio);
+    } catch (error) {
+
+      console.warn(
+        "⚠️ MEDIA SOURCE CREATION FAILED — USING NORMAL OROMO AUDIO:",
+        error
+      );
+
+      // VERY IMPORTANT:
+      // Do not stop the Bingo game because the
+      // voice-depth engine failed.
+
+      return null;
+    }
+
+    // ==========================================================
+    // BASS
     // ==========================================================
 
     const bassFilter =
       ctx.createBiquadFilter();
 
-    bassFilter.type = "lowshelf";
+    bassFilter.type =
+      "lowshelf";
 
-    bassFilter.frequency.value = 120;
-
-    // Positive depth = much more bass
-    // Negative depth = less bass
+    bassFilter.frequency.value =
+      120;
 
     bassFilter.gain.value =
       depth * 1.15;
 
     // ==========================================================
-    // 🎤 CHEST / VOCAL BODY
+    // VOCAL BODY
     // ==========================================================
 
     const bodyFilter =
       ctx.createBiquadFilter();
 
-    bodyFilter.type = "peaking";
+    bodyFilter.type =
+      "peaking";
 
-    bodyFilter.frequency.value = 180;
+    bodyFilter.frequency.value =
+      180;
 
-    bodyFilter.Q.value = 0.9;
+    bodyFilter.Q.value =
+      0.9;
 
     bodyFilter.gain.value =
       depth * 0.75;
 
     // ==========================================================
-    // 🎤 LOW-MID PRESENCE
-    // Makes the announcer sound thicker and bolder
+    // LOW MID
     // ==========================================================
 
     const lowMidFilter =
       ctx.createBiquadFilter();
 
-    lowMidFilter.type = "peaking";
+    lowMidFilter.type =
+      "peaking";
 
-    lowMidFilter.frequency.value = 280;
+    lowMidFilter.frequency.value =
+      280;
 
-    lowMidFilter.Q.value = 0.8;
+    lowMidFilter.Q.value =
+      0.8;
 
     lowMidFilter.gain.value =
       depth * 0.45;
 
     // ==========================================================
-    // 🔥 WARMTH
+    // WARMTH
     // ==========================================================
 
     const warmthFilter =
       ctx.createBiquadFilter();
 
-    warmthFilter.type = "lowpass";
-
-    // Keep enough high frequencies so speech stays clear.
+    warmthFilter.type =
+      "lowpass";
 
     warmthFilter.frequency.value =
       depth > 0
@@ -1253,76 +1171,64 @@ function applyVoiceDepth(audio) {
         : 12000;
 
     // ==========================================================
-    // 🎚️ BROADCAST COMPRESSOR
+    // COMPRESSOR
     // ==========================================================
 
     const compressor =
       ctx.createDynamicsCompressor();
 
-    compressor.threshold.value = -20;
+    compressor.threshold.value =
+      -20;
 
-    compressor.knee.value = 10;
+    compressor.knee.value =
+      10;
 
     compressor.ratio.value =
       depth > 0
         ? 4.5
         : 3;
 
-    compressor.attack.value = 0.003;
+    compressor.attack.value =
+      0.003;
 
-    compressor.release.value = 0.22;
+    compressor.release.value =
+      0.22;
 
     // ==========================================================
-    // 🔊 OUTPUT GAIN
+    // OUTPUT
     // ==========================================================
 
     const outputGain =
       ctx.createGain();
 
-    // Don't allow the depth control to become dangerously loud.
-
-    const outputLevel =
+    outputGain.gain.value =
       depth > 0
         ? 1.0
         : 0.95;
 
-    outputGain.gain.value =
-      outputLevel;
-
     // ==========================================================
-    // 🔊 AUDIO CHAIN
-    //
-    // Audio
-    //   ↓
-    // Bass
-    //   ↓
-    // Vocal Body
-    //   ↓
-    // Low-Mid
-    //   ↓
-    // Warmth
-    //   ↓
-    // Compressor
-    //   ↓
-    // Output
-    //   ↓
-    // Speakers
+    // CONNECT
     // ==========================================================
 
-    source
-      .connect(bassFilter)
-      .connect(bodyFilter)
-      .connect(lowMidFilter)
-      .connect(warmthFilter)
-      .connect(compressor)
-      .connect(outputGain)
-      .connect(ctx.destination);
+    source.connect(bassFilter);
+
+    bassFilter.connect(bodyFilter);
+
+    bodyFilter.connect(lowMidFilter);
+
+    lowMidFilter.connect(warmthFilter);
+
+    warmthFilter.connect(compressor);
+
+    compressor.connect(outputGain);
+
+    outputGain.connect(ctx.destination);
 
     // ==========================================================
-    // SAVE NODES ON AUDIO OBJECT
+    // SAVE NODES ON AUDIO
     // ==========================================================
 
-    audio._voiceNodes = {
+    const nodes = {
       source,
       bassFilter,
       bodyFilter,
@@ -1332,8 +1238,11 @@ function applyVoiceDepth(audio) {
       outputGain
     };
 
+    audio._voiceNodes =
+      nodes;
+
     // ==========================================================
-    // SAVE REFERENCES
+    // SAVE REFS
     // ==========================================================
 
     audioSourceRef.current =
@@ -1347,26 +1256,26 @@ function applyVoiceDepth(audio) {
     // ==========================================================
 
     console.log(
-      "================================="
+      "🎙️ AFFAN OROMO VOICE ENGINE"
     );
 
     console.log(
-      "🎙️ VOICE DEPTH:",
+      "🎚️ DEPTH:",
       depth
     );
 
     console.log(
-      "⚡ VOICE SPEED:",
-      voiceSpeedRef.current
-    );
-
-    console.log(
-      "🎚️ PLAYBACK RATE:",
+      "⚡ SPEED:",
       audio.playbackRate
     );
 
     console.log(
-      "🔊 BASS:",
+      "🔊 VOLUME:",
+      audio.volume
+    );
+
+    console.log(
+      "🎙️ BASS:",
       bassFilter.gain.value
     );
 
@@ -1380,25 +1289,26 @@ function applyVoiceDepth(audio) {
       lowMidFilter.gain.value
     );
 
-    console.log(
-      "================================="
-    );
-
-    return audio._voiceNodes;
+    return nodes;
 
   } catch (error) {
 
     console.error(
-      "❌ VOICE DEPTH ENGINE ERROR:",
+      "❌ VOICE DEPTH ENGINE ERROR — OROMO AUDIO WILL CONTINUE:",
       error
     );
+
+    // ==========================================================
+    // IMPORTANT
+    //
+    // Voice depth is OPTIONAL.
+    // The recorded Affan Oromo voice must NEVER depend
+    // on the Web Audio effects engine to work.
+    // ==========================================================
 
     return null;
   }
 }
-// ============================================================
-// 🎯 BINGO CALL PLAYBACK
-// ============================================================
 // ============================================================
 // 🎯 BINGO CALL PLAYBACK
 // ============================================================
@@ -1586,355 +1496,7 @@ async function playRecordedBingoCall(
   // PLAY RECORDING
   // ==========================================================
 
-  function playCompleteRecording(path, onFinished = () => {}) {
 
-    return new Promise(
-      (resolve, reject) => {
-
-        // ====================================================
-        // CHECK BEFORE CREATING AUDIO
-        // ====================================================
-
-        if (
-          stateRef.current.paused
-        ) {
-
-          console.log(
-            "⏸️ GAME PAUSED BEFORE AUDIO CREATION:",
-            completeName
-          );
-
-          resolve({
-            paused: true,
-            completed: false
-          });
-
-          return;
-        }
-
-        // ====================================================
-        // CHECK GENERATION
-        // ====================================================
-
-        if (
-          generationId !==
-          audioGenerationRef.current
-        ) {
-
-          console.log(
-            "🛑 GENERATION NO LONGER CURRENT:",
-            generationId
-          );
-
-          resolve({
-            cancelled: true,
-            completed: false
-          });
-
-          return;
-        }
-
-        // ====================================================
-        // CREATE AUDIO
-        // ====================================================
-
-        const audio =
-          new Audio(path);
-
-        // ====================================================
-        // VOLUME
-        // ====================================================
-
-        audio.volume =
-          Math.max(
-            0,
-            Math.min(
-              1,
-              Number(volumeRef.current) || 1
-            )
-          );
-
-        // ====================================================
-        // SPEED
-        // ====================================================
-
-        const selectedSpeed =
-          Number(voiceSpeedRef.current) || 1;
-
-        audio.playbackRate =
-          Math.max(
-            0.5,
-            Math.min(
-              2.0,
-              selectedSpeed
-            )
-          );
-
-        // ====================================================
-        // VOICE DEPTH
-        // ====================================================
-
-        const audioNodes =
-          applyVoiceDepth(audio);
-
-        // ====================================================
-        // ACTIVE AUDIO
-        // ====================================================
-
-        activeAudioRef.current =
-          audio;
-
-        let finished = false;
-
-        // ====================================================
-        // CLEANUP
-        // ====================================================
-
-        const cleanup = () => {
-
-          if (finished) {
-            return;
-          }
-
-          finished = true;
-
-          if (
-            activeAudioRef.current === audio
-          ) {
-
-            activeAudioRef.current =
-              null;
-          }
-
-          try {
-
-            if (audio._voiceNodes) {
-
-              Object.values(
-                audio._voiceNodes
-              ).forEach((node) => {
-
-                try {
-
-                  if (
-                    node &&
-                    typeof node.disconnect ===
-                      "function"
-                  ) {
-
-                    node.disconnect();
-                  }
-
-                } catch (e) {}
-
-              });
-
-              audio._voiceNodes = null;
-            }
-
-          } catch (error) {
-
-            console.warn(
-              "⚠️ AUDIO NODE CLEANUP:",
-              error
-            );
-          }
-
-          if (
-            audioSourceRef.current ===
-            audioNodes?.source
-          ) {
-
-            audioSourceRef.current =
-              null;
-          }
-
-          if (
-            bassFilterRef.current ===
-            audioNodes?.bassFilter
-          ) {
-
-            bassFilterRef.current =
-              null;
-          }
-
-          audio.onended = null;
-          audio.onerror = null;
-        };
-
-        // ====================================================
-        // TIME DEBUG
-        // ====================================================
-
-        audio.addEventListener(
-          "timeupdate",
-          () => {
-
-            if (
-              activeAudioRef.current ===
-              audio
-            ) {
-
-              console.log(
-                "🎵 AUDIO TIME:",
-                audio.currentTime
-              );
-            }
-
-          }
-        );
-
-        // ====================================================
-        // AUDIO ENDED
-        // ====================================================
-
-       audio.onended = () => {
-  console.log(
-    "✅ VOICE FINISHED:",
-    completeName
-  );
-
-  cleanup();
-
-  // Do NOT clear the pending call here.
-  // The Bingo call completion handler owns that state.
-
-  try {
-    onFinished();
-  } catch (error) {
-    console.error(
-      "❌ BINGO COMPLETION CALLBACK ERROR:",
-      error
-    );
-  }
-
-  resolve({
-    completed: true
-  });
-};
-        // ====================================================
-        // AUDIO ERROR
-        // ====================================================
-
-        audio.onerror = (error) => {
-
-          // --------------------------------------------------
-          // PAUSE IS NOT AN ERROR
-          // --------------------------------------------------
-
-          if (
-            stateRef.current.paused
-          ) {
-
-            console.log(
-              "⏸️ AUDIO ERROR WHILE PAUSED — KEEPING AUDIO"
-            );
-
-            // DO NOT cleanup active audio here.
-            // Pause/Resume still owns this object.
-
-            resolve({
-              paused: true,
-              completed: false
-            });
-
-            return;
-          }
-
-          console.error(
-            "❌ VOICE AUDIO ERROR:",
-            path,
-            error
-          );
-
-          cleanup();
-
-          reject(
-            new Error(
-              `Could not play ${path}`
-            )
-          );
-        };
-
-        // ====================================================
-        // PLAY
-        // ====================================================
-
-        audio.play()
-          .then(() => {
-
-            console.log(
-              "▶️ PLAYING:",
-              path
-            );
-
-            console.log(
-              "🎙️ DEPTH:",
-              voiceDepthRef.current
-            );
-
-            console.log(
-              "⚡ SPEED:",
-              voiceSpeedRef.current
-            );
-
-            console.log(
-              "⚡ ACTUAL RATE:",
-              audio.playbackRate
-            );
-
-            // ------------------------------------------------
-            // IF PAUSE HAPPENED DURING play()
-            // ------------------------------------------------
-
-            if (
-              stateRef.current.paused
-            ) {
-
-              console.log(
-                "⏸️ AUDIO STARTED BUT GAME IS PAUSED"
-              );
-
-              return;
-            }
-
-          })
-          .catch((error) => {
-
-            // =================================================
-            // ABORT ERROR CAUSED BY PAUSE
-            // =================================================
-
-           if (
-  error?.name === "AbortError" &&
-  stateRef.current.paused
-) {
-  console.log(
-    "⏸️ PLAY INTERRUPTED BECAUSE GAME WAS PAUSED"
-  );
-
-  // IMPORTANT:
-  // Pause is NOT completion.
-  // Keep the playRecordedBingoCall promise alive.
-  // The same audio object will continue after PLAY.
-  // audio.onended will complete the call.
-
-  return;
-}
-
-            console.error(
-              "❌ AUDIO PLAY ERROR:",
-              error
-            );
-
-            cleanup();
-
-            reject(error);
-          });
-
-      }
-    );
-  }
 
   // ==========================================================
   // EXECUTE
@@ -2107,9 +1669,254 @@ if (stateRef.current.paused) {
   }
 }
  } // ==========================================================
+function playCompleteRecording(
+  path,
+  onFinished = () => {}
+) {
+  return new Promise((resolve, reject) => {
+    // ====================================================
+    // VALUES FOR THIS AUDIO CALL
+    // ====================================================
+    const completeName =
+      typeof path === "string"
+        ? path.split("/").pop()
+        : "unknown-audio";
 
+    const generationId = audioGenerationRef.current;
+
+    // ====================================================
+    // CHECK BEFORE CREATING AUDIO
+    // ====================================================
+    if (stateRef.current.paused) {
+      console.log("⏸️ GAME PAUSED BEFORE AUDIO CREATION:", completeName);
+      resolve({ paused: true, completed: false });
+      return;
+    }
+
+    // ====================================================
+    // CHECK GENERATION
+    // ====================================================
+    if (generationId !== audioGenerationRef.current) {
+      console.log(
+        "🛑 GENERATION NO LONGER CURRENT:",
+        generationId,
+        "CURRENT:",
+        audioGenerationRef.current
+      );
+      resolve({ cancelled: true, completed: false });
+      return;
+    }
+
+    // ====================================================
+    // CREATE AUDIO
+    // ====================================================
+    const audio = new Audio(path);
+    audio.preload = "auto";
+
+    // ====================================================
+    // VOLUME
+    // ====================================================
+    const selectedVolume = Number(volumeRef.current);
+    audio.volume = Math.max(
+      0,
+      Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
+    );
+
+    // ====================================================
+    // SPEED
+    // ====================================================
+    const selectedSpeed = Number(voiceSpeedRef.current);
+    audio.playbackRate = Math.max(
+      0.5,
+      Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
+    );
+    audio.defaultPlaybackRate = audio.playbackRate;
+
+    // ====================================================
+    // VOICE DEPTH
+    // ====================================================
+    let audioNodes = null;
+    try {
+      audioNodes = applyVoiceDepth(audio);
+    } catch (error) {
+      console.warn("⚠️ VOICE DEPTH FAILED — USING RAW AUDIO:", error);
+      audioNodes = null;
+    }
+
+    // ====================================================
+    // ACTIVE AUDIO
+    // ====================================================
+    activeAudioRef.current = audio;
+    let finished = false;
+
+    // ====================================================
+    // TIME DEBUG
+    // ====================================================
+    const handleTimeUpdate = () => {
+      if (activeAudioRef.current === audio) {
+        /* console.log("🎵 AUDIO TIME:", audio.currentTime); */
+      }
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+
+    // ====================================================
+    // CLEANUP
+    // ====================================================
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+
+      try {
+        audio.removeEventListener("timeupdate", handleTimeUpdate);
+      } catch (error) {}
+
+      if (activeAudioRef.current === audio) {
+        activeAudioRef.current = null;
+      }
+
+      // Disconnect Web Audio nodes to prevent memory leaks
+      try {
+        if (audio._voiceNodes) {
+          Object.values(audio._voiceNodes).forEach((node) => {
+            try {
+              if (node && typeof node.disconnect === "function") {
+                node.disconnect();
+              }
+            } catch (e) {}
+          });
+          audio._voiceNodes = null;
+        }
+      } catch (error) {
+        console.warn("⚠️ AUDIO NODE CLEANUP:", error);
+      }
+
+      if (
+        audioNodes?.source &&
+        audioSourceRef.current === audioNodes.source
+      ) {
+        audioSourceRef.current = null;
+      }
+
+      if (
+        audioNodes?.bassFilter &&
+        bassFilterRef.current === audioNodes.bassFilter
+      ) {
+        bassFilterRef.current = null;
+      }
+
+      audio.onended = null;
+      audio.onerror = null;
+      audio.onpause = null;
+
+      try {
+        audio.pause();
+      } catch (error) {}
+
+      console.log("🧹 AUDIO CLEANED:", completeName);
+    };
+
+    // ====================================================
+    // AUDIO ENDED
+    // ====================================================
+    audio.onended = () => {
+      if (finished) return;
+
+      console.log("✅ VOICE FINISHED:", completeName);
+      cleanup();
+
+      try {
+        onFinished();
+      } catch (error) {
+        console.error("❌ BINGO COMPLETION CALLBACK ERROR:", error);
+      }
+
+      resolve({ completed: true });
+    };
+
+    // ====================================================
+    // AUDIO ERROR
+    // ====================================================
+    audio.onerror = (error) => {
+      if (stateRef.current.paused) {
+        console.log("⏸️ AUDIO ERROR WHILE PAUSED:", completeName);
+        cleanup();
+        resolve({ paused: true, completed: false });
+        return;
+      }
+
+      if (generationId !== audioGenerationRef.current) {
+        console.log(
+          "🛑 OLD AUDIO GENERATION ERROR — IGNORING:",
+          generationId,
+          "CURRENT:",
+          audioGenerationRef.current
+        );
+        cleanup();
+        resolve({ cancelled: true, completed: false });
+        return;
+      }
+
+      console.error("❌ VOICE AUDIO ERROR:", path, error);
+      cleanup();
+      reject(new Error(`Could not play ${path}`));
+    };
+
+    // ====================================================
+    // PLAY
+    // ====================================================
+    let playPromise;
+    try {
+      playPromise = audio.play();
+    } catch (error) {
+      console.error("❌ AUDIO.PLAY() ERROR:", error);
+      cleanup();
+      reject(error);
+      return;
+    }
+
+    // ====================================================
+    // PLAY PROMISE
+    // ====================================================
+    if (playPromise && typeof playPromise.then === "function") {
+      playPromise
+        .then(() => {
+          console.log("▶️ PLAYING:", path);
+
+          if (stateRef.current.paused) {
+            console.log("⏸️ AUDIO STARTED BUT GAME IS PAUSED");
+            cleanup();
+            resolve({ paused: true, completed: false });
+          }
+        })
+        .catch((error) => {
+          if (error?.name === "AbortError" && stateRef.current.paused) {
+            console.log("⏸️ PLAY INTERRUPTED BECAUSE GAME WAS PAUSED");
+            cleanup();
+            resolve({ paused: true, completed: false });
+            return;
+          }
+
+          if (generationId !== audioGenerationRef.current) {
+            console.log(
+              "🛑 PLAY FAILED FOR OLD GENERATION:",
+              generationId,
+              "CURRENT:",
+              audioGenerationRef.current
+            );
+            cleanup();
+            resolve({ cancelled: true, completed: false });
+            return;
+          }
+
+          console.error("❌ AUDIO PLAY ERROR:", error);
+          cleanup();
+          reject(error);
+        });
+    }
+  });
+}
     // end of playCompleteRecording
-
 
   // ==========================================================
   // 🎵 VERIFICATION AUDIO
@@ -2324,99 +2131,36 @@ function playShuffleSound(onComplete = () => {}) {
       onComplete();
     });
 }
-  // --- Optimized Native Voice Selection ---
-  function getSelectedVoice(langCode) {
-    const availableVoices = voices.length ? voices : window.speechSynthesis.getVoices();
-    if (!availableVoices || availableVoices.length === 0) return null;
+  
+  
+   
+function stopAllActiveAudio() {
 
-    if (langCode === "om" || langCode === "om-ET") {
-      const oromoVoice = availableVoices.find(v => v.lang.toLowerCase().includes("om") || v.lang.toLowerCase().includes("or") || v.lang.toLowerCase().includes("et"));
-      if (oromoVoice) return oromoVoice;
-    }
-
-    const nativePriorities = [
-      "Google UK English Male",
-      "Google US English",
-      "Microsoft David Online",
-      "Microsoft George Online",
-      "Daniel",
-      "Oliver",
-      "en-GB", 
-      "en-US"
-    ];
-
-    for (let pattern of nativePriorities) {
-      const found = availableVoices.find(v => (v.name.includes(pattern) || v.lang.includes(pattern)) && v.lang.startsWith("en"));
-      if (found) return found;
-    }
-
-    return availableVoices.find(v => v.lang.startsWith("en")) || availableVoices[0];
+  if (audioTimeoutRef.current) {
+    clearTimeout(audioTimeoutRef.current);
+    audioTimeoutRef.current = null;
   }
 
-  function stopAllActiveAudio() {
-    if (audioTimeoutRef.current) {
-      clearTimeout(audioTimeoutRef.current);
-      audioTimeoutRef.current = null;
-    }
-    if (activeUtteranceRef.current) {
-      activeUtteranceRef.current.onend = null;
-      activeUtteranceRef.current.onerror = null;
-      activeUtteranceRef.current = null;
-    }
-    if (activeAudioRef.current) {
-      activeAudioRef.current.onended = null;
-      activeAudioRef.current.onerror = null;
-      activeAudioRef.current.pause();
-      activeAudioRef.current = null;
-    }
-    if (shuffleAudioRef.current && typeof shuffleAudioRef.current.pause === 'function') {
-      shuffleAudioRef.current.onended = null;
-      shuffleAudioRef.current.pause();
-    }
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+  // STOP RECORDED OROMO AUDIO
+  if (activeAudioRef.current) {
+    activeAudioRef.current.onended = null;
+    activeAudioRef.current.onerror = null;
+    activeAudioRef.current.pause();
+    activeAudioRef.current.currentTime = 0;
+    activeAudioRef.current = null;
   }
 
-  function speakWithStyledVoice(text, onComplete = () => {}, options = {}) {
-    if (typeof window === "undefined" || !window.speechSynthesis) {
-      onComplete();
-      return;
-    }
-
-    window.speechSynthesis.resume();
-
-    const currentGame = stateRef.current.game || game;
-    const requestedLang = currentGame.speechLang || "en-US";
-
-    const speech = new SpeechSynthesisUtterance(text);
-    const selectedVoice = getSelectedVoice(requestedLang);
-
-    if (selectedVoice) {
-      speech.voice = selectedVoice;
-      speech.lang = selectedVoice.lang || requestedLang;
-    } else {
-      speech.lang = requestedLang;
-    }
-
-    // Tuned for deep, booming, energetic, stadium-announcer delivery
-    speech.rate = options.rate ?? 0.81;   // Energetic and punchy pacing
-    speech.pitch = options.pitch ?? 0.90; // Deep and commanding pitch
-    speech.volume = options.volume ?? 1.0; // Maximum power and volume
-
-    speech.onend = () => {
-      activeUtteranceRef.current = null;
-      onComplete();
-    };
-
-    speech.onerror = () => {
-      activeUtteranceRef.current = null;
-      onComplete();
-    };
-
-    activeUtteranceRef.current = speech;
-    window.speechSynthesis.speak(speech);
+  // STOP SHUFFLE AUDIO
+  if (
+    shuffleAudioRef.current &&
+    typeof shuffleAudioRef.current.pause === "function"
+  ) {
+    shuffleAudioRef.current.onended = null;
+    shuffleAudioRef.current.pause();
+    shuffleAudioRef.current.currentTime = 0;
+    shuffleAudioRef.current = null;
   }
+}
 
  // --- Dynamic Arena Announcer Sequence ---
 // --- Dynamic Arena Announcer Sequence ---
@@ -2431,188 +2175,19 @@ function speakBallSequence(
     return;
   }
 
-  const currentGame = stateRef.current.game || game;
-  const activeVoiceMode =
-    currentGame.voiceMode || currentGame.voice_mode;
-
-  const activeSpeechLang =
-    currentGame.speechLang || "en-US";
-
-  // ==========================================
-  // RECORDED OROMO
-  // ==========================================
-  if (activeVoiceMode === "recorded-oromo") {
-    console.log(
-      "🎙️ SPEAKING RECORDED OROMO:",
-      letter,
-      number
-    );
-
-    playRecordedBingoCall(
-      letter,
-      number,
-      onSequenceFinished
-    );
-
-    return;
-  }
-
-  // ==========================================
-  // RECORDED AMHARIC
-  // ==========================================
-  if (activeVoiceMode === "recorded") {
-    console.log(
-      "🎙️ SPEAKING RECORDED VOICE:",
-      letter,
-      number
-    );
-
-    playRecordedBingoCall(
-      letter,
-      number,
-      onSequenceFinished
-    );
-
-    return;
-  }
-
-  // ==========================================
-  // COMPUTER AMHARIC
-  // ==========================================
-  if (activeVoiceMode === "computer-amharic") {
-    const amharicNumber =
-      amharicPhoneticNumbers[number] ||
-      String(number);
-
-    const letterWord =
-      spokenLetter[letter] || letter;
-
-    const dramaticLetter =
-      makeDramaticBingoText(letterWord);
-
-    const dramaticNumber =
-      makeDramaticBingoText(amharicNumber);
-
-    console.log(
-      `🎙️ DRAMATIC BINGO: ${letter} ${number}`
-    );
-
-    // LETTER
-    speakWithStyledVoice(
-      dramaticLetter,
-      () => {
-        if (stateRef.current.paused) {
-          return;
-        }
-
-        setTimeout(() => {
-          if (stateRef.current.paused) {
-            return;
-          }
-
-          // NUMBER
-          speakWithStyledVoice(
-            dramaticNumber,
-            () => {
-              if (stateRef.current.paused) {
-                return;
-              }
-
-              console.log(
-                `🎯 DRAMATIC BINGO FINISHED: ${letter} ${number}`
-              );
-
-              onSequenceFinished();
-            },
-            {
-              rate: 1.3,
-              pitch: 0.5,
-              volume: 1.0
-            }
-          );
-        }, 450);
-      },
-      {
-        rate: 1.2,
-        pitch: 0.55,
-        volume: 1.0
-      }
-    );
-
-    return;
-  }
-
   console.log(
-    "⚠️ UNKNOWN VOICE MODE:",
-    activeVoiceMode,
-    "LANG:",
-    activeSpeechLang
+    "🎙️ PLAYING AFFAN RECORDED OROMO:",
+    letter,
+    number
   );
 
-  const playerName = footballLegends[number] || "";
-  const isTwoDigit = number >= 10 && number <= 75;
-
-  if (activeSpeechLang === "om-ET") {
-    const oromoWord = afaanOromoNumbers[number] || number.toString();
-    let revealText = `${letter}! ${oromoWord}!`;
-    if (isTwoDigit) {
-      const digits = String(number).split("");
-      const separateDigitsStr = digits.map(d => afaanOromoDigitWords[d] || d).join("... ");
-      revealText += `... ${separateDigitsStr}!`;
-    }
-    if (playerName) {
-      revealText += `... ${playerName}!`;
-    }
-
-    speakWithStyledVoice(revealText, () => {
-      if (!stateRef.current.paused) {
-        onSequenceFinished();
-      }
-    }, { rate: 1.15, pitch: 0.65, volume: 1 });
-    return;
-  }
-
-  // Professional live bingo cadence with dramatic pauses, deep booming voice, and maximum energy
-  const fullNumberWord = number.toLocaleString("en-US");
-  const letterWord = spokenLetter[letter] || letter;
-
-  // Step 1: Call the Letter with high energy & deep booming voice
-  speakWithStyledVoice(letterWord, () => {
-    if (stateRef.current.paused) return;
-
-    // Step 2: Call the Full Number with maximum force and clear pronunciation
-    speakWithStyledVoice(fullNumberWord, () => {
-      if (stateRef.current.paused) return;
-
-      // Step 3: Announce separate digits and football legend nickname with booming stadium style
-      let suffixParts = [];
-      if (isTwoDigit) {
-        const digits = String(number).split("");
-        suffixParts.push(digits.map(d => digitWords[d] || d).join("... "));
-      }
-      if (playerName) {
-        suffixParts.push(playerName);
-      }
-
-      const suffixText = suffixParts.join("... ");
-
-      if (suffixText) {
-        speakWithStyledVoice(suffixText, () => {
-          if (!stateRef.current.paused) {
-            onSequenceFinished();
-          }
-        }, { rate: 1.2, pitch: 0.6, volume: 1 });
-      } else {
-        if (!stateRef.current.paused) {
-          onSequenceFinished();
-        }
-      }
-
-    }, { rate: 1.15, pitch: 0.65, volume: 1 });
-
-  }, { rate: 1.25, pitch: 0.7, volume: 1 });
+  // ONLY AFFAN RECORDED OROMO
+  playRecordedBingoCall(
+    letter,
+    number,
+    onSequenceFinished
+  );
 }
-
 function updateRunningCallInterval() {
   const audio = activeAudioRef.current;
 
@@ -2722,617 +2297,143 @@ function updateRunningCallInterval() {
 }
 
 function announceLetsGo(callback) {
-  const currentGame = stateRef.current.game;
-  if (currentGame.voiceMode === "recorded" ||
-      currentGame.voiceMode === "recorded-oromo") {
-    playRecordedAudio("letsgo", callback);
-    return;
-  }
-
-  if (typeof window === "undefined" || !window.speechSynthesis) {
-    callback();
-    return;
-  }
-  window.speechSynthesis.resume();
-  
-  if (currentGame.voiceMode === "recorded-oromo") {
-    playRecordedAudio("letsgo");
-    return;
-  }
-
-  const greetingText = "Alright everyone, let's play bingo!";
-  const speech = new SpeechSynthesisUtterance(greetingText);
-  const selectedVoice = getSelectedVoice(currentGame.speechLang || "en-US");
-  if (selectedVoice) speech.voice = selectedVoice;
-  speech.rate = 0.8;
-  speech.pitch = 0.65;
-  speech.volume = 1.0;
-  
-  speech.onend = () => callback();
-  speech.onerror = () => callback();
-  
-  window._activeUtterance = speech;
-  window.speechSynthesis.speak(speech);
+  playRecordedAudio("letsgo", callback);
 }
 
+ 
 const togglePlayPause = () => {
-  // ==========================================================
-  // PLAY / PAUSE - STABLE SINGLE-CALL CONTROL
-  // ==========================================================
-
   const actionId = ++playPauseActionRef.current;
   const isCurrentlyPaused = stateRef.current.paused;
 
   // ==========================================================
-  // ⏸️ PAUSE
+  // ⏸️ PAUSE ENGINE
   // ==========================================================
-
   if (!isCurrentlyPaused) {
     console.log("⏸️ PAUSE");
 
-    // IMPORTANT:
-    // Update the ref immediately so every async callback
-    // knows the game is paused.
     stateRef.current.paused = true;
     setPaused(true);
-
-    // ----------------------------------------------------------
-    // STOP ONLY THE NEXT-NUMBER TIMER
-    // ----------------------------------------------------------
 
     if (loopTimeoutRef.current !== null) {
       clearTimeout(loopTimeoutRef.current);
       loopTimeoutRef.current = null;
-
-      console.log("⏹️ NEXT NUMBER TIMER CANCELLED");
     }
-
-    if (callIntervalTimerRef.current !== null) {
-      clearTimeout(callIntervalTimerRef.current);
-      callIntervalTimerRef.current = null;
-    }
-
-    // ==========================================================
-    // 1. CURRENT HTML AUDIO
-    // ==========================================================
 
     const audio = activeAudioRef.current;
-
     if (audio && !audio.ended) {
       const currentTime = Number(audio.currentTime) || 0;
+      console.log("⏸️ PAUSING OROMO AUDIO:", audio.src);
+      
+      const currentBallStr = stateRef.current.current || "";
+      const parts = currentBallStr.trim().split(/\s+/);
 
-      console.log("⏸️ PAUSING AUDIO:", audio.src);
-      console.log("⏱️ SAVING POSITION:", currentTime);
+      // FIX: Cleanly extract the string token and numeric element out of the split array
+      const extractedLetter = parts[0] ? String(parts[0]).trim() : "";
+      const extractedNumber = parts[1] ? Number(parts[1]) : 0;
 
-      // Save the exact same Audio object.
       pausedAudioRef.current = {
         audio,
-        fileName: audio.src
-          .split("/")
-          .pop()
-          .split(".")[0]
-          .toLowerCase(),
+        letter: extractedLetter,
+        number: extractedNumber,
         time: currentTime,
       };
 
       try {
         audio.pause();
-      } catch (error) {
-        console.warn("⚠️ AUDIO PAUSE ERROR:", error);
-      }
-
-      // Keep this exact audio object alive.
-      activeAudioRef.current = audio;
-
-      console.log("🔒 CURRENT CALL LOCKED");
+      } catch (error) {}
       return;
     }
-
-    // ==========================================================
-    // 2. NATIVE SPEECH
-    // ==========================================================
-
-    if (
-      typeof window !== "undefined" &&
-      window.speechSynthesis &&
-      activeUtteranceRef.current
-    ) {
-      console.log("⏸️ PAUSING NATIVE SPEECH");
-
-      try {
-        window.speechSynthesis.pause();
-      } catch (error) {
-        console.warn("⚠️ SPEECH PAUSE ERROR:", error);
-      }
-
-      return;
-    }
-
-    // ==========================================================
-    // 3. AUDIO SEARCH / PENDING NUMBER
-    // ==========================================================
 
     if (pendingBingoCallRef.current) {
-      console.log(
-        "⏸️ CURRENT NUMBER WAITING:",
-        pendingBingoCallRef.current
-      );
-
-      // Do NOT remove the pending number.
-      // Play will announce this SAME number.
-
-      // Cancel any old async audio search.
-      audioGenerationRef.current++;
-
-      // The number already exists, so don't let the
-      // generation lock block Play.
+      console.log("⏸️ CURRENT NUMBER WAITING:", pendingBingoCallRef.current);
+      audioGenerationRef.current++; // Void active background file tasks instantly
       isDrawingBallRef.current = false;
-
-      console.log("🔒 PENDING NUMBER SAVED FOR RESUME");
-
       return;
     }
-
-    // ==========================================================
-    // 4. GENERATION STARTED BUT NO NUMBER YET
-    // ==========================================================
 
     if (isDrawingBallRef.current) {
-      console.log(
-        "⏸️ GENERATION IN PROGRESS — CANCELLING CURRENT GENERATION"
-      );
-
+      console.log("⏸️ GENERATION IN PROGRESS — CANCELLING");
       generationCancelRef.current++;
       audioGenerationRef.current++;
-
       isDrawingBallRef.current = false;
-
-      console.log("🛑 GENERATION CANCELLED");
-
       return;
     }
-
-    console.log("⏸️ PAUSED — NOTHING CURRENTLY PLAYING");
-
     return;
   }
 
   // ==========================================================
-  // ▶️ PLAY / RESUME
+  // ▶️ PLAY / RESUME ENGINE
   // ==========================================================
-
   console.log("▶️ PLAY");
 
-  // Update immediately.
   stateRef.current.paused = false;
   setPaused(false);
 
-  // ==========================================================
-  // 1. RESUME EXACT SAME PAUSED AUDIO
-  // ==========================================================
-
   const pausedData = pausedAudioRef.current;
-
   if (pausedData && pausedData.audio) {
-    const audio = pausedData.audio;
+    const resumeLetter = pausedData.letter;
+    const resumeNumber = pausedData.number;
+    
+    // Clear instantly so double clicks cannot read this stale data again
+    pausedAudioRef.current = null; 
+    pendingBingoCallRef.current = null;
 
-    // ----------------------------------------------------------
-    // VERY IMPORTANT:
-    //
-    // Remove pausedData BEFORE calling audio.play().
-    //
-    // This prevents rapid Play → Play from starting multiple
-    // play() promises for the same audio.
-    //
-    // If the user presses Pause again while play() is starting,
-    // the Pause handler will create a fresh pausedData object.
-    // ----------------------------------------------------------
+    if (actionId !== playPauseActionRef.current) return;
 
-    pausedAudioRef.current = null;
-
-    // Make sure this is still the newest button action.
-    if (actionId !== playPauseActionRef.current) {
-      console.log("🛑 OLD PLAY ACTION IGNORED");
-      return;
-    }
-
-    // ----------------------------------------------------------
-    // Audio already finished
-    // ----------------------------------------------------------
-
-    if (audio.ended) {
-      console.log("⚠️ PAUSED AUDIO ALREADY FINISHED");
-
-      if (activeAudioRef.current === audio) {
-        activeAudioRef.current = null;
-      }
-
+    if (!resumeLetter || !resumeNumber) {
+      console.warn("⚠️ Refusing to resume: corrupted track parameters. Advancing loop...");
       isDrawingBallRef.current = false;
-
-      // Do NOT generate here.
-      // The normal flow below will decide what to do.
-    } else {
-      // --------------------------------------------------------
-      // Restore exact position
-      // --------------------------------------------------------
-
-      const savedTime = Number(pausedData.time) || 0;
-
-      try {
-        if (
-          Number.isFinite(audio.duration) &&
-          audio.duration > 0 &&
-          savedTime >= 0 &&
-          savedTime < audio.duration
-        ) {
-          audio.currentTime = savedTime;
-
-          console.log(
-            "⏱️ RESTORED AUDIO POSITION:",
-            audio.currentTime
-          );
-        }
-      } catch (error) {
-        console.warn(
-          "⚠️ COULD NOT RESTORE AUDIO POSITION:",
-          error
-        );
-      }
-
-      // Keep same audio active.
-      activeAudioRef.current = audio;
-
-      // --------------------------------------------------------
-      // Start the SAME audio
-      // --------------------------------------------------------
-
-      let resumePromise;
-
-      try {
-        resumePromise = audio.play();
-      } catch (error) {
-        console.error("❌ AUDIO RESUME ERROR:", error);
-
-        // Put it back so the next Play can retry.
-        if (!audio.ended) {
-          pausedAudioRef.current = {
-            audio,
-            fileName: audio.src
-              .split("/")
-              .pop()
-              .split(".")[0]
-              .toLowerCase(),
-            time: Number(audio.currentTime) || 0,
-          };
-
-          stateRef.current.paused = true;
-          setPaused(true);
-        }
-
-        return;
-      }
-
-      resumePromise
-        .then(() => {
-          // ----------------------------------------------------
-          // Ignore stale Play promises.
-          // ----------------------------------------------------
-
-          if (actionId !== playPauseActionRef.current) {
-            console.log(
-              "🛑 OLD RESUME PROMISE IGNORED"
-            );
-            return;
-          }
-
-          // ----------------------------------------------------
-          // User pressed Pause while play() was starting.
-          // ----------------------------------------------------
-
-          if (stateRef.current.paused) {
-            console.log(
-              "⏸️ AUDIO STARTED BUT GAME IS PAUSED"
-            );
-            return;
-          }
-
-          console.log(
-            "✅ AUDIO RESUMED:",
-            audio.src,
-            "TIME:",
-            audio.currentTime
-          );
-        })
-        .catch((error) => {
-          // ----------------------------------------------------
-          // AbortError is normal when Pause happens quickly.
-          // ----------------------------------------------------
-
-          if (error?.name === "AbortError") {
-            console.log(
-              "⏸️ RESUME ABORTED — PAUSE HANDLER WILL SAVE POSITION"
-            );
-
-            return;
-          }
-
-          console.error(
-            "❌ AUDIO RESUME ERROR:",
-            error
-          );
-
-          // Preserve current position if playback failed.
-          if (!audio.ended) {
-            pausedAudioRef.current = {
-              audio,
-              fileName: audio.src
-                .split("/")
-                .pop()
-                .split(".")[0]
-                .toLowerCase(),
-              time: Number(audio.currentTime) || 0,
-            };
-
-            activeAudioRef.current = audio;
-
-            stateRef.current.paused = true;
-            setPaused(true);
-          }
-        });
-
-      // ========================================================
-      // VERY IMPORTANT:
-      //
-      // We are resuming the current number.
-      // NEVER generate another number here.
-      // ========================================================
-
+      generateNumber();
       return;
     }
-  }
 
-  // ==========================================================
-  // 2. RESUME NATIVE SPEECH
-  // ==========================================================
-
-  if (
-    typeof window !== "undefined" &&
-    window.speechSynthesis &&
-    activeUtteranceRef.current
-  ) {
-    console.log("▶️ RESUMING NATIVE SPEECH");
-
-    try {
-      window.speechSynthesis.resume();
-    } catch (error) {
-      console.warn(
-        "⚠️ SPEECH RESUME ERROR:",
-        error
-      );
-    }
-
+    console.log(`🚀 RELAUNCHING TRACKED ENGINE FOR BALL: ${resumeLetter} ${resumeNumber}`);
+    isDrawingBallRef.current = true;
+    
+    playRecordedBingoCall(resumeLetter, resumeNumber, () => {
+      isDrawingBallRef.current = false;
+      if (stateRef.current.paused) return;
+      generateNumber();
+    });
     return;
   }
-
-  // ==========================================================
-  // 3. ACTIVE AUDIO EXISTS
-  // ==========================================================
-
-  const activeAudio = activeAudioRef.current;
-
-  if (
-    activeAudio &&
-    !activeAudio.ended
-  ) {
-    console.log(
-      "▶️ ACTIVE AUDIO EXISTS:",
-      activeAudio.src
-    );
-
-    // Only call play() if it is actually paused.
-    if (activeAudio.paused) {
-      let playPromise;
-
-      try {
-        playPromise = activeAudio.play();
-      } catch (error) {
-        console.error(
-          "❌ ACTIVE AUDIO PLAY ERROR:",
-          error
-        );
-        return;
-      }
-
-      playPromise
-        .then(() => {
-          if (
-            actionId !== playPauseActionRef.current
-          ) {
-            console.log(
-              "🛑 OLD ACTIVE AUDIO PLAY IGNORED"
-            );
-            return;
-          }
-
-          if (stateRef.current.paused) {
-            console.log(
-              "⏸️ AUDIO PLAYED BUT GAME IS PAUSED"
-            );
-            return;
-          }
-
-          console.log(
-            "✅ ACTIVE AUDIO PLAYING:",
-            activeAudio.currentTime
-          );
-        })
-        .catch((error) => {
-          if (error?.name === "AbortError") {
-            console.log(
-              "⏸️ ACTIVE AUDIO PLAY ABORTED"
-            );
-            return;
-          }
-
-          console.error(
-            "❌ ACTIVE AUDIO PLAY ERROR:",
-            error
-          );
-        });
-    }
-
-    // Never generate another number while current audio exists.
-    return;
-  }
-
-  // ==========================================================
-  // 4. GENERATION STILL IN PROGRESS
-  // ==========================================================
 
   if (isDrawingBallRef.current) {
-    console.log(
-      "⏳ CALL GENERATION STILL IN PROGRESS"
-    );
-
+    console.log("⏳ CALL GENERATION STILL IN PROGRESS");
     return;
   }
-
-  // ==========================================================
-  // 5. PENDING BINGO CALL
-  // ==========================================================
 
   if (pendingBingoCallRef.current) {
     const pending = pendingBingoCallRef.current;
+    pendingBingoCallRef.current = null; 
 
-    console.log(
-      "▶️ RESUMING PENDING CALL:",
-      pending
-    );
-
-    // ----------------------------------------------------------
-    // IMPORTANT:
-    //
-    // Lock generation BEFORE starting the async audio search.
-    //
-    // This prevents:
-    //
-    // Play
-    // Play
-    // Play
-    //
-    // from launching the same pending call three times.
-    // ----------------------------------------------------------
-
+    console.log("▶️ RESUMING PENDING OROMO CALL:", pending);
     isDrawingBallRef.current = true;
-
-    playRecordedBingoCall(
-      pending.letter,
-      pending.number,
-      () => {
-        // ------------------------------------------------------
-        // If user paused during this call:
-        // ------------------------------------------------------
-
-        if (stateRef.current.paused) {
-          console.log(
-            "⏸️ PENDING CALL FINISHED BUT GAME IS PAUSED"
-          );
-
-          isDrawingBallRef.current = false;
-
-          return;
-        }
-
-        // ------------------------------------------------------
-        // Current number is now completely announced.
-        // ------------------------------------------------------
-
-        pendingBingoCallRef.current = null;
-
-        isDrawingBallRef.current = false;
-
-        console.log(
-          "✅ PENDING CALL FINISHED:",
-          pending.letter,
-          pending.number
-        );
-
-        // ------------------------------------------------------
-        // Start next number ONLY ONCE.
-        // ------------------------------------------------------
-
-        generateNumber();
-      }
-    );
-
+    
+    playRecordedBingoCall(pending.letter, pending.number, () => {
+      isDrawingBallRef.current = false;
+      if (stateRef.current.paused) return;
+      generateNumber();
+    });
     return;
   }
-
-  // ==========================================================
-  // 6. NO CURRENT CALL
-  // ==========================================================
-
-  console.log(
-    "▶️ NO AUDIO / NO GENERATION / NO PENDING CALL"
-  );
-
-  // ==========================================================
-  // FIRST GAME SHUFFLE
-  // ==========================================================
 
   if (!hasPlayedShuffleRef.current) {
     hasPlayedShuffleRef.current = true;
+    sessionStorage.setItem("bingo_shuffle_played", "true");
 
-    sessionStorage.setItem(
-      "bingo_shuffle_played",
-      "true"
-    );
-
-    console.log(
-      "🎵 PLAYING SHUFFLE — FIRST GAME START"
-    );
-
+    console.log("🎵 PLAYING OROMO SHUFFLE — FIRST GAME START");
     playShuffleSound(() => {
-      if (stateRef.current.paused) {
-        console.log(
-          "⏸️ PAUSED DURING SHUFFLE"
-        );
-
-        return;
-      }
-
-      if (isDrawingBallRef.current) {
-        console.log(
-          "⏳ GENERATION ALREADY STARTED"
-        );
-
-        return;
-      }
-
+      if (stateRef.current.paused || isDrawingBallRef.current) return;
       generateNumber();
     });
-
     return;
   }
 
-  // ==========================================================
-  // NORMAL NEW NUMBER
-  // ==========================================================
-
-  console.log(
-    "🚀 STARTING NEW NUMBER"
-  );
-
+  console.log("🚀 STARTING NEW OROMO NUMBER");
   generateNumber();
 };
 
-
-// ==========================================
-// END PAUSE / PLAY
-// ==========================================
-// ==========================================
-// END PAUSE / PLAY
-// ==========================================
 
 useEffect(() => {
   const updatePhysics = () => {
@@ -3393,494 +2494,179 @@ useEffect(() => {
 
 async function generateNumber() {
   const generationStart = Date.now();
+  const myGenerationId = generationCancelRef.current;
+  
+  // Resolve game ID reliably from active state tree
+  const currentGameId = stateRef.current.game?.game_id || stateRef.current.game?.id || id;
 
-  const myGenerationId =
-    generationCancelRef.current;
+  console.log("🔥 GENERATE ENTERED", generationStart, "LOCK:", isDrawingBallRef.current, "CANCEL ID:", myGenerationId, "GAME:", currentGameId);
 
-  const currentGameId =
-    stateRef.current.game?.game_id ||
-    stateRef.current.game?.id;
-
-  console.log(
-    "🔥 GENERATE ENTERED",
-    generationStart,
-    "LOCK:",
-    isDrawingBallRef.current,
-    "CANCEL ID:",
-    myGenerationId,
-    "GAME:",
-    currentGameId
-  );
-
+  // Core safety guardrails
   if (stateRef.current.paused) {
-    console.log(
-      ">>> GENERATE BLOCKED - PAUSED"
-    );
+    console.log(">>> GENERATE BLOCKED - PAUSED");
     return;
   }
 
   if (isDrawingBallRef.current) {
-    console.log(
-      "⏳ CALL GENERATION STILL IN PROGRESS"
-    );
+    console.log("⏳ CALL GENERATION STILL IN PROGRESS");
     return;
   }
 
   if (loopTimeoutRef.current) {
-    console.log(
-      ">>> GENERATE BLOCKED - LOOP ALREADY EXISTS"
-    );
+    console.log(">>> GENERATE BLOCKED - LOOP ALREADY EXISTS");
     return;
   }
-
-  // =========================================================
-  // MAKE SURE GAME ID EXISTS
-  // =========================================================
 
   if (!currentGameId) {
-    console.error(
-      "❌ NO GAME ID AVAILABLE — CANNOT GENERATE NUMBER"
-    );
-
+    console.error("❌ NO GAME ID AVAILABLE — CANNOT GENERATE NUMBER");
     isDrawingBallRef.current = false;
-
     return;
   }
 
-  // =========================================================
-  // LOCK IMMEDIATELY
-  // =========================================================
-
+  // Atomically claim the drawing loop lock
   isDrawingBallRef.current = true;
 
-  // =========================================================
-  // GENERATION VALIDATION
-  // =========================================================
-
   const generationStillValid = () => {
-    return (
-      myGenerationId ===
-        generationCancelRef.current &&
-      !stateRef.current.paused
-    );
+    return myGenerationId === generationCancelRef.current && !stateRef.current.paused;
   };
 
   try {
-    // =========================================================
-    // GET REMAINING NUMBERS
-    // =========================================================
+    const currentRemaining = remainingNumbersRef.current;
 
-    const currentRemaining =
-      remainingNumbersRef.current;
-
-    if (
-      !currentRemaining ||
-      currentRemaining.length === 0
-    ) {
-      console.log(
-        "🛑 NO REMAINING NUMBERS"
-      );
-
+    if (!currentRemaining || currentRemaining.length === 0) {
+      console.log("🛑 NO REMAINING NUMBERS");
       isDrawingBallRef.current = false;
-
       return;
     }
 
-    // =========================================================
-    // PICK RANDOM NUMBER
-    // =========================================================
-
-    const randomIndex = Math.floor(
-      Math.random() *
-        currentRemaining.length
-    );
-
-    const number =
-      currentRemaining[randomIndex];
-
-    // =========================================================
-    // CHECK CANCELLATION
-    // =========================================================
+    // Pick a random number safely
+    const randomIndex = Math.floor(Math.random() * currentRemaining.length);
+    const number = currentRemaining[randomIndex];
 
     if (!generationStillValid()) {
-      console.log(
-        "🛑 OLD GENERATION CANCELLED — STOPPING"
-      );
-
       isDrawingBallRef.current = false;
-
       return;
     }
 
-    // =========================================================
-    // REMOVE NUMBER FROM REMAINING
-    // =========================================================
+    // Update remaining pool directly
+    remainingNumbersRef.current = currentRemaining.filter(n => n !== number);
 
-    remainingNumbersRef.current =
-      currentRemaining.filter(
-        n => n !== number
-      );
-
-    // =========================================================
-    // DETERMINE BINGO LETTER
-    // =========================================================
-
+    // Determine target column letter
     let letter = "B";
+    if (number >= 16) letter = "I";
+    if (number >= 31) letter = "N";
+    if (number >= 46) letter = "G";
+    if (number >= 61) letter = "O";
 
-    if (number >= 16) {
-      letter = "I";
-    }
-
-    if (number >= 31) {
-      letter = "N";
-    }
-
-    if (number >= 46) {
-      letter = "G";
-    }
-
-    if (number >= 61) {
-      letter = "O";
-    }
-
-    const result =
-      `${letter} ${number}`;
-
-    // =========================================================
-    // REMEMBER BALL
-    // =========================================================
-
+    const result = `${letter} ${number}`;
     seenBallsRef.current.add(result);
 
-    // =========================================================
-    // REMEMBER PENDING CALL
-    // =========================================================
-
-    pendingBingoCallRef.current = {
-      letter,
-      number,
-      result
-    };
-
-    console.log(
-      "💾 PENDING BINGO CALL:",
-      pendingBingoCallRef.current
-    );
-
-    // =========================================================
-    // CHECK AGAIN BEFORE STATE UPDATE
-    // =========================================================
+    pendingBingoCallRef.current = { letter, number, result };
 
     if (!generationStillValid()) {
-      console.log(
-        "🛑 OLD GENERATION CANCELLED — STOPPING BEFORE STATE UPDATE"
-      );
-
       isDrawingBallRef.current = false;
-
       return;
     }
 
-    // =========================================================
-    // UPDATE FRONTEND STATE
-    // =========================================================
-
-    const updatedCalled = [
-      ...calledRef.current,
-      result
-    ];
-
-    calledRef.current =
-      updatedCalled;
-
+    // Synchronize both State arrays and Mutable Refs simultaneously 
+    const updatedCalled = [...calledRef.current, result];
+    calledRef.current = updatedCalled;
     setCalled(updatedCalled);
     setCurrent(result);
 
-    console.log(
-      "🎯 CALLING NUMBER:",
-      result,
-      "FOR GAME:",
-      currentGameId
-    );
+    // Update operational state context container instantly
+    stateRef.current.called = updatedCalled;
+    stateRef.current.current = result;
 
-    // =========================================================
-    // SAVE NUMBER TO BACKEND
-    // =========================================================
+    // Dispatch background network logging with explicit recovery fallbacks
+    fetch(`${API_URL}/games/${currentGameId}/call-number`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ball: result })
+    })
+    .then(async response => {
+      if (!response.ok) throw new Error(`Server returned status ${response.status}`);
+      console.log("✅ NUMBER SAVED IN BACKGROUND:", result);
+    })
+    .catch(err => {
+      console.error("❌ BACKGROUND NUMBER SAVE FAILED:", result, err);
+      
+      // Force an immediate atomic global engine halt
+      stateRef.current.paused = true;
+      setPaused(true);
 
-    fetch(
-      `${API_URL}/games/${currentGameId}/call-number`,
-      {
-        method: "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body: JSON.stringify({
-          ball: result
-        })
+      if (loopTimeoutRef.current) {
+        clearTimeout(loopTimeoutRef.current);
+        loopTimeoutRef.current = null;
       }
-    )
-      .then(async response => {
-        if (!response.ok) {
-          const errorText =
-            await response.text();
-
-          throw new Error(
-            `Call-number API failed: ${response.status} ${errorText}`
-          );
-        }
-
-        console.log(
-          "✅ NUMBER SAVED IN BACKGROUND:",
-          result
-        );
-      })
-      .catch(err => {
-        console.error(
-          "❌ BACKGROUND NUMBER SAVE FAILED:",
-          result,
-          err
-        );
-
-        setPaused(true);
-
-        if (
-          loopTimeoutRef.current
-        ) {
-          clearTimeout(
-            loopTimeoutRef.current
-          );
-
-          loopTimeoutRef.current =
-            null;
-        }
-
-        isDrawingBallRef.current =
-          false;
-
-        alert(
-          "Connection lost. Game paused."
-        );
-      });
-
-    // =========================================================
-    // CHECK BEFORE VOICE
-    // =========================================================
+      
+      isDrawingBallRef.current = false;
+      alert("Connection lost with backend server. Game has been safely paused.");
+    });
 
     if (!generationStillValid()) {
-      console.log(
-        "🛑 OLD GENERATION CANCELLED — STOPPING BEFORE VOICE"
-      );
-
       isDrawingBallRef.current = false;
-
       return;
     }
 
-    // =========================================================
-    // PLAY VOICE
-    // =========================================================
+    // Trigger sequential playback routing engine
+    playRecordedBingoCall(letter, number, () => {
+      console.log("✅ CURRENT CALL FINISHED:", result);
 
-  playRecordedBingoCall(letter, number, () => {
-
-  console.log(
-    "✅ CURRENT CALL FINISHED:",
-    result
-  );
-
-  // The voice is definitely finished.
-  isDrawingBallRef.current = false;
-
-  // The number has now been fully announced.
-  if (
-    pendingBingoCallRef.current &&
-    pendingBingoCallRef.current.letter === letter &&
-    pendingBingoCallRef.current.number === number
-  ) {
-    pendingBingoCallRef.current = null;
-  }
-  // ==========================================================
-  // IF PAUSED, DO NOT START THE NEXT NUMBER
-  // ==========================================================
-
-  if (stateRef.current.paused) {
-    console.log(
-      "⏸️ CALL FINISHED WHILE PAUSED — WAITING FOR PLAY"
-    );
-
-    return;
-  }
-
-  // ==========================================================
-  // READ CURRENT CALL INTERVAL
-  // ==========================================================
-
-  const selectedSeconds =
-    Number(callIntervalRef.current);
-
-  const safeSeconds =
-    Number.isFinite(selectedSeconds)
-      ? selectedSeconds
-      : 5;
-        // =====================================================
-        // PREVENT DUPLICATE TIMER
-        // =====================================================
-
-        if (
-          loopTimeoutRef.current !==
-          null
-        ) {
-          console.log(
-            ">>> LOOP ALREADY SCHEDULED"
-          );
-
-          return;
-        }
-
-        // =====================================================
-        // NEGATIVE = FAST CALL MODE
-        // =====================================================
-
-        if (safeSeconds < 0) {
-
-          const overlapSeconds =
-            Math.abs(
-              safeSeconds
-            );
-
-          const fastDelayMs =
-            Math.max(
-              0,
-              1000 -
-                overlapSeconds *
-                  1000
-            );
-
-          console.log(
-            `⚡ FAST CALL MODE: ${safeSeconds}s`
-          );
-
-          console.log(
-            `🚀 NEXT NUMBER STARTS IN: ${
-              fastDelayMs / 1000
-            } SECOND(S)`
-          );
-
-          loopTimeoutRef.current =
-            setTimeout(() => {
-
-              loopTimeoutRef.current =
-                null;
-
-              if (
-                stateRef.current.paused
-              ) {
-                isDrawingBallRef.current =
-                  false;
-
-                return;
-              }
-
-              // Check cancellation
-              if (
-                myGenerationId !==
-                generationCancelRef.current
-              ) {
-                console.log(
-                  "🛑 OLD GENERATION TIMER CANCELLED"
-                );
-
-                isDrawingBallRef.current =
-                  false;
-
-                return;
-              }
-
-              isDrawingBallRef.current =
-                false;
-
-              console.log(
-                "⚡ FAST CALL: STARTING NEXT NUMBER"
-              );
-
-              generateNumber();
-
-            }, fastDelayMs);
-
-          return;
-        }
-
-        // =====================================================
-        // NORMAL / ZERO INTERVAL
-        // =====================================================
-
-        const delayMs =
-          safeSeconds * 1000;
-
-        console.log(
-          `>>> NEXT NUMBER IN EXACTLY ${
-            safeSeconds
-          } SECOND(S)`
-        );
-
-        loopTimeoutRef.current =
-          setTimeout(() => {
-
-            loopTimeoutRef.current =
-              null;
-
-            if (
-              stateRef.current.paused
-            ) {
-              isDrawingBallRef.current =
-                false;
-
-              return;
-            }
-
-            // Check cancellation
-            if (
-              myGenerationId !==
-              generationCancelRef.current
-            ) {
-              console.log(
-                "🛑 OLD GENERATION TIMER CANCELLED"
-              );
-
-              isDrawingBallRef.current =
-                false;
-
-              return;
-            }
-
-            isDrawingBallRef.current =
-              false;
-
-            console.log(
-              ">>> TIMEOUT FIRED"
-            );
-
-            generateNumber();
-
-          }, delayMs);
+      // Clean up previous operational states cleanly 
+      isDrawingBallRef.current = false;
+      if (pendingBingoCallRef.current?.letter === letter && pendingBingoCallRef.current?.number === number) {
+        pendingBingoCallRef.current = null;
       }
-    );
+
+      if (stateRef.current.paused) {
+        console.log("⏸️ CALL FINISHED WHILE PAUSED — WAITING FOR PLAY");
+        return;
+      }
+
+      const selectedSeconds = Number(callIntervalRef.current);
+      const safeSeconds = Number.isFinite(selectedSeconds) ? selectedSeconds : 5;
+
+      if (loopTimeoutRef.current !== null) {
+        return; // Next loop block has already been successfully mounted
+      }
+
+      // Fast-speed handling mechanics (< 0 interval option support)
+      if (safeSeconds < 0) {
+        const overlapSeconds = Math.abs(safeSeconds);
+        const fastDelayMs = Math.max(0, 1000 - (overlapSeconds * 1000));
+
+        loopTimeoutRef.current = setTimeout(() => {
+          loopTimeoutRef.current = null;
+          if (stateRef.current.paused || myGenerationId !== generationCancelRef.current) {
+            isDrawingBallRef.current = false;
+            return;
+          }
+          generateNumber();
+        }, fastDelayMs);
+
+        return;
+      }
+
+      // Normal auto-advancement structural timer pathing
+      const delayMs = safeSeconds * 1000;
+      loopTimeoutRef.current = setTimeout(() => {
+        loopTimeoutRef.current = null;
+        if (stateRef.current.paused || myGenerationId !== generationCancelRef.current) {
+          isDrawingBallRef.current = false;
+          return;
+        }
+        generateNumber();
+      }, delayMs);
+    });
 
   } catch (err) {
-
-    console.error(
-      "❌ GENERATE NUMBER FAILED:",
-      err
-    );
-
-    isDrawingBallRef.current =
-      false;
-
-    // Do NOT schedule another call here.
+    console.error("❌ GENERATE NUMBER CRITICAL EXCEPTION:", err);
+    // Safety valve: release engine lock so system can be recovered manually
+    isDrawingBallRef.current = false;
   }
 }
+
   const checkWinner = async () => {
     if (!cartelaId.trim()) {
       alert("Please enter a Cartela ID first.");
@@ -4047,8 +2833,7 @@ setWinningCells(
   
 
  return (
-  <div className={`bingo-wrapper ${tvMode ? 'tv-viewport' : ''}`}>
-
+ <div className="bingo-wrapper">
     {/* SMALL BACK BUTTON */}
     <button
       type="button"
@@ -4689,7 +3474,7 @@ setWinningCells(
     borderLeft: "1px solid rgba(255,255,255,0.05)",
   }}
 >
-            <span style={{ fontSize: '17px', fontWeight: 'bold', color: '#ff5aa5', letterSpacing: '1px', marginBottom: '2px' }}>
+            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff5aa5', letterSpacing: '1px', marginBottom: '2px' }}>
               {t.currentBall}
             </span>
             
@@ -4716,13 +3501,214 @@ setWinningCells(
 
         </div>
 
+  {/* =====================================================
+      ARROW BUTTON
+      ===================================================== */}
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowSoldCartelas((prev) => !prev)
+    }
+    title={
+      showSoldCartelas
+        ? "Hide sold Cartelas"
+        : "Show sold Cartelas"
+    }
+    style={{
+      width: "42px",
+      height: "42px",
+      minWidth: "42px",
+      minHeight: "42px",
+
+      borderRadius: "50%",
+      border: "2px solid rgba(0, 240, 255, 0.8)",
+
+      background: "rgba(0, 0, 0, 0.65)",
+
+      color: "#00f0ff",
+
+      cursor: "pointer",
+
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+
+      fontSize: "28px",
+      fontWeight: "bold",
+
+      padding: 0,
+      margin: 0,
+
+      lineHeight: 1,
+
+      position: "relative",
+
+      zIndex: 1000001,
+
+      boxShadow:
+        "0 2px 12px rgba(0, 0, 0, 0.6)"
+    }}
+  >
+    {showSoldCartelas ? "◀" : "▶"}
+  </button>
+       {/* =========================================================
+    SOLD CARTELAS OVERLAY
+    ALL NUMBERS VISIBLE — NO SCROLLING
+    ========================================================= */}
+{showSoldCartelas && (
+  <div
+    style={{
+      position: "fixed",
+
+      top: "50%",
+      left: "50%",
+
+      transform: "translate(-50%, -50%)",
+
+      width: "min(92vw, 1200px)",
+
+      maxHeight: "80vh",
+
+      background: "rgba(5, 12, 30, 0.98)",
+
+      border: "3px solid rgba(0, 240, 255, 0.85)",
+
+      borderRadius: "16px",
+
+      padding: "18px",
+
+      boxSizing: "border-box",
+
+      zIndex: 999999,
+
+      boxShadow:
+        "0 12px 45px rgba(0, 0, 0, 0.9)",
+
+      display: "flex",
+
+      flexDirection: "column",
+
+      alignItems: "center",
+
+      justifyContent: "center"
+    }}
+  >
+
+    {/* =====================================================
+        TITLE
+        ===================================================== */}
+    <div
+      style={{
+        color: "#00f0ff",
+
+        fontSize: "22px",
+
+        fontWeight: "bold",
+
+        marginBottom: "14px",
+
+        textAlign: "center"
+      }}
+    >
+    Kartelaawwan qabaman \ የተያዙ ካርቴላዎች ({soldCartelaIds.length})
+    </div>
+
+
+    {/* =====================================================
+        ALL CARTELA NUMBERS
+        NO SCROLL
+        AUTOMATIC GRID
+        ===================================================== */}
+    {soldCartelaIds.length > 0 ? (
+
+      <div
+        style={{
+          width: "100%",
+
+          display: "grid",
+
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(65px, 1fr))",
+
+          gap: "10px",
+
+          alignItems: "center",
+
+          justifyItems: "center",
+
+          boxSizing: "border-box"
+        }}
+      >
+
+        {soldCartelaIds.map((num) => (
+
+          <div
+            key={num}
+            style={{
+              width: "100%",
+
+              minWidth: "60px",
+
+              maxWidth: "90px",
+
+              height: "55px",
+
+              display: "flex",
+
+              alignItems: "center",
+
+              justifyContent: "center",
+
+              background:
+                "rgba(0, 240, 255, 0.15)",
+
+              border:
+                "2px solid rgba(0, 240, 255, 0.55)",
+
+              borderRadius: "9px",
+
+              color: "#ffffff",
+
+              fontSize: "24px",
+
+              fontWeight: "bold",
+
+              boxSizing: "border-box"
+            }}
+          >
+            #{num}
+          </div>
+
+        ))}
+
+      </div>
+
+    ) : (
+
+      <div
+        style={{
+          color: "#aaaaaa",
+
+          fontSize: "18px",
+
+          padding: "20px"
+        }}
+      >
+        No sold cartelas
+      </div>
+
+    )}
+
+  </div>
+)}
         {/* --- 3. CALLED BALL HISTORY (TOUCHES DASHBOARD IMMEDIATELY) --- */}
         <div
           className="called-section"
           style={{
             width: "100%",
             margin: "0",
-            padding: "6px",
+            padding: "0px",
             boxSizing: "border-box",
             background: "rgba(0,0,0,0.25)",
             borderRadius: "0 0 10px 10px",
@@ -4737,20 +3723,27 @@ setWinningCells(
               textAlign: "center",
             }}
           >
-            ({called.length}/75)
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              gap: "6px",
-              alignItems: "center",
-              minHeight: "52px",
-              width: "100%",
-              overflow: "hidden",
-            }}
-          >
+        <span
+  style={{
+    fontSize: "45px",
+    fontWeight: "bold",
+  }}
+>
+  ({called.length}/75)
+</span>
+          </div>  
+  
+          <div  
+            style={{  
+              display: "flex",  
+              justifyContent: "center",  
+              gap: "15px",  
+              alignItems: "center",  
+              minHeight: "52px",  
+              width: "100%",  
+              overflow: "hidden",  
+            }}     
+           > 
             {incomingHistoryBalls.length > 0 ? (
               incomingHistoryBalls.map((ballStr, idx) => {
                 const parts = String(ballStr).trim().split(/\s+/);
@@ -4818,218 +3811,615 @@ setWinningCells(
             ) : (
               <div
                 style={{
-                  fontSize: "15px",
+                  fontSize: "20px",
                   color: "#4b5970",
                   fontStyle: "italic",
                 }}
               >
                 {t.waitingToBegin}
               </div>
-            )}
+            )}    <button
+  type="button"
+  onClick={() => setShowGameControls((prev) => !prev)}
+  title={showGameControls ? "Hide game controls" : "Show game controls"}
+  style={{
+    width: "24px",
+    height: "24px",
+    minWidth: "24px",
+    minHeight: "24px",
+
+    borderRadius: "4px",
+    border: "1px solid rgba(0,240,255,0.8)",
+    background: "rgba(0,0,0,0.65)",
+    color: "#00f0ff",
+
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    fontSize: "40px",
+    fontWeight: "bold",
+    padding: 0,
+    margin: 0,
+    lineHeight: 1,
+
+    boxShadow: "0 1px 6px rgba(0,0,0,0.6)",
+
+    position: "absolute",
+    right: "4px",
+    top: "95%",
+    transform: "translateY(-50%)",
+
+    zIndex: 1000001,
+  }}
+>
+  {showGameControls ? "◀" : "▶"}
+</button>
           </div>
         </div>
 
         {/* --- 4. REMAINING UI / FOOTER CONSOLE BAR (TOUCHES CALLED BALLS IMMEDIATELY) --- */}
-        <footer 
-          className="game-top-bar" 
-          style={{ 
-            display: 'flex', 
-            justify: 'space-between', 
-            alignItems: 'center', 
-            background: 'rgba(0,0,0,0.3)',
-            margin: '0',
-            padding: '6px'
+       {/* =========================================================
+    SMALL GAME CONTROLS SHOW / HIDE
+    ========================================================= */}
+
+<div
+  style={{
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "42px",
+    height: "42px",
+    flexShrink: 0,
+    zIndex: 1000000,
+  }}
+>
+
+  {/* =======================================================
+      SMALL SHOW / HIDE ARROW
+      ======================================================= */}
+
+ 
+  {/* =======================================================
+      CONTROLS PANEL
+      ======================================================= */}
+
+  {showGameControls && (
+    <div
+      style={{
+        position: "fixed",
+
+        top: "50%",
+
+        right: "20px",
+
+        transform:
+          "translateY(-50%)",
+
+        width: "300px",
+
+        padding: "16px",
+
+        background:
+          "rgba(5,12,30,0.98)",
+
+        border:
+          "2px solid rgba(0,240,255,0.8)",
+
+        borderRadius: "14px",
+
+        boxSizing: "border-box",
+
+        zIndex: 999999,
+
+        boxShadow:
+          "0 10px 40px rgba(0,0,0,0.85)",
+
+        display: "flex",
+
+        flexDirection: "column",
+
+        gap: "14px",
+      }}
+    >
+
+      {/* =====================================================
+          VOICE MODE
+          ===================================================== */}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "10px",
+        }}
+      >
+
+        <span
+          style={{
+            color: "#fff",
+            fontWeight: "bold",
+            fontSize: "15px",
           }}
         >
-          <div className="call-interval-control">
-            <div className="call-interval-header">
-              <span>CALL SPEED</span>
-              <div className="call-interval-adjust">
-                {/* MINUS */}
-                <button
-                  type="button"
-                  className="interval-minus"
-                  onClick={() => {
-                    const current = Number(callInterval);
-                    const safeCurrent = Number.isFinite(current) ? current : 5;
-                    const newValue = Math.max(0, safeCurrent - 1);
-                    setCallInterval(newValue);
-                    console.log("➖ CALL SPEED:", newValue, "SECONDS");
-                  }}
-                >
-                  −
-                </button>
+          🎙️ VOICE
+        </span>
 
-                {/* VALUE */}
-                <strong className="interval-value">
-                  {Number(callInterval)}s
-                </strong>
+        <select
+          value="recorded-oromo"
+          onChange={() => {
+            setGame((prev) => ({
+              ...prev,
+              voiceMode: "recorded-oromo",
+              speechLang: "oromo",
+            }));
+          }}
+          style={{
+            background: "#0c162d",
+            border: "1px solid #00c8ff",
+            color: "#fff",
+            borderRadius: "6px",
+            padding: "6px 8px",
+            fontSize: "13px",
+            fontWeight: "bold",
+            cursor: "pointer",
+            outline: "none",
+          }}
+        >
+          <option value="recorded-oromo">
+            🟢 Voice
+          </option>
+        </select>
 
-                {/* PLUS */}
-                <button
-                  type="button"
-                  className="interval-plus"
-                  onClick={() => {
-                    const current = Number(callInterval);
-                    const safeCurrent = Number.isFinite(current) ? current : 5;
-                    const newValue = Math.min(15, safeCurrent + 1);
-                    setCallInterval(newValue);
-                    console.log("➕ CALL SPEED:", newValue, "SECONDS");
-                  }}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span>🔊 Volume</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={Math.round(volume * 100)}
-              onChange={(e) => {
-                const newVolume = Number(e.target.value) / 100;
-                setVolume(newVolume);
-                volumeRef.current = newVolume;
-                if (activeAudioRef.current) {
-                  activeAudioRef.current.volume = newVolume;
-                }
-              }}
-              style={{
-                width: "130px",
-                cursor: "pointer",
-              }}
-            />
-            <span style={{ minWidth: "45px" }}>
-              {Math.round(volume * 100)}%
-            </span>
-          </div>
- <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ color: "#fff", fontWeight: "600" }}>
-              Voice Speed
-            </span>
+      </div>
+
+
+      {/* =====================================================
+          CALL SPEED
+          ===================================================== */}
+
+      <div
+        className="call-interval-control"
+        style={{
+          width: "100%",
+        }}
+      >
+
+        <div
+          className="call-interval-header"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            width: "100%",
+          }}
+        >
+
+          <span
+            style={{
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "15px",
+            }}
+          >
+            CALL SPEED
+          </span>
+
+
+          <div
+            className="call-interval-adjust"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+
+            {/* MINUS */}
+
             <button
-              onClick={decreaseVoiceSpeed}
+              type="button"
+              className="interval-minus"
+              onClick={() => {
+
+                const current =
+                  Number(callInterval);
+
+                const safeCurrent =
+                  Number.isFinite(current)
+                    ? current
+                    : 5;
+
+                const newValue =
+                  Math.max(
+                    0,
+                    safeCurrent - 1
+                  );
+
+                setCallInterval(newValue);
+
+                console.log(
+                  "➖ CALL SPEED:",
+                  newValue,
+                  "SECONDS"
+                );
+
+              }}
               style={{
-                padding: "6px 12px",
-                fontSize: "18px",
+                width: "30px",
+                height: "30px",
+
+                borderRadius: "6px",
+
+                border:
+                  "1px solid #00f0ff",
+
+                background:
+                  "rgba(0,240,255,0.12)",
+
+                color: "#00f0ff",
+
+                fontSize: "20px",
+
                 fontWeight: "bold",
-                cursor: "pointer"
+
+                cursor: "pointer",
+
+                padding: 0,
               }}
             >
               −
             </button>
-            <span style={{
-              minWidth: "50px",
-              textAlign: "center",
-              color: "#fff",
-              fontWeight: "bold"
-            }}>
-              {voiceSpeed.toFixed(1)}×
-            </span>
-            <button
-              onClick={increaseVoiceSpeed}
+
+
+            {/* VALUE */}
+
+            <strong
+              className="interval-value"
               style={{
-                padding: "6px 12px",
-                fontSize: "18px",
+                minWidth: "45px",
+                textAlign: "center",
+                color: "#fff",
+                fontSize: "17px",
+              }}
+            >
+              {Number(callInterval)}s
+            </strong>
+
+
+            {/* PLUS */}
+
+            <button
+              type="button"
+              className="interval-plus"
+              onClick={() => {
+
+                const current =
+                  Number(callInterval);
+
+                const safeCurrent =
+                  Number.isFinite(current)
+                    ? current
+                    : 5;
+
+                const newValue =
+                  Math.min(
+                    15,
+                    safeCurrent + 1
+                  );
+
+                setCallInterval(newValue);
+
+                console.log(
+                  "➕ CALL SPEED:",
+                  newValue,
+                  "SECONDS"
+                );
+
+              }}
+              style={{
+                width: "30px",
+                height: "30px",
+
+                borderRadius: "6px",
+
+                border:
+                  "1px solid #00f0ff",
+
+                background:
+                  "rgba(0,240,255,0.12)",
+
+                color: "#00f0ff",
+
+                fontSize: "20px",
+
                 fontWeight: "bold",
-                cursor: "pointer"
+
+                cursor: "pointer",
+
+                padding: 0,
               }}
             >
               +
             </button>
+
           </div>
 
-         
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-           <div style={{
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: "4px"
-}}>
-  <span style={{
-    fontSize: "11px",
-    fontWeight: "bold",
-    color: "#00f0ff"
-  }}>
-    🎙️ VOICE DEPTH
-  </span>
+        </div>
 
-  <input
-    type="range"
-    min="-20"
-    max="40"
-    step="1"
-    value={voiceDepth}
-    onChange={(e) => {
-      const value = Number(e.target.value);
+      </div>
 
-      setVoiceDepth(value);
-      voiceDepthRef.current = value;
 
-      const cashierId =
-        localStorage.getItem("logged_in_cashier");
+      {/* =====================================================
+          VOLUME
+          ===================================================== */}
 
-      if (cashierId) {
-        localStorage.setItem(
-          `cashier_voice_depth_${cashierId}`,
-          String(value)
-        );
-      }
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          width: "100%",
+        }}
+      >
 
-      console.log("🎙️ NEW VOICE DEPTH:", value);
-    }}
-    style={{
-      width: "120px",
-      height: "6px",
-      cursor: "pointer"
-    }}
-  />
+        <span
+          style={{
+            color: "#fff",
+            fontWeight: "bold",
+            fontSize: "15px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          🔊 Volume
+        </span>
 
-  <span style={{
-    fontSize: "10px",
-    color: "#ffd700"
-  }}>
-    {voiceDepth > 0
-      ? `Deep +${voiceDepth}`
-      : voiceDepth < 0
-      ? `High ${voiceDepth}`
-      : "Normal"}
-  </span>
+
+        <input
+          type="range"
+          min="0"
+          max="100"
+          step="1"
+          value={Math.round(volume * 100)}
+          onChange={(e) => {
+
+            const newVolume =
+              Number(e.target.value) / 100;
+
+            setVolume(newVolume);
+
+            volumeRef.current =
+              newVolume;
+
+            if (activeAudioRef.current) {
+
+              activeAudioRef.current.volume =
+                newVolume;
+
+            }
+
+          }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            cursor: "pointer",
+          }}
+        />
+
+
+        <span
+          style={{
+            minWidth: "45px",
+            textAlign: "right",
+            color: "#fff",
+            fontWeight: "bold",
+          }}
+        >
+          {Math.round(volume * 100)}%
+        </span>
+
+      </div>
+
+
+      {/* =====================================================
+          VOICE SPEED
+          ===================================================== */}
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px",
+          width: "100%",
+        }}
+      >
+
+        <span
+          style={{
+            color: "#fff",
+            fontWeight: "600",
+            fontSize: "15px",
+          }}
+        >
+          Voice Speed
+        </span>
+
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "5px",
+          }}
+        >
+
+          <button
+            type="button"
+            onClick={decreaseVoiceSpeed}
+            style={{
+              width: "32px",
+              height: "32px",
+
+              padding: 0,
+
+              fontSize: "18px",
+              fontWeight: "bold",
+
+              cursor: "pointer",
+
+              borderRadius: "6px",
+
+              border:
+                "1px solid #00f0ff",
+
+              background:
+                "rgba(0,240,255,0.12)",
+
+              color: "#00f0ff",
+            }}
+          >
+            −
+          </button>
+
+
+          <span
+            style={{
+              minWidth: "50px",
+              textAlign: "center",
+              color: "#fff",
+              fontWeight: "bold",
+            }}
+          >
+            {voiceSpeed.toFixed(1)}×
+          </span>
+
+
+          <button
+            type="button"
+            onClick={increaseVoiceSpeed}
+            style={{
+              width: "32px",
+              height: "32px",
+
+              padding: 0,
+
+              fontSize: "18px",
+              fontWeight: "bold",
+
+              cursor: "pointer",
+
+              borderRadius: "6px",
+
+              border:
+                "1px solid #00f0ff",
+
+              background:
+                "rgba(0,240,255,0.12)",
+
+              color: "#00f0ff",
+            }}
+          >
+            +
+          </button>
+
+        </div>
+
+      </div>
+
+
+      {/* =====================================================
+          VOICE DEPTH
+          ===================================================== */}
+
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "6px",
+          width: "100%",
+        }}
+      >
+
+        <span
+          style={{
+            fontSize: "13px",
+            fontWeight: "bold",
+            color: "#00f0ff",
+          }}
+        >
+          🎙️ VOICE DEPTH
+        </span>
+
+
+        <input
+          type="range"
+          min="-20"
+          max="40"
+          step="1"
+          value={voiceDepth}
+          onChange={(e) => {
+
+            const value =
+              Number(e.target.value);
+
+            setVoiceDepth(value);
+
+            voiceDepthRef.current =
+              value;
+
+            const cashierId =
+              localStorage.getItem(
+                "logged_in_cashier"
+              );
+
+            if (cashierId) {
+
+              localStorage.setItem(
+                `cashier_voice_depth_${cashierId}`,
+                String(value)
+              );
+
+            }
+
+            console.log(
+              "🎙️ NEW VOICE DEPTH:",
+              value
+            );
+
+          }}
+          style={{
+            width: "100%",
+            height: "6px",
+            cursor: "pointer",
+          }}
+        />
+
+
+        <span
+          style={{
+            fontSize: "12px",
+            color: "#ffd700",
+            fontWeight: "bold",
+          }}
+        >
+          {voiceDepth > 0
+            ? `Deep +${voiceDepth}`
+            : voiceDepth < 0
+            ? `High ${voiceDepth}`
+            : "Normal"}
+        </span>
+
+      </div>
+
+    </div>
+  )}
+
 </div>
-            {/* Voice Mode Selector */}
-            <select
-              value="recorded-oromo"
-              onChange={() => {
-                setGame(prev => ({
-                  ...prev,
-                  voiceMode: "recorded-oromo",
-                  speechLang: "oromo"
-                }));
-              }}
-              style={{
-                background: '#0c162d',
-                border: '1px solid #00c8ff',
-                color: '#fff',
-                borderRadius: '4px',
-                padding: '2px 4px',
-                fontSize: '9px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                outline: 'none'
-              }}
-            >
-              <option value="recorded-oromo">
-                🟢 voice
-              </option>
-            </select>
-          </div>
-        </footer>
 
     </div>
   </div>

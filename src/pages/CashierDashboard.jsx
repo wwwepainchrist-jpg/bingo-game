@@ -419,13 +419,21 @@ async function startGame() {
       );
     }
 
-    const result = await response.json();
-    const savedGame = result.game;
+   const result = await response.json();
+const savedGame = {
+  ...result.game,
+  soldCartelas: soldCartelas,
+};
 
-    console.log(
-      "✅ GAME CREATED:",
-      savedGame.game_id
-    );
+console.log(
+  "✅ GAME CREATED:",
+  savedGame.game_id
+);
+
+console.log(
+  "🚨 SOLD CARTELAS FOR BINGO:",
+  savedGame.soldCartelas
+);
 
     setGameStarted(true);
     setStartClicked(true);
@@ -436,7 +444,9 @@ async function startGame() {
       performance.now() - startGameStart,
       "ms"
     );
-
+console.log("🚨 SOLD CARTELAS BEFORE NAVIGATE:", soldCartelas);
+console.log("🚨 SAVED GAME:", savedGame);
+console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
     navigate(`/bingo-game/${savedGame.game_id}`, {
   state: {
     game: savedGame,
@@ -515,7 +525,7 @@ async function startGame() {
 
             {/* CONTROLS */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, justifyContent: "flex-end" }}>
-              {/* BET AMOUNT */}
+              {/* መደብ */}
               <div style={{ 
                 display: "inline-flex", 
                 alignItems: "center", 
@@ -525,20 +535,20 @@ async function startGame() {
                 border: "1px solid rgba(255, 255, 255, 0.15)", 
                 borderRadius: "6px" 
               }}>
-                <span style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
-                  {t?.bet || "BET"}:
+                <span style={{ fontSize: "30px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
+                  {t?.bet || "መደብ"}:
                 </span>
-                <span style={{ fontSize: "12px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>AMOUNT: {bet} ETB</span>
+                <span style={{ fontSize: "30px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
                 <div style={{ display: "flex", gap: "4px", marginLeft: "2px" }}>
                   <button 
                     onClick={handleDecreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "11px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "25px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     − 5
                   </button>
                   <button 
                     onClick={handleIncreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "11px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "25px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     + 5
                   </button>
@@ -564,7 +574,7 @@ async function startGame() {
           </div>
           
           {/* STATS */}
-          <div className="header-stats" style={{ margin: "3px 0", fontSize: "11px", display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="header-stats" style={{ margin: "3px 0", fontSize: "30px", display: "flex", gap: "10px", alignItems: "center" }}>
             <div>{t?.cashier || "Cashier"}: <b className="stat-cashier">{id}</b></div>
             <div>{t?.sold || "Sold Cartelas"}: <b className="stat-sold">{soldCartelas.length}</b></div>
             
@@ -577,12 +587,12 @@ async function startGame() {
               fontWeight: "800",
               boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
             }}>
-              {t?.netIncome || "Net Income"}: <b className="stat-income" style={{ fontSize: "22px", fontWeight: "900", color: "#38bdf8", marginLeft: "6px" }}>{netIncome.toFixed(2)} ETB</b>
-            </div>
+             {<span style={{ fontSize: "25px", fontWeight: "900" }}>{t?.netIncome || "Gahataa\ደራሽ"}</span>}: <b className="stat-income" style={{ fontSize: "40px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
+            </div>     
           </div>
 
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
-            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "11px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "20px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.resetGame || "Reset Game"}
             </button>
             
@@ -597,8 +607,8 @@ async function startGame() {
               style={{
                 opacity: isInsufficientPackage ? 0.4 : 1,
                 cursor: isInsufficientPackage ? "not-allowed" : "pointer",
-                padding: "3px 8px",
-                fontSize: "11px",
+                padding: "2px 6px",
+                fontSize: "25px",
                 lineHeight: 1.2,
                 textTransform: "none",
                 backgroundColor: startClicked ? "#dc2626" : undefined,
@@ -612,14 +622,14 @@ async function startGame() {
                   : (t?.start || "START GAME")}
             </button>
             
-            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "3px 8px", fontSize: "11px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "18px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.finance || "FINANCE"}
             </button>
 
             <button 
               onClick={() => setShowQrModal(true)} 
               className="btn btn-neutral"
-              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "11px", lineHeight: 1.2, textTransform: "none" }}
+              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "20px", lineHeight: 1.2, textTransform: "none" }}
             >
               📱 {t?.qr || "PLAYER QR CODE"}
             </button>
@@ -632,7 +642,7 @@ async function startGame() {
   >
     <div
       className="finance-summary"
-      style={{ fontSize: "11px" }}
+      style={{ fontSize: "25px" }}
     >
       Gross: {grossIncome} ETB
     </div>
@@ -666,28 +676,11 @@ async function startGame() {
                     borderRadius: "4px",
                     color: "#ffffff",
                     fontWeight: "bold",
-                    fontSize: "11px",
+                    fontSize: "20px",
                     outline: "none"
                   }}
                 />
-                <button 
-                  type="submit"
-                  style={{
-                    ...localeFontStyle,
-                    background: "#22c55e",
-                    color: "#ffffff",
-                    border: "none",
-                    borderRadius: "4px",
-                    padding: "4px 8px",
-                    fontWeight: "bold",
-                    fontSize: "11px",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                    lineHeight: 1.2
-                  }}
-                >
-                  {t?.sellButton || "SELL"} ↵
-                </button>
+              
               </form>
 
               {/* MAIN RIGHT SELL BUTTON */}
@@ -784,12 +777,12 @@ async function startGame() {
       background: "transparent",
       border: "none",
       color: "#38bdf8",
-      fontSize: "12px",
+      fontSize: "19px",
       fontWeight: "900",
       cursor: "pointer"
     }}
   >
-<span>🏆 WINNING PATTERNS / PATTERNOOTA MO'AA /የማሸነፊያ ዝጎች</span> 
+<span>🏆 የማሸነፊያ ዝጎች / PATTERNOOTA MO'AA /</span> 
 
     <span 
       style={{ 
