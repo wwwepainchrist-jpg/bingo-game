@@ -600,7 +600,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               fontWeight: "800",
               boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
             }}>
-             {<span style={{ fontSize: "19px", fontWeight: "900" }}>{t?.netIncome || "Gahataa\ደራሽ"}</span>}: <b className="stat-income" style={{ fontSize: "32px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
+             {<span style={{ fontSize: "23px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "32px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
             </div>     
           </div>
 
@@ -669,8 +669,8 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
             
             {/* GRID HEADER WITH INPUT FORM */}
             <div className="grid-header" style={{ marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <h2 style={{ margin: 0, fontSize: "14px", whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
-                {t?.select || "Select Cartela to Sell"}
+              <h2 style={{ margin: 0, fontSize: "25px", whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
+                {"CARTELA (Filadhaa : ይምረጡ)"}
               </h2>
 
               {/* INPUT FORM */}
@@ -697,9 +697,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               </form>
 
               {/* MAIN RIGHT SELL BUTTON */}
-              <button onClick={sellCartela} className="btn-primary-neon" style={{ padding: "4px 10px", fontSize: "11px", whiteSpace: "nowrap", lineHeight: 1.2, textTransform: "none" }}>
-                ✓ {t?.sell || "SELL SELECTED"}
-              </button>
+            
             </div>
             
             {/* CARTELA GRID */}
