@@ -272,16 +272,29 @@ const handleDecreaseBet = async () => {
       console.error("Error updating setting:", err);
     }
   }
+async function sellCartela(cartelaNum = null) {
+  const cartelaToSell =
+    cartelaNum !== null
+      ? Number(cartelaNum)
+      : Number(selectedCartela);
 
-  async function sellCartela() {
-    if (selectedCartela === null) return alert("Select a cartela first!");
-    if (soldCartelas.includes(Number(selectedCartela))) return alert("Already sold!");
-    
-    const updated = [...soldCartelas, Number(selectedCartela)];
-    setSoldCartelas(updated);
-    setSelectedCartela(null);
+  if (isNaN(cartelaToSell)) {
+    return alert("Select a cartela first!");
   }
 
+  if (soldCartelas.includes(cartelaToSell)) {
+    return alert("Already sold!");
+  }
+
+  const updated = [...soldCartelas, cartelaToSell];
+
+  setSoldCartelas(updated);
+
+  if (cartelaNum === null) {
+    setSelectedCartela(null);
+  }
+}
+  
   const handleKeyboardSubmit = async (e) => {
     e.preventDefault();
     if (!keyboardInput.trim()) return;
@@ -535,20 +548,20 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                 border: "1px solid rgba(255, 255, 255, 0.15)", 
                 borderRadius: "6px" 
               }}>
-                <span style={{ fontSize: "30px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
+                <span style={{ fontSize: "26px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
                 </span>
-                <span style={{ fontSize: "30px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
+                <span style={{ fontSize: "26px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
                 <div style={{ display: "flex", gap: "4px", marginLeft: "2px" }}>
                   <button 
                     onClick={handleDecreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "25px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "19px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     − 5
                   </button>
                   <button 
                     onClick={handleIncreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "25px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "19px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     + 5
                   </button>
@@ -574,7 +587,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
           </div>
           
           {/* STATS */}
-          <div className="header-stats" style={{ margin: "3px 0", fontSize: "30px", display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="header-stats" style={{ margin: "3px 0", fontSize: "22px", display: "flex", gap: "10px", alignItems: "center" }}>
             <div>{t?.cashier || "Cashier"}: <b className="stat-cashier">{id}</b></div>
             <div>{t?.sold || "Sold Cartelas"}: <b className="stat-sold">{soldCartelas.length}</b></div>
             
@@ -583,16 +596,16 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               padding: "6px 14px", 
               borderRadius: "8px", 
               border: "2px solid #38bdf8",
-              fontSize: "16px",
+              fontSize: "12px",
               fontWeight: "800",
               boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
             }}>
-             {<span style={{ fontSize: "25px", fontWeight: "900" }}>{t?.netIncome || "Gahataa\ደራሽ"}</span>}: <b className="stat-income" style={{ fontSize: "40px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
+             {<span style={{ fontSize: "19px", fontWeight: "900" }}>{t?.netIncome || "Gahataa\ደራሽ"}</span>}: <b className="stat-income" style={{ fontSize: "32px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
             </div>     
           </div>
 
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
-            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "20px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.resetGame || "Reset Game"}
             </button>
             
@@ -608,7 +621,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                 opacity: isInsufficientPackage ? 0.4 : 1,
                 cursor: isInsufficientPackage ? "not-allowed" : "pointer",
                 padding: "2px 6px",
-                fontSize: "25px",
+                fontSize: "20px",
                 lineHeight: 1.2,
                 textTransform: "none",
                 backgroundColor: startClicked ? "#dc2626" : undefined,
@@ -622,14 +635,14 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   : (t?.start || "START GAME")}
             </button>
             
-            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "18px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.finance || "FINANCE"}
             </button>
 
             <button 
               onClick={() => setShowQrModal(true)} 
               className="btn btn-neutral"
-              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "20px", lineHeight: 1.2, textTransform: "none" }}
+              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}
             >
               📱 {t?.qr || "PLAYER QR CODE"}
             </button>
@@ -734,11 +747,14 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   <button 
                     key={num}
                     onClick={() => {
-                      if (sold) {
-                        toggleSoldCartela(num);
-                      } else {
-                        setSelectedCartela(selected ? null : num);
-                      }
+                     if (sold) {
+  toggleSoldCartela(num);
+} else {
+  setSelectedCartela(num);
+
+  // Auto-sell on click
+  sellCartela(num);
+}
                     }}
                     className={btnClass}
                     style={cellGlassStyle}
