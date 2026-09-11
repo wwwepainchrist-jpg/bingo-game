@@ -88,8 +88,8 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(14px, 2.5vw, 22px);
-    font-weight: 900;
+    font-size: clamp(29px, 2.5vw, 40px);
+    font-weight: 990;
     border-radius: 6px;
     color: white;
 }
@@ -111,24 +111,24 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: clamp(11px, 1.8vw, 20px);
+    font-size: clamp(37px, 1.8vw, 51px);
     font-weight: bold;
     border-radius: 6px;
     background: #111f35;
     border: 1px solid #1e3b5d;
     transition: transform .25s ease, background-color .25s ease;
-    color: white;
+    color: rgb(11, 10, 10);
 }
 
 .number-cell:hover {
     transform: scale(1.05);
 }
 
-.active-b { background: #00b7ff; color: white; box-shadow: 0 0 12px #00b7ff; }
-.active-i { background: #ffd400; color: black; box-shadow: 0 0 12px #ffd400; }
-.active-n { background: #ff5aa5; color: white; box-shadow: 0 0 12px #ff5aa5; }
-.active-g { background: #00ff66; color: black; box-shadow: 0 0 12px #00ff66; }
-.active-o { background: #ff4b4b; color: white; box-shadow: 0 0 12px #ff4b4b; }
+.active-b { background: #00b7ff; color: white; box-shadow: 0 0 18px #00b7ff; }
+.active-i { background: #f1c905; color: black; box-shadow: 0 0 18px #ffd400; }
+.active-n { background: #ff5aa5; color: white; box-shadow: 0 0 18px #ff5aa5; }
+.active-g { background: #00ff66; color: black; box-shadow: 0 0 18px #00ff66; }
+.active-o { background: #ff4b4b; color: white; box-shadow: 0 0 18px #ff4b4b; }
 
 /* ==========================================================================
    3. MIDDLE DASHBOARD HUB (PERFECT CENTER ALIGNMENT)
@@ -336,8 +336,8 @@ input {
    5. RIGHT CURRENT DISPLAY & FOOTER SECTION
    ========================================================================== */
 .current-ball-display {
-    width: clamp(110px, 25vw, 140px);
-    height: clamp(110px, 25vw, 140px);
+    width: clamp(135px, 25vw, 160px);
+    height: clamp(130px, 25vw, 160px);
     border-radius: 50%;
     display: flex;
     justify-content: center;
@@ -357,14 +357,14 @@ input {
 }
 
 .ball-letter {
-    font-size: clamp(16px, 3vw, 24px);
+    font-size: clamp(55px, 3vw, 60px);
     font-weight: 900;
-    color: #00d4ff;
+    color: #ffffff;
     line-height: 1;
 }
 
 .ball-number {
-    font-size: clamp(40px, 10vw, 80px);
+    font-size: clamp(65px, 10vw, 90px);
     font-weight: 900;
     color: white;
     line-height: 1;

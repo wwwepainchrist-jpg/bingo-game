@@ -91,7 +91,8 @@ speechLang: "om-ET",
 const audioGenerationInProgressRef = useRef(false);
 const audioLoadingRef = useRef(false);
   const remainingNumbersRef = useRef(Array.from({ length: 75 }, (_, i) => i + 1));
- 
+ const lastGenerationTimeRef = useRef(0);
+ const startupTimeoutRef = useRef(null);
   const activeAudioRef = useRef(null);
   const pausedAudioRef = useRef(null);
   const audioTimeoutRef = useRef(null);
@@ -139,6 +140,9 @@ const [showGameControls, setShowGameControls] = useState(false);
 const SHUFFLE_PLAYED_KEY = "bingo_shuffle_played";
 const pendingBingoCallRef = useRef(null);
 const playPauseActionRef = useRef(0);
+// Add this near your other useRef allocations at the top
+const globalAudioInstanceRef = useRef(null);
+
 const resumeAfterGenerationRef = useRef(false);
 const [voiceDepth, setVoiceDepth] = useState(() => {
   const cashierId = localStorage.getItem("logged_in_cashier");
@@ -327,6 +331,8 @@ useEffect(() => {
 
 
 const nextGenerationTimeRef = useRef(null);
+// Add this near your other useRef anchors at the top of your file
+const audioFailsafeTimeoutRef = useRef(null);
 
 
 const cashierId =
@@ -381,6 +387,41 @@ const callIntervalChangeRef = useRef(null);
   const increaseVoiceSpeed = () => {
     setVoiceSpeed(prev => Math.min(2.0, +(prev + 0.1).toFixed(1)));
   };
+  useEffect(() => {
+  console.log("🧹 NEW GAME DETECTED:", id);
+
+  generationCancelRef.current++;
+
+  isDrawingBallRef.current = false;
+
+  if (loopTimeoutRef.current) {
+    clearTimeout(loopTimeoutRef.current);
+    loopTimeoutRef.current = null;
+  }
+
+  if (audioFailsafeTimeoutRef.current) {
+    clearTimeout(audioFailsafeTimeoutRef.current);
+    audioFailsafeTimeoutRef.current = null;
+  }
+
+  if (startupTimeoutRef.current) {
+    clearTimeout(startupTimeoutRef.current);
+    startupTimeoutRef.current = null;
+  }
+
+  lastGenerationTimeRef.current = 0;
+
+  seenBallsRef.current.clear();
+
+  calledRef.current = [];
+
+  remainingNumbersRef.current =
+    Array.from({ length: 75 }, (_, i) => i + 1);
+
+  stopAllActiveAudio();
+
+  console.log("✅ GAME ENGINE RESET COMPLETE");
+}, [id]);
 useEffect(() => {
   if (!cashierId) return;
 
@@ -419,11 +460,7 @@ useEffect(() => {
     activeAudioRef.current.playbackRate = voiceSpeed;
   }
 }, [voiceSpeed]);
-useEffect(() => {
-  if (activeAudioRef.current) {
-    activeAudioRef.current.playbackRate = voiceSpeed;
-  }
-}, [voiceSpeed]);
+
   // --- Fetch Active Game from Backend ---
 // Add with your other refs at the top of the component
 const fetchingGameRef = useRef(false);
@@ -616,8 +653,26 @@ console.log(
 useEffect(() => {
   return () => {
     stopAllActiveAudio();
-    if (loopTimeoutRef.current) clearTimeout(loopTimeoutRef.current);
-    if (audioTimeoutRef.current) clearTimeout(audioTimeoutRef.current);
+
+    if (loopTimeoutRef.current) {
+      clearTimeout(loopTimeoutRef.current);
+      loopTimeoutRef.current = null;
+    }
+
+    if (audioTimeoutRef.current) {
+      clearTimeout(audioTimeoutRef.current);
+      audioTimeoutRef.current = null;
+    }
+
+    if (audioFailsafeTimeoutRef.current) {
+      clearTimeout(audioFailsafeTimeoutRef.current);
+      audioFailsafeTimeoutRef.current = null;
+    }
+
+    if (startupTimeoutRef.current) {
+      clearTimeout(startupTimeoutRef.current);
+      startupTimeoutRef.current = null;
+    }
   };
 }, []);
 
@@ -1312,371 +1367,90 @@ function applyVoiceDepth(audio) {
 // ============================================================
 // 🎯 BINGO CALL PLAYBACK
 // ============================================================
+// ============================================================
+// 🎯 BINGO CALL PLAYBACK (RESTORED & ENHANCED)
+// ============================================================
+async function playRecordedBingoCall(letter, number, onComplete = () => {}, resumeTime = 0) {
+  const generationId = ++audioGenerationRef.current;
+  const completeName = `${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}`;
 
-async function playRecordedBingoCall(
-  letter,
-  number,
-  onComplete = () => {}
-) {
+  console.log("🎯 NEW AUDIO GENERATION:", generationId, letter, number);
 
-  // ==========================================================
-  // CREATE UNIQUE GENERATION
-  // ==========================================================
+  // Instantly lock this ball into the active reference frame tracking structure
+  pendingBingoCallRef.current = { letter, number, result: `${letter} ${number}` };
 
-  const generationId =
-    ++audioGenerationRef.current;
+  if (stateRef.current.paused) {
+    console.log("⏸️ GAME PAUSED — ABORTING PLAYBACK LIFE CYCLE CONTEXT");
+    isDrawingBallRef.current = false;
+    return;
+  }
 
-  const completeName =
-    `${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}`;
-
-  console.log(
-    "🎯 NEW AUDIO GENERATION:",
-    generationId,
-    letter,
-    number
-  );
-
-  // ==========================================================
-  // REMEMBER THIS BALL
-  //
-  // VERY IMPORTANT:
-  // Even if Pause happens while searching for the file,
-  // we still remember which ball must resume.
-  // ==========================================================
-
-  pendingBingoCallRef.current = {
-    letter,
-    number,
-    generationId,
-    completeName
-  };
-
-  // ==========================================================
-  // DO NOT PLAY WHILE PAUSED
-  // ==========================================================
-
- 
-  // ==========================================================
-  // STOP OLD AUDIO
-  // ==========================================================
-
-  const oldAudio =
-    activeAudioRef.current;
-
-  if (
-    oldAudio &&
-    !oldAudio.ended
-  ) {
-
-    console.log(
-      "🛑 STOPPING OLD AUDIO:",
-      oldAudio.src
+  // Halt any running tracks cleanly
+  const oldAudio = activeAudioRef.current;
+  if (oldAudio && !oldAudio.ended) {
+    console.error(
+      "🚨 AUDIO INTERRUPTED BEFORE FINISHING!",
+      "\n🎵 CUT PATH URL:", oldAudio.src,
+      "\n⏱️ TIME POSITION WHEN CUT:", oldAudio.currentTime.toFixed(2), "seconds"
     );
 
     try {
       oldAudio.pause();
+      oldAudio.onended = null; 
+      oldAudio.onerror = null;
     } catch (e) {}
-
   }
-
-  // ==========================================================
-  // OROMO FOLDER
-  // ==========================================================
 
   const folder = "oromo";
-
-  const letterName =
-    String(letter)
-      .trim()
-      .toLowerCase();
-
-  const numberName =
-    String(number)
-      .trim()
-      .toLowerCase();
-
-  const completePaths = [
-    `/${folder}/${letterName}${numberName}.mp3`,
-    `/${folder}/${letterName}${numberName}.wav`
-  ];
-
-  console.log(
-    "🎙️ BINGO CALL:",
-    `${letterName}${numberName}`
-  );
-
-  console.log(
-    "🎙️ DEPTH:",
-    voiceDepthRef.current
-  );
-
-  console.log(
-    "⚡ SPEED:",
-    voiceSpeedRef.current
-  );
-
-  // ==========================================================
-  // FIND RECORDING
-  // ==========================================================
-
-  async function findCompleteRecording() {
-
-    for (const path of completePaths) {
-
-      // --------------------------------------------------------
-      // GENERATION CHECK
-      // --------------------------------------------------------
-
-      if (
-        generationId !==
-        audioGenerationRef.current
-      ) {
-
-        console.log(
-          "🛑 OLD AUDIO GENERATION CANCELLED:",
-          generationId
-        );
-
-        return null;
-      }
-
-      // --------------------------------------------------------
-      // IMPORTANT:
-      //
-      // DO NOT CANCEL THE PENDING BALL JUST BECAUSE GAME
-      // IS PAUSED.
-      //
-      // We want Play to resume this SAME ball.
-      // --------------------------------------------------------
-
-      if (stateRef.current.paused) {
-
-        console.log(
-          "⏸️ PAUSED WHILE SEARCHING — KEEPING PENDING CALL:",
-          completeName
-        );
-
-        return null;
-      }
-
-      try {
-
-        const response =
-          await fetch(
-            path,
-            {
-              method: "HEAD",
-              cache: "no-cache"
-            }
-          );
-
-        if (response.ok) {
-
-          console.log(
-            "✅ FOUND:",
-            path
-          );
-
-          return path;
-        }
-
-      } catch (error) {
-
-        console.log(
-          "❌ CHECK FAILED:",
-          path
-        );
-      }
-    }
-
-    return null;
-  }
-
-  // ==========================================================
-  // PLAY RECORDING
-  // ==========================================================
-
-
-
-  // ==========================================================
-  // EXECUTE
-  // ==========================================================
+  const letterName = String(letter).trim().toLowerCase();
+  const numberName = String(number).trim().toLowerCase();
+  const finalPath = `/${folder}/${letterName}${numberName}.mp3`;
 
   try {
+    // ✅ PASS THE RESUME TIME DIRECTLY INTO THE WRAPPER HOOK HERE
+    const result = await playCompleteRecording(finalPath, () => {
+      console.log("🔔 DIRECT AUDIO COMPLETION:", completeName);
+    }, resumeTime);
 
-    const foundPath =
-      await findCompleteRecording();
-// ========================================================
-// GENERATION CHECK AFTER AUDIO SEARCH
-// ========================================================
-
-if (
-  generationId !==
-  audioGenerationRef.current
-) {
-
-  console.log(
-    "🛑 OLD GENERATION WILL NOT CONTINUE:",
-    generationId,
-    "CURRENT:",
-    audioGenerationRef.current
-  );
-
-  return;
-}
-
-
-// ========================================================
-// GAME PAUSED DURING SEARCH
-// ========================================================
-
-if (stateRef.current.paused) {
-
-  console.log(
-    "⏸️ GAME PAUSED WHILE FINDING AUDIO — KEEPING BALL:",
-    completeName
-  );
-
-  pendingBingoCallRef.current = {
-    letter,
-    number,
-    generationId,
-    completeName,
-    foundPath
-  };
-
-  // VERY IMPORTANT
-  isDrawingBallRef.current = false;
-
-  return;
-}
-    // ========================================================
-    // GAME PAUSED DURING SEARCH
-    // ========================================================
-
-    if (
-      stateRef.current.paused
-    ) {
-
-      console.log(
-        "⏸️ GAME PAUSED WHILE FINDING AUDIO — KEEPING BALL:",
-        completeName
-      );
-
-      // DO NOT CLEAR pendingBingoCallRef
-      // DO NOT call onComplete
-      // DO NOT generate another number
-
-      return;
-    }
-
-    // ========================================================
-    // GENERATION CHECK
-    // ========================================================
-
-    if (
-      generationId !==
-      audioGenerationRef.current
-    ) {
-
-      console.log(
-        "🛑 OLD GENERATION WILL NOT PLAY:",
-        generationId
-      );
-
-      return;
-    }
-
-    // ========================================================
-    // PLAY FOUND RECORDING
-    // ========================================================
-
-    if (foundPath) {
-
-    const result =
-  await playCompleteRecording(
-    foundPath,
-    () => {
-      console.log(
-        "🔔 DIRECT AUDIO COMPLETION:",
-        completeName
-      );
-
-      // This callback is intentionally only a completion signal.
-      // The normal onComplete below remains responsible
-      // for scheduling the next number.
-    }
-  );
-
-      // ------------------------------------------------------
-      // PAUSED
-      // ------------------------------------------------------
-
-    if (result?.paused) {
-
-  console.log(
-    "⏸️ CALL WAITING FOR RESUME:",
-    completeName
-  );
-
-  isDrawingBallRef.current = false;
-
-  return;
-}
-
-      // ------------------------------------------------------
-      // COMPLETED
-      // ------------------------------------------------------
-
-      if (
-        result?.completed
-      ) {
-
-        onComplete();
+    if (generationId !== audioGenerationRef.current) {
+      console.log("🛑 OBSELETE GENERATION TIMELINE BLOCKED:", generationId);
+      
+      if (loopTimeoutRef.current === null) {
+        setTimeout(() => {
+          if (!stateRef.current.paused) {
+            console.log("🚀 AUTO-RECOVERY HOOK: FORCING ADVANCEMENT PAST STALE BLOCKED THREAD");
+            isDrawingBallRef.current = false;
+            generateNumber();
+          }
+        }, 1000);
       }
-
-    } else {
-
-      console.error(
-        `❌ NO RECORDING FOUND: ${completeName}`
-      );
-
-      // We don't want the game to silently continue.
-      isDrawingBallRef.current =
-        false;
+      return;
     }
 
+    if (result?.paused || stateRef.current.paused) {
+      console.log("⏸️ CALL WAITING FOR RESUME SEPARATION:", completeName);
+      isDrawingBallRef.current = false;
+      return;
+    }
+
+    if (result?.completed) {
+      onComplete();
+    }
   } catch (error) {
-
-  if (
-    error?.name === "AbortError"
-  ) {
-
-    console.log(
-      "⏸️ AUDIO ABORTED DURING PAUSE"
-    );
-
+    console.error("❌ CRITICAL ANNOUNCER ROUTING REJECTION EXCEPTION:", error);
     isDrawingBallRef.current = false;
-
-  } else {
-
-    console.error(
-      "❌ BINGO VOICE ERROR:",
-      error
-    );
-
-    isDrawingBallRef.current = false;
+    onComplete(); 
   }
 }
- } // ==========================================================
-function playCompleteRecording(
-  path,
-  onFinished = () => {}
-) {
+
+
+
+
+
+
+
+function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
   return new Promise((resolve, reject) => {
-    // ====================================================
-    // VALUES FOR THIS AUDIO CALL
-    // ====================================================
     const completeName =
       typeof path === "string"
         ? path.split("/").pop()
@@ -1684,245 +1458,270 @@ function playCompleteRecording(
 
     const generationId = audioGenerationRef.current;
 
-    // ====================================================
-    // CHECK BEFORE CREATING AUDIO
-    // ====================================================
     if (stateRef.current.paused) {
       console.log("⏸️ GAME PAUSED BEFORE AUDIO CREATION:", completeName);
       resolve({ paused: true, completed: false });
       return;
     }
 
-    // ====================================================
-    // CHECK GENERATION
-    // ====================================================
     if (generationId !== audioGenerationRef.current) {
-      console.log(
-        "🛑 GENERATION NO LONGER CURRENT:",
-        generationId,
-        "CURRENT:",
-        audioGenerationRef.current
-      );
+      console.log("🛑 GENERATION NO LONGER CURRENT:", generationId);
       resolve({ cancelled: true, completed: false });
       return;
     }
 
-    // ====================================================
-    // CREATE AUDIO
-    // ====================================================
-    const audio = new Audio(path);
-    audio.preload = "auto";
-
-    // ====================================================
-    // VOLUME
-    // ====================================================
-    const selectedVolume = Number(volumeRef.current);
-    audio.volume = Math.max(
-      0,
-      Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
-    );
-
-    // ====================================================
-    // SPEED
-    // ====================================================
-    const selectedSpeed = Number(voiceSpeedRef.current);
-    audio.playbackRate = Math.max(
-      0.5,
-      Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
-    );
-    audio.defaultPlaybackRate = audio.playbackRate;
-
-    // ====================================================
-    // VOICE DEPTH
-    // ====================================================
-    let audioNodes = null;
-    try {
-      audioNodes = applyVoiceDepth(audio);
-    } catch (error) {
-      console.warn("⚠️ VOICE DEPTH FAILED — USING RAW AUDIO:", error);
-      audioNodes = null;
+    if (!globalAudioInstanceRef.current) {
+      globalAudioInstanceRef.current = new Audio();
+      globalAudioInstanceRef.current.preload = "auto";
     }
 
-    // ====================================================
-    // ACTIVE AUDIO
-    // ====================================================
-    activeAudioRef.current = audio;
-    let finished = false;
+    const audio = globalAudioInstanceRef.current;
 
-    // ====================================================
-    // TIME DEBUG
-    // ====================================================
-    const handleTimeUpdate = () => {
-      if (activeAudioRef.current === audio) {
-        /* console.log("🎵 AUDIO TIME:", audio.currentTime); */
-      }
+    // Reset listeners
+    audio.onended = null;
+    audio.onerror = null;
+    audio.onpause = null;
+    audio.onwaiting = null;
+    audio.onstalled = null;
+    audio.oncanplay = null;
+    audio.onloadstart = null;
+
+    audio.src = path;
+
+    // ============================================================
+    // NEW DEBUGGING
+    // ============================================================
+    audio.load();
+
+    console.log("📦 AUDIO LOAD REQUEST:", completeName);
+
+    audio.onloadstart = () => {
+      console.log("📥 LOAD START:", completeName);
     };
 
-    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.oncanplay = () => {
+      console.log("✅ CAN PLAY:", completeName);
+    };
 
-    // ====================================================
-    // CLEANUP
-    // ====================================================
+    audio.onwaiting = () => {
+      console.warn("⏳ AUDIO WAITING:", completeName);
+    };
+
+    audio.onstalled = () => {
+      console.error("🚨 AUDIO STALLED:", completeName);
+    };
+
+    // ============================================================
+
+    const selectedVolume = Number(volumeRef.current);
+
+    audio.volume = Math.max(
+      0,
+      Math.min(
+        1,
+        Number.isFinite(selectedVolume)
+          ? selectedVolume
+          : 1
+      )
+    );
+
+    const selectedSpeed = Number(voiceSpeedRef.current);
+
+    audio.playbackRate = Math.max(
+      0.5,
+      Math.min(
+        2.0,
+        Number.isFinite(selectedSpeed)
+          ? selectedSpeed
+          : 1
+      )
+    );
+
+    audio.defaultPlaybackRate = audio.playbackRate;
+
+    activeAudioRef.current = audio;
+
+    let finished = false;
+
     const cleanup = () => {
       if (finished) return;
-      finished = true;
 
-      try {
-        audio.removeEventListener("timeupdate", handleTimeUpdate);
-      } catch (error) {}
+      finished = true;
 
       if (activeAudioRef.current === audio) {
         activeAudioRef.current = null;
       }
 
-      // Disconnect Web Audio nodes to prevent memory leaks
-      try {
-        if (audio._voiceNodes) {
-          Object.values(audio._voiceNodes).forEach((node) => {
-            try {
-              if (node && typeof node.disconnect === "function") {
-                node.disconnect();
-              }
-            } catch (e) {}
-          });
-          audio._voiceNodes = null;
-        }
-      } catch (error) {
-        console.warn("⚠️ AUDIO NODE CLEANUP:", error);
-      }
-
-      if (
-        audioNodes?.source &&
-        audioSourceRef.current === audioNodes.source
-      ) {
-        audioSourceRef.current = null;
-      }
-
-      if (
-        audioNodes?.bassFilter &&
-        bassFilterRef.current === audioNodes.bassFilter
-      ) {
-        bassFilterRef.current = null;
-      }
-
       audio.onended = null;
       audio.onerror = null;
       audio.onpause = null;
+      audio.onwaiting = null;
+      audio.onstalled = null;
+      audio.oncanplay = null;
+      audio.onloadstart = null;
 
       try {
         audio.pause();
       } catch (error) {}
 
-      console.log("🧹 AUDIO CLEANED:", completeName);
+      console.log("🧹 AUDIO SOURCE WIPED CLEAN:", completeName);
     };
 
-    // ====================================================
-    // AUDIO ENDED
-    // ====================================================
+    const onCanPlayThrough = () => {
+      audio.removeEventListener(
+        "canplaythrough",
+        onCanPlayThrough
+      );
+
+      console.log(
+        "🎯 CANPLAYTHROUGH RECEIVED:",
+        completeName
+      );
+
+      if (
+        stateRef.current.paused ||
+        generationId !== audioGenerationRef.current
+      ) {
+        cleanup();
+        return;
+      }
+
+      if (resumeTime > 0) {
+        try {
+          audio.currentTime = Number(resumeTime);
+
+          console.log(
+            "🎯 REUSABLE SINGLETON PRE-SEEK SUCCESSFUL AT TIME POSITION:",
+            resumeTime,
+            "s"
+          );
+        } catch (e) {
+          console.warn(
+            "⚠️ Audio singleton pre-seek layout warning skipped safely:",
+            e
+          );
+        }
+      }
+
+      let playPromise;
+
+      try {
+        playPromise = audio.play();
+      } catch (error) {
+        console.error("❌ AUDIO.PLAY() ERROR:", error);
+        cleanup();
+        reject(error);
+        return;
+      }
+
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(
+              "▶️ REUSABLE AUDIO LANE PLAYING SUCCESSFULLY:",
+              completeName
+            );
+          })
+          .catch((error) => {
+            if (error.name === "AbortError") {
+              console.log(
+                "⏸️ REUSABLE STREAM INTENTIONALLY ABORTED BY SYSTEM CONTROLS"
+              );
+
+              cleanup();
+
+              resolve({
+                paused: true,
+                completed: false,
+              });
+            } else {
+              console.error(
+                "❌ PLAY PROMISE ERROR:",
+                error
+              );
+
+              cleanup();
+              reject(error);
+            }
+          });
+      }
+    };
+
+    audio.addEventListener(
+      "canplaythrough",
+      onCanPlayThrough
+    );
+
     audio.onended = () => {
       if (finished) return;
 
       console.log("✅ VOICE FINISHED:", completeName);
+
       cleanup();
 
       try {
         onFinished();
       } catch (error) {
-        console.error("❌ BINGO COMPLETION CALLBACK ERROR:", error);
+        console.error(
+          "❌ BINGO COMPLETION CALLBACK ERROR:",
+          error
+        );
       }
 
       resolve({ completed: true });
     };
 
-    // ====================================================
-    // AUDIO ERROR
-    // ====================================================
     audio.onerror = (error) => {
+      audio.removeEventListener(
+        "canplaythrough",
+        onCanPlayThrough
+      );
+
       if (stateRef.current.paused) {
-        console.log("⏸️ AUDIO ERROR WHILE PAUSED:", completeName);
         cleanup();
-        resolve({ paused: true, completed: false });
-        return;
-      }
-
-      if (generationId !== audioGenerationRef.current) {
-        console.log(
-          "🛑 OLD AUDIO GENERATION ERROR — IGNORING:",
-          generationId,
-          "CURRENT:",
-          audioGenerationRef.current
-        );
-        cleanup();
-        resolve({ cancelled: true, completed: false });
-        return;
-      }
-
-      console.error("❌ VOICE AUDIO ERROR:", path, error);
-      cleanup();
-      reject(new Error(`Could not play ${path}`));
-    };
-
-    // ====================================================
-    // PLAY
-    // ====================================================
-    let playPromise;
-    try {
-      playPromise = audio.play();
-    } catch (error) {
-      console.error("❌ AUDIO.PLAY() ERROR:", error);
-      cleanup();
-      reject(error);
-      return;
-    }
-
-    // ====================================================
-    // PLAY PROMISE
-    // ====================================================
-    if (playPromise && typeof playPromise.then === "function") {
-      playPromise
-        .then(() => {
-          console.log("▶️ PLAYING:", path);
-
-          if (stateRef.current.paused) {
-            console.log("⏸️ AUDIO STARTED BUT GAME IS PAUSED");
-            cleanup();
-            resolve({ paused: true, completed: false });
-          }
-        })
-        .catch((error) => {
-          if (error?.name === "AbortError" && stateRef.current.paused) {
-            console.log("⏸️ PLAY INTERRUPTED BECAUSE GAME WAS PAUSED");
-            cleanup();
-            resolve({ paused: true, completed: false });
-            return;
-          }
-
-          if (generationId !== audioGenerationRef.current) {
-            console.log(
-              "🛑 PLAY FAILED FOR OLD GENERATION:",
-              generationId,
-              "CURRENT:",
-              audioGenerationRef.current
-            );
-            cleanup();
-            resolve({ cancelled: true, completed: false });
-            return;
-          }
-
-          console.error("❌ AUDIO PLAY ERROR:", error);
-          cleanup();
-          reject(error);
+        resolve({
+          paused: true,
+          completed: false,
         });
-    }
+        return;
+      }
+
+      if (
+        generationId !== audioGenerationRef.current
+      ) {
+        cleanup();
+
+        resolve({
+          cancelled: true,
+          completed: false,
+        });
+
+        return;
+      }
+
+      console.error(
+        "❌ VOICE AUDIO ERROR:",
+        path,
+        error
+      );
+
+      cleanup();
+
+      reject(
+        new Error(`Could not play ${path}`)
+      );
+    };
   });
 }
+
+
+
     // end of playCompleteRecording
 
   // ==========================================================
   // 🎵 VERIFICATION AUDIO
   // ==========================================================
-
-  function playRecordedAudio(fileName, onComplete = () => {}) {
+function playRecordedAudio(fileName, onComplete = () => {}) {
   const folder =
     stateRef.current.game?.voiceMode === "recorded-oromo"
       ? "oromo"
@@ -1930,129 +1729,136 @@ function playCompleteRecording(
 
   const audioPath = `/${folder}/${fileName}.mp3`;
 
-  console.log("🎵 VERIFICATION AUDIO:", audioPath);
-
-  // Stop ONLY currently playing audio
-  if (activeAudioRef.current) {
-    try {
-      activeAudioRef.current.pause();
-      activeAudioRef.current.currentTime = 0;
-    } catch (error) {
-      console.warn("⚠️ Could not stop previous audio:", error);
-    }
-    activeAudioRef.current = null;
-  }
-
-  const audio = new Audio(audioPath);
-
-  // ✅ CRITICAL BUSINESS FIX: Bound the max volume limit mathematically to a strict 1.0 peak envelope maximum
-  const calculatedVolume = (Number(volumeRef.current) || 0.7) * 1.2;
-  audio.volume = Math.max(0, Math.min(1, calculatedVolume));
-
-  audio.playbackRate = Math.max(
-    1,
-    Math.min(2, (Number(voiceSpeedRef.current) || 1) * 1.15)
+  console.log(
+    "🎵 VERIFICATION AUDIO SYSTEM TRIGGERED:",
+    audioPath
   );
 
-  activeAudioRef.current = audio;
+  const verificationInstance = new Audio(audioPath);
 
-  audio.onended = () => {
-    if (activeAudioRef.current === audio) {
-      activeAudioRef.current = null;
-    }
-    console.log("✅ VERIFICATION AUDIO FINISHED:", audioPath);
-    onComplete();
-  };
+  verificationInstance.preload = "auto";
 
-  audio.onerror = (error) => {
-    if (activeAudioRef.current === audio) {
-      activeAudioRef.current = null;
-    }
-    console.error("❌ VERIFICATION AUDIO ERROR:", audioPath, error);
-    onComplete();
-  };
+  const calculatedVolume =
+    (Number(volumeRef.current) || 0.7) * 1.2;
 
-  audio.play()
-    .then(() => {
-      console.log("▶️ VERIFICATION AUDIO PLAYING:", audioPath);
-    })
-    .catch((error) => {
-      console.error("❌ VERIFICATION AUDIO PLAY ERROR:", audioPath, error);
-      if (activeAudioRef.current === audio) {
-        activeAudioRef.current = null;
-      }
-      onComplete();
-    });
-}
+  verificationInstance.volume = Math.max(
+    0,
+    Math.min(1, calculatedVolume)
+  );
 
- 
-function playShuffleSound(onComplete = () => {}) {
-  const audioPath = "/oromo/shuffle.mp3";
+  verificationInstance.playbackRate = Math.max(
+    1,
+    Math.min(
+      2,
+      (Number(voiceSpeedRef.current) || 1) * 1.15
+    )
+  );
 
-  console.log("🎵 OROMO SHUFFLE:", audioPath);
-
-  // Stop previous shuffle only
-  if (shuffleAudioRef.current) {
+  verificationInstance.onended = () => {
     try {
-      shuffleAudioRef.current.pause();
-      shuffleAudioRef.current.onended = null;
-      shuffleAudioRef.current.onerror = null;
-    } catch (error) {
-      console.warn("⚠️ OLD SHUFFLE STOP ERROR:", error);
-    }
-    shuffleAudioRef.current = null;
-  }
+      verificationInstance.pause();
+      verificationInstance.src = "";
+    } catch {}
 
-  const audio = new Audio(audioPath);
-  audio.preload = "auto";
+    console.log(
+      "✅ VERIFICATION SOUND LIFE CYCLE TERMINATED CLEANLY:",
+      audioPath
+    );
 
-  // Audio configuration settings
-  audio.volume = Number(volumeRef.current) || 1;
-  audio.playbackRate = Number(voiceSpeedRef.current) || 1;
-  audio.preservesPitch = true;
+    verificationInstance.onended = null;
+    verificationInstance.onerror = null;
 
-  shuffleAudioRef.current = audio;
-
-  audio.onended = () => {
-    if (shuffleAudioRef.current === audio) {
-      shuffleAudioRef.current = null;
-    }
-    console.log("✅ OROMO SHUFFLE FINISHED CLEANLY");
     onComplete();
   };
 
-  audio.onerror = () => {
-    if (shuffleAudioRef.current === audio) {
-      shuffleAudioRef.current = null;
-    }
-    console.error("❌ OROMO SHUFFLE FILE LOADING ERROR:", audioPath);
-    // Safety fallback: fire callback anyway so the game doesn't stick
-    onComplete(); 
+  verificationInstance.onerror = (error) => {
+    try {
+      verificationInstance.pause();
+      verificationInstance.src = "";
+    } catch {}
+
+    console.error(
+      "❌ VERIFICATION AUDIO CHANNEL FAILURE EXCEPTION:",
+      audioPath,
+      error
+    );
+
+    verificationInstance.onended = null;
+    verificationInstance.onerror = null;
+
+    onComplete();
   };
 
-  // ✅ SAFE PROMISE LIFE-CYCLE HARNESS (FIXES THE UNCAUGHT BUG)
-  const playPromise = audio.play();
+  const playPromise = verificationInstance.play();
 
   if (playPromise !== undefined) {
     playPromise
       .then(() => {
-        console.log("▶️ OROMO SHUFFLE STARTED SUCCESSFULLY");
+        console.log(
+          "▶️ VERIFICATION AUDIO STREAM RESOLVED SUCCESSFULLY:",
+          audioPath
+        );
       })
-      .catch((error) => {
-        // Intercept, absorb, and silence interruptions smoothly without throwing console crashes
-        if (error.name === "AbortError") {
-          console.log("⏸️ SHUFFLE SOUND PLAYBACK SAFELY INTERRUPTED BY PAUSE COMMAND");
-        } else {
-          console.warn("⚠️ SHUFFLE AUDIO LIFECYCLE REJECTED SAFELY:", error.message);
-        }
-        
-        // Ensure the loop remains active even if the audio element gets aborted
-        if (shuffleAudioRef.current === audio) {
-          shuffleAudioRef.current = null;
-        }
+      .catch((err) => {
+        console.warn(
+          "⚠️ VERIFICATION AUDIO INTERRUPTED:",
+          err.message
+        );
+
+        onComplete();
       });
   }
 }
+
+  
+ 
+function playShuffleSound(onFinished = () => {}) {
+  console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO CHANNEL RESOURCE");
+  
+  const audio = new Audio("/oromo/shuffle.mp3");
+  audio.preload = "auto";
+  
+  // Bind the channel to our global component reference so togglePlayPause can control it
+  shuffleAudioRef.current = audio;
+
+  audio.onended = () => {
+    console.log("🧹 CAGE SHUFFLE TRACK ENDED NATURALLY");
+    shuffleAudioRef.current = null;
+    sessionStorage.removeItem("paused_shuffle_timestamp"); // Flush clean tracking cache
+    
+    // Execute our callback pipeline route link
+    try {
+      onFinished();
+    } catch(error) {
+      console.error("❌ SHUFFLE COMPLETION HANDSHAKE ERROR:", error);
+    }
+  };
+
+  audio.onerror = (error) => {
+    console.error("❌ SHUFFLE TRACK CRITICAL LOADING FAILURE EXCEPTION:", error);
+    shuffleAudioRef.current = null;
+    sessionStorage.removeItem("paused_shuffle_timestamp");
+    
+    // Failsafe auto-rescue: If the shuffle sound file crashes or fails to load,
+    // fire the completion hook anyway so the game room doesn't stay frozen!
+    onFinished();
+  };
+
+  // Safe promise-wrapped stream execution execution thread
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.log("▶️ SHUFFLE AUDIO CURRENTLY SPINNING SUCCESSFULLY");
+      })
+      .catch((err) => {
+        console.warn("⚠️ Shuffle element blocked or muted by browser protocols:", err.message);
+        // Fallback auto-advance execution trigger
+        onFinished();
+      });
+  }
+}
+
 
    
 function stopAllActiveAudio() {
@@ -2091,7 +1897,8 @@ function speakBallSequence(
   number,
   onSequenceFinished = () => {}
 ) {
-  if (stateRef.current.paused) {
+  if (stateRef.current
+.paused) {
     console.log("⏸️ SPEAK SEQUENCE BLOCKED — GAME PAUSED");
     return;
   }
@@ -2240,17 +2047,39 @@ const togglePlayPause = () => {
       loopTimeoutRef.current = null;
     }
 
+    if (audioFailsafeTimeoutRef.current !== null) {
+      clearTimeout(audioFailsafeTimeoutRef.current);
+      audioFailsafeTimeoutRef.current = null;
+    }
+
+    // Capture the precise millisecond marker if the shuffle track is running
+    if (shuffleAudioRef.current) {
+      try { 
+        const currentShuffleTime = Number(shuffleAudioRef.current.currentTime) || 0;
+        console.log("⏸️ PAUSING CAGE SHUFFLE BACKGROUND TRACK MID-RUN AT POSITION:", currentShuffleTime);
+        
+        sessionStorage.setItem("paused_shuffle_timestamp", String(currentShuffleTime));
+        shuffleAudioRef.current.pause(); 
+      } catch(e){}
+    }
+
     const audio = activeAudioRef.current;
     if (audio && !audio.ended) {
       const currentTime = Number(audio.currentTime) || 0;
-      console.log("⏸️ PAUSING OROMO AUDIO:", audio.src);
+      console.log("⏸️ PAUSING ACTIVE ANNOUNCER VOICE ELEMENT:", audio.src, "AT POSITION:", currentTime);
       
       const currentBallStr = stateRef.current.current || "";
-      const parts = currentBallStr.trim().split(/\s+/);
+const parts = currentBallStr.trim().split(/\s+/);
 
-      // FIX: Cleanly extract the string token and numeric element out of the split array
-      const extractedLetter = parts[0] ? String(parts[0]).trim() : "";
-      const extractedNumber = parts[1] ? Number(parts[1]) : 0;
+const extractedLetter = parts[0] || "";
+const extractedNumber = Number(parts[1]) || 0;
+
+console.log(
+  "💾 PAUSE SNAPSHOT:",
+  extractedLetter,
+  extractedNumber,
+  currentTime
+);
 
       pausedAudioRef.current = {
         audio,
@@ -2262,20 +2091,14 @@ const togglePlayPause = () => {
       try {
         audio.pause();
       } catch (error) {}
-      return;
-    }
-
-    if (pendingBingoCallRef.current) {
-      console.log("⏸️ CURRENT NUMBER WAITING:", pendingBingoCallRef.current);
-      audioGenerationRef.current++; // Void active background file tasks instantly
+      
       isDrawingBallRef.current = false;
       return;
     }
 
-    if (isDrawingBallRef.current) {
-      console.log("⏸️ GENERATION IN PROGRESS — CANCELLING");
-      generationCancelRef.current++;
-      audioGenerationRef.current++;
+    if (pendingBingoCallRef.current || isDrawingBallRef.current) {
+      console.log("⏸️ DRAW ENGINE DISARMED MID-FLIGHT");
+      audioGenerationRef.current++; 
       isDrawingBallRef.current = false;
       return;
     }
@@ -2283,40 +2106,82 @@ const togglePlayPause = () => {
   }
 
   // ==========================================================
-  // ▶️ PLAY / RESUME ENGINE
+  // ▶️ PLAY / RESUME ENGINE (TRUE SEAMLESS RESUMPTION)
   // ==========================================================
   console.log("▶️ PLAY");
 
   stateRef.current.paused = false;
   setPaused(false);
 
+  // 🎵 INITIAL MATCH LAUNCH GATING RESTRUCTURE
+  if (!hasPlayedShuffleRef.current) {
+    hasPlayedShuffleRef.current = true;
+    sessionStorage.setItem("bingo_shuffle_played", "true");
+    sessionStorage.removeItem("paused_shuffle_timestamp"); 
+
+    console.log("🚀 INITIAL MATCH LAUNCH: FIRING SHUFFLE TRACK ONLY");
+
+    // ✅ FIX: Fire the shuffle track, but do NOT call generateNumber() here!
+    // The number generator is now passed safely as a completion hook inside playShuffleSound.
+    playShuffleSound(() => {
+      if (!stateRef.current.paused) {
+        console.log("🏁 SHUFFLE AUDIO FINISHED: GENERATING NUMBER 1 NOW");
+        isDrawingBallRef.current = false;
+        generateNumber();
+      }
+    });
+    return;
+  }
+
+  // 🎵 TRUE SHUFFLE RESUME VALVE (If unpausing mid-shuffle before any numbers dropped)
+  const currentRemainingPool = remainingNumbersRef.current || [];
+  if (currentRemainingPool.length === 75) {
+    const savedShuffleTimeStr = sessionStorage.getItem("paused_shuffle_timestamp");
+    const resumeShuffleTime = savedShuffleTimeStr ? Number(savedShuffleTimeStr) : 0;
+    
+    console.log(`🚀 INITIAL SHUFFLE RESUME VALVE: CONTINUING CAGE SOUND FROM POSITION: ${resumeShuffleTime}s`);
+    
+    if (shuffleAudioRef.current) {
+      try { 
+        if (resumeShuffleTime > 0) {
+          shuffleAudioRef.current.currentTime = resumeShuffleTime;
+        }
+        shuffleAudioRef.current.play(); 
+      } catch(e){
+        // Dynamic rescue if the object instance dropped out entirely
+        isDrawingBallRef.current = false;
+        generateNumber();
+      }
+    } else {
+      isDrawingBallRef.current = false;
+      generateNumber();
+    }
+    return;
+  }
+
+  // True voice audio resume gating snapshot
   const pausedData = pausedAudioRef.current;
   if (pausedData && pausedData.audio) {
     const resumeLetter = pausedData.letter;
     const resumeNumber = pausedData.number;
+    const resumeTime = pausedData.time || 0;
     
-    // Clear instantly so double clicks cannot read this stale data again
     pausedAudioRef.current = null; 
     pendingBingoCallRef.current = null;
 
     if (actionId !== playPauseActionRef.current) return;
 
-    if (!resumeLetter || !resumeNumber) {
-      console.warn("⚠️ Refusing to resume: corrupted track parameters. Advancing loop...");
-      isDrawingBallRef.current = false;
-      generateNumber();
+    if (resumeLetter && resumeNumber) {
+      console.log(`🚀 TRUE RESUME: REPLAYING INTERRUPTED BALL ${resumeLetter} ${resumeNumber} FROM POSITION: ${resumeTime}s`);
+      isDrawingBallRef.current = true;
+      
+      playRecordedBingoCall(resumeLetter, resumeNumber, () => {
+        isDrawingBallRef.current = false;
+        if (stateRef.current.paused) return;
+        generateNumber();
+      }, resumeTime);
       return;
     }
-
-    console.log(`🚀 RELAUNCHING TRACKED ENGINE FOR BALL: ${resumeLetter} ${resumeNumber}`);
-    isDrawingBallRef.current = true;
-    
-    playRecordedBingoCall(resumeLetter, resumeNumber, () => {
-      isDrawingBallRef.current = false;
-      if (stateRef.current.paused) return;
-      generateNumber();
-    });
-    return;
   }
 
   if (isDrawingBallRef.current) {
@@ -2324,36 +2189,21 @@ const togglePlayPause = () => {
     return;
   }
 
-  if (pendingBingoCallRef.current) {
-    const pending = pendingBingoCallRef.current;
-    pendingBingoCallRef.current = null; 
-
-    console.log("▶️ RESUMING PENDING OROMO CALL:", pending);
-    isDrawingBallRef.current = true;
-    
-    playRecordedBingoCall(pending.letter, pending.number, () => {
-      isDrawingBallRef.current = false;
-      if (stateRef.current.paused) return;
-      generateNumber();
-    });
-    return;
-  }
-
-  if (!hasPlayedShuffleRef.current) {
-    hasPlayedShuffleRef.current = true;
-    sessionStorage.setItem("bingo_shuffle_played", "true");
-
-    console.log("🎵 PLAYING OROMO SHUFFLE — FIRST GAME START");
-    playShuffleSound(() => {
-      if (stateRef.current.paused || isDrawingBallRef.current) return;
-      generateNumber();
-    });
-    return;
-  }
-
-  console.log("🚀 STARTING NEW OROMO NUMBER");
+  console.log("🚀 ADVANCING ENGINE TIMELINE SAFELY");
   generateNumber();
 };
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 useEffect(() => {
@@ -2415,6 +2265,12 @@ useEffect(() => {
 // ==========================================================
 // NETWORK RETRY HELPER (Runs silently on a background thread)
 // ==========================================================
+// ==========================================================
+// NETWORK RETRY HELPER (Runs silently on a background thread)
+// ==========================================================
+// ==========================================================
+// 📡 1. NETWORK RETRY HELPER (Runs silently in the background)
+// ==========================================================
 async function saveBallWithRetry(gameId, ball, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -2425,7 +2281,7 @@ async function saveBallWithRetry(gameId, ball, retries = 3) {
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return true; // Resolved successfully
+      return true; // Save succeeded
     } catch (err) {
       console.warn(`⚠️ Save Ball Retry ${i + 1}/${retries} failed:`, err.message);
       if (i < retries - 1) {
@@ -2433,8 +2289,14 @@ async function saveBallWithRetry(gameId, ball, retries = 3) {
       }
     }
   }
-  return false; // Failed all 3 retries
+  return false; // Failed all 3 attempts
 }
+
+// ==========================================================
+// 🎱 2. AUTHORITATIVE GENERATOR ENGINE (Blazing 0s Instant Mode)
+// ==========================================================
+// Declare this variable outside the function or right above it in your file to track times
+
 
 async function generateNumber() {
   const generationStart = Date.now();
@@ -2442,6 +2304,13 @@ async function generateNumber() {
   const currentGameId = stateRef.current.game?.game_id || stateRef.current.game?.id || id;
 
   console.log("🔥 GENERATE ENTERED", generationStart, "LOCK:", isDrawingBallRef.current, "CANCEL ID:", myGenerationId, "GAME:", currentGameId);
+
+  // ✅ CRITICAL TIMESTAMP PROTECTION: Bypasses duplicate double-click triggers instantly
+  if (generationStart - lastGenerationTimeRef.current < 800) {
+    console.warn("🚫 DOUBLE-FIRE PREVENTED: DROPPING DUPLICATE REQUEST MARKS INTERCEPTED");
+    return;
+  }
+  lastGenerationTimeRef.current = generationStart;
 
   // Core safety guardrails
   if (stateRef.current.paused) {
@@ -2465,7 +2334,7 @@ async function generateNumber() {
     return;
   }
 
-  // Atomically claim the drawing loop lock
+  // Claim the drawing loop lock atomically
   isDrawingBallRef.current = true;
 
   const generationStillValid = () => {
@@ -2473,6 +2342,14 @@ async function generateNumber() {
   };
 
   try {
+    let result = "";
+    let letter = "";
+    let number = 0;
+    let isFirstBallOfGame = false;
+
+    // Absolute Business Protection: Clear pending flags to force clean selections
+    pendingBingoCallRef.current = null;
+
     const currentRemaining = remainingNumbersRef.current;
 
     if (!currentRemaining || currentRemaining.length === 0) {
@@ -2481,154 +2358,313 @@ async function generateNumber() {
       return;
     }
 
-    // Pick a random number safely
+    if (currentRemaining.length === 75) {
+      isFirstBallOfGame = true;
+    }
+
     const randomIndex = Math.floor(Math.random() * currentRemaining.length);
-    const number = currentRemaining[randomIndex];
+    number = currentRemaining[randomIndex];
 
     if (!generationStillValid()) {
       isDrawingBallRef.current = false;
       return;
     }
 
-    // Update remaining pool directly
     remainingNumbersRef.current = currentRemaining.filter(n => n !== number);
 
-    // Determine target column letter
-    let letter = "B";
+    letter = "B";
     if (number >= 16) letter = "I";
     if (number >= 31) letter = "N";
     if (number >= 46) letter = "G";
     if (number >= 61) letter = "O";
 
-    const result = `${letter} ${number}`;
+    result = `${letter} ${number}`;
     seenBallsRef.current.add(result);
 
-    pendingBingoCallRef.current = { letter, number, result };
-
-    if (!generationStillValid()) {
-      isDrawingBallRef.current = false;
-      return;
-    }
-
-    // Synchronize both State arrays and Mutable Refs simultaneously 
+    // Synchronize both arrays and Refs simultaneously
     const updatedCalled = [...calledRef.current, result];
     calledRef.current = updatedCalled;
     setCalled(updatedCalled);
     setCurrent(result);
 
-    // Update operational state context container instantly
     stateRef.current.called = updatedCalled;
     stateRef.current.current = result;
 
-    // Dispatch background network logging with explicit recovery fallbacks
-       // ✅ NON-BLOCKING BACKGROUND RETRY ENGINE (Optimized for Free Tier Speed)
+    // Unblocked background persistence network write
     saveBallWithRetry(currentGameId, result, 3).then((saved) => {
-      if (!saved) {
-        console.error("❌ BALL SAVE FAILED AFTER 3 BACKGROUND RETRIES:", result);
-        
-        // Only pull the emergency brake if the server fails completely after 3 full attempts
-        stateRef.current.paused = true;
-        setPaused(true);
-
-        if (loopTimeoutRef.current) {
-          clearTimeout(loopTimeoutRef.current);
-          loopTimeoutRef.current = null;
-        }
-
-        isDrawingBallRef.current = false;
-        alert("Critical network failure. Backend server is not responding. Game safely paused.");
-      } else {
-        console.log("✅ NUMBER SAVED SECURELY IN BACKGROUND:", result);
-      }
+      if (!saved) console.error("❌ BACKEND TRANSACTION LOSS WARNING:", result);
+      else console.log("✅ NUMBER SECURED ON SERVER CLOUD:", result);
     });
 
-    if (!generationStillValid()) {
+    if (!generationStillValid() || !result) {
       isDrawingBallRef.current = false;
       return;
     }
 
-    // 🛡️ EMERGENCY FAILSAFE HEARTBEAT (Triggers automatically if browser sound stutters)
-    const audioFailsafeTimeout = setTimeout(() => {
-      if (isDrawingBallRef.current && generationStillValid() && loopTimeoutRef.current === null) {
-        console.warn("⚠️ AUDIO LIFECYCLE DROPPED: EMERGENY ADVANCEMENT FORCED");
+    // Dynamic initial startup shuffle countdown parameter valve
+        // ✅ OPTIMIZED UPGRADE: Bypasses the old timeout delay valve entirely!
+    const startupDelayDuration = 0; 
+
+    
+    if (isFirstBallOfGame) {
+      console.log("⏳ HOLDING FIRST BALL ANNOUNCEMENT VOICE FOR SHUFFLE MUSIC TO FINISH: 5.5s");
+    }
+
+   startupTimeoutRef.current = setTimeout(() => {
+      if (!generationStillValid()) {
         isDrawingBallRef.current = false;
-        
-        if (pendingBingoCallRef.current?.letter === letter && pendingBingoCallRef.current?.number === number) {
-          pendingBingoCallRef.current = null;
-        }
-        generateNumber();
-      }
-    }, 12000);
-
-    // Trigger sequential playback routing engine
-    playRecordedBingoCall(letter, number, () => {
-      console.log("✅ CURRENT CALL FINISHED:", result);
-
-      // Kill failsafe immediately on completion
-      clearTimeout(audioFailsafeTimeout);
-
-      // Clean up previous operational states cleanly 
-      isDrawingBallRef.current = false;
-      if (pendingBingoCallRef.current?.letter === letter && pendingBingoCallRef.current?.number === number) {
-        pendingBingoCallRef.current = null;
-      }
-
-      if (stateRef.current.paused) {
-        console.log("⏸️ CALL FINISHED WHILE PAUSED — WAITING FOR PLAY");
         return;
       }
 
-      // Read selection value from button adjustments directly
-      const selectedSeconds = Number(callIntervalRef.current);
-      const safeSeconds = Number.isFinite(selectedSeconds) ? selectedSeconds : 0;
-
-      if (loopTimeoutRef.current !== null) {
-        return; 
+      // Kill any loose pending failsafe timers before mounting a fresh clock instance anchor
+      if (audioFailsafeTimeoutRef.current !== null) {
+        clearTimeout(audioFailsafeTimeoutRef.current);
+        audioFailsafeTimeoutRef.current = null;
       }
 
-      // ✅ CRITICAL FIX: If speed is explicitly set to 0, call next ball IMMEDIATELY without native setTimeout queue lag
-      if (safeSeconds === 0) {
-        console.log("🚀 SPEED IS 0s: DRAWING NEXT NUMBER ABSOLUTE INSTANTLY");
-        generateNumber();
+      // =========================================================================
+      // 🛡️ HEARTBEAT TIMEOUT (8-SECOND ISOLATED TIMELINE PROTECTOR)
+      // =========================================================================
+            // =========================================================================
+      // 🛡️ RE-TUNED HEARTBEAT FAILSAFE (LIVE HEARTBEAT GUARD — ZERO CUT-OFFS)
+      // =========================================================================
+ // ============================================================
+// 🛡️ AUDIO WATCHDOG
+// IMPORTANT:
+// The watchdog NEVER generates another ball directly.
+// It only reports a genuine failure to the same completion
+audioFailsafeTimeoutRef.current = setTimeout(() => {
+  const audio = activeAudioRef.current;
+
+  // Generation already cancelled
+  if (!generationStillValid()) {
+    console.log(
+      "🛑 WATCHDOG IGNORED — GENERATION NO LONGER VALID:",
+      result
+    );
+
+    audioFailsafeTimeoutRef.current = null;
+    return;
+  }
+
+  // Game paused
+  if (stateRef.current.paused) {
+    console.log(
+      "⏸️ WATCHDOG IGNORED — GAME IS PAUSED:",
+      result
+    );
+
+    audioFailsafeTimeoutRef.current = null;
+    return;
+  }
+
+  // Audio is still alive
+  if (
+    audio &&
+    !audio.paused &&
+    !audio.ended
+  ) {
+    console.log(
+      "🛡️ WATCHDOG CANCELLED — AUDIO STILL PLAYING:",
+      result,
+      "TIME:",
+      Number(audio.currentTime || 0).toFixed(2)
+    );
+
+    audioFailsafeTimeoutRef.current = null;
+    return;
+  }
+
+  // Real stall
+  console.error(
+    "🚨 REAL AUDIO STALL DETECTED:",
+    result,
+    "\n🎵 AUDIO:",
+    audio?.src || "NO ACTIVE AUDIO",
+    "\n⏱️ POSITION:",
+    audio?.currentTime ?? "N/A"
+  );
+
+  audioFailsafeTimeoutRef.current = null;
+
+  // Release lock ONLY
+  isDrawingBallRef.current = false;
+
+}, 8000);
+// ============================================================
+
+
+      // Fire voice playback engine directly
+      playRecordedBingoCall(letter, number, () => {
+
+  // ==========================================================
+  // NEVER ALLOW AN OLD AUDIO GENERATION TO CONTROL THE GAME
+  // ==========================================================
+
+  if (myGenerationId !== generationCancelRef.current) {
+    console.warn(
+      "🛑 COMPLETION IGNORED — STALE GAME GENERATION:",
+      result,
+      "CALL GENERATION:",
+      myGenerationId,
+      "CURRENT:",
+      generationCancelRef.current
+    );
+    return;
+  }
+
+  console.log(
+    "BaseGame Call Hook Completed -> ✅ CURRENT CALL FINISHED COMPLETELY:",
+    result
+  );
+
+  // ==========================================================
+  // CLEAR WATCHDOG
+  // ==========================================================
+
+  if (audioFailsafeTimeoutRef.current !== null) {
+    clearTimeout(audioFailsafeTimeoutRef.current);
+    audioFailsafeTimeoutRef.current = null;
+  }
+
+  // ==========================================================
+  // RELEASE CURRENT DRAW LOCK
+  // ==========================================================
+
+  isDrawingBallRef.current = false;
+
+  // ==========================================================
+  // PAUSE
+  // ==========================================================
+
+  if (stateRef.current.paused) {
+    console.log(
+      "⏸️ GAME WAS PAUSED MID-LOOP TRANSITION"
+    );
+    return;
+  }
+
+  // ==========================================================
+  // READ INTERVAL
+  // ==========================================================
+
+  const selectedSeconds = Number(callIntervalRef.current);
+
+  const safeSeconds = Number.isFinite(selectedSeconds)
+    ? selectedSeconds
+    : 0;
+
+  // ==========================================================
+  // NEVER CREATE TWO LOOP TIMERS
+  // ==========================================================
+
+  if (loopTimeoutRef.current !== null) {
+    console.log(
+      "⏳ LOOP ALREADY SCHEDULED — SKIPPING DUPLICATE:",
+      result
+    );
+    return;
+  }
+
+  // ==========================================================
+  // INSTANT MODE
+  // ==========================================================
+
+  if (safeSeconds === 0) {
+
+    console.log(
+      "🚀 SPEED IS 0s: DRAWING NEXT BALL ABSOLUTE INSTANTLY"
+    );
+
+    if (
+      !stateRef.current.paused &&
+      myGenerationId === generationCancelRef.current
+    ) {
+      generateNumber();
+    }
+
+    return;
+  }
+
+  // ==========================================================
+  // NEGATIVE / FAST MODE
+  // ==========================================================
+
+  if (safeSeconds < 0) {
+
+    const overlapSeconds = Math.abs(safeSeconds);
+
+    const fastDelayMs = Math.max(
+      0,
+      1000 - (overlapSeconds * 1000)
+    );
+
+    loopTimeoutRef.current = setTimeout(() => {
+
+      loopTimeoutRef.current = null;
+
+      if (
+        stateRef.current.paused ||
+        myGenerationId !== generationCancelRef.current
+      ) {
         return;
       }
 
-      // Fast-speed handling mechanics (< 0 interval option support)
-      if (safeSeconds < 0) {
-        const overlapSeconds = Math.abs(safeSeconds);
-        const fastDelayMs = Math.max(0, 1000 - (overlapSeconds * 1000));
+      generateNumber();
 
-        loopTimeoutRef.current = setTimeout(() => {
-          loopTimeoutRef.current = null;
-          if (stateRef.current.paused || myGenerationId !== generationCancelRef.current) {
-            isDrawingBallRef.current = false;
-            return;
-          }
-          generateNumber();
-        }, fastDelayMs);
+    }, fastDelayMs);
 
-        return;
-      }
+    return;
+  }
 
-      // Normal auto-advancement structural timer pathing using buttons values (1s, 2s, 3s, etc.)
-      const delayMs = safeSeconds * 1000;
-      console.log(`>>> TIMEOUT MOUNTED IN EXACTLY ${safeSeconds} SECONDS`);
-      
-      loopTimeoutRef.current = setTimeout(() => {
-        loopTimeoutRef.current = null;
-        if (stateRef.current.paused || myGenerationId !== generationCancelRef.current) {
-          isDrawingBallRef.current = false;
-          return;
-        }
-        generateNumber();
-      }, delayMs);
-    });
+  // ==========================================================
+  // NORMAL MODE
+  // ==========================================================
+
+  const delayMs = safeSeconds * 1000;
+
+  loopTimeoutRef.current = setTimeout(() => {
+
+    loopTimeoutRef.current = null;
+
+    if (
+      stateRef.current.paused ||
+      myGenerationId !== generationCancelRef.current
+    ) {
+      return;
+    }
+
+    generateNumber();
+
+  }, delayMs);
+
+});
+    }, startupDelayDuration);
 
   } catch (err) {
-    console.error("❌ GENERATE NUMBER CRITICAL EXCEPTION:", err);
+    console.error("❌ GENERATE NUMBER CRITICAL CONTAINER FAULT EXCEPTION:", err);
     isDrawingBallRef.current = false;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+// ==========================================================
+// AUTHORITATIVE GENERATOR ENGINE (SANDBOXED INSTANT MODE)
+// ==========================================================
+
+
+
+
 
   const checkWinner = async () => {
     if (!cartelaId.trim()) {
@@ -2842,7 +2878,7 @@ setWinningCells(
         alignItems: "center",
         justifyContent: "center",
 
-        fontSize: "17px",
+        fontSize: "12px",
         fontWeight: "bold",
 
         cursor: "pointer",
