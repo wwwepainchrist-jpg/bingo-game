@@ -548,10 +548,10 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                 border: "1px solid rgba(255, 255, 255, 0.15)", 
                 borderRadius: "6px" 
               }}>
-                <span style={{ fontSize: "26px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
+                <span style={{ fontSize: "31px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
                 </span>
-                <span style={{ fontSize: "26px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
+                <span style={{ fontSize: "32px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
                 <div style={{ display: "flex", gap: "4px", marginLeft: "2px" }}>
                   <button 
                     onClick={handleDecreaseBet} 

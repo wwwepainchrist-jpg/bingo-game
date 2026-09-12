@@ -2888,7 +2888,7 @@ setWinningCells(
 
                 <div
                   style={{
-                    fontSize: "40px",
+                    fontSize: "60px",
                     color: "#00f0ff",
                     fontWeight: "900",
                     textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
@@ -3201,78 +3201,144 @@ setWinningCells(
                 </div>
               </div>
             )}
-           
- {/* 1. LEFT SIDE: WINNING PATTERN PREVIEW */}
-            {activeWinningPattern && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "5px",
-                  animation: "winningPatternPulse 1.5s ease-in-out infinite",
-                }}
-              >
+          
+{/* 1. LEFT SIDE: WINNING PATTERN PREVIEW (COMPLETELY WHITE BOARD SHIELD ENFORCED) */}
+{/* 🏆 1:1 REACT JSX OVERHAUL: PURE WHITE GRID TILE MATRIX BACKGROUND */}
+{activeWinningPattern && (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "5px",
+    }}
+  >
+    {/* 🏆 TITLE */}
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: "900",
+        color: "#111827",
+        letterSpacing: "0.7px",
+        marginBottom: "2px",
+        textAlign: "center",
+      }}
+    >
+      🏆 {activeWinningPattern} PATTERN
+      {activeWinningPattern > 1 ? "S" : ""}
+    </div>
+
+    {/* 🎟️ BINGO CARD */}
+    <div
+      style={{
+        width: "125px",
+        height: "145px",
+        background: "#dce8f2",
+        border: "2px solid #657789",
+        borderRadius: "6px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.18)",
+      }}
+    >
+      {/* 🔤 BINGO HEADER */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          height: "27px",
+          background: "#536b82",
+          borderBottom: "2px solid #71869a",
+        }}
+      >
+        {["B", "I", "N", "G", "O"].map((letter) => (
+          <div
+            key={letter}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#ffffff",
+              fontSize: "12px",
+              fontWeight: "900",
+              textShadow: "0 1px 1px rgba(0,0,0,0.25)",
+              borderRight: "1px solid rgba(255,255,255,0.18)",
+              boxSizing: "border-box",
+            }}
+          >
+            {letter}
+          </div>
+        ))}
+      </div>
+
+      {/* 🔲 5 × 5 GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateRows: "repeat(5, 1fr)",
+          width: "100%",
+          height: "calc(100% - 27px)",
+          background: "#dce8f2",
+        }}
+      >
+        {Array.from({ length: 25 }).map((_, index) => {
+          const row = Math.floor(index / 5);
+          const col = index % 5;
+          const cellKey = `${row}-${col}`;
+
+          const highlighted =
+            displayedWinningPatterns?.includes(cellKey) ?? false;
+
+          return (
+            <div
+              key={index}
+              style={{
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: highlighted
+                  ? "#cbdbea"
+                  : "#e3edf5",
+                borderRight:
+                  col < 4
+                    ? "1px solid #91a5b8"
+                    : "none",
+                borderBottom:
+                  row < 4
+                    ? "1px solid #91a5b8"
+                    : "none",
+                boxSizing: "border-box",
+              }}
+            >
+              {/* 🔵 WINNING CIRCLE */}
+              {highlighted && (
                 <div
                   style={{
-                    fontSize: "11px",
-                    fontWeight: "900",
-                    color: "#ffd700",
-                    letterSpacing: "1px",
+                    width: "72%",
+                    height: "72%",
+                    maxWidth: "24px",
+                    maxHeight: "24px",
+                    minWidth: "11px",
+                    minHeight: "11px",
+                    borderRadius: "50%",
+                    background:
+                      "radial-gradient(circle at 35% 30%, #4d9cff, #0066d6 65%, #0054b8)",
+                    border: "1px solid #004fa8",
+                    boxShadow:
+                      "0 1px 2px rgba(0,0,0,0.25)",
                   }}
-                >
-             🏆 {activeWinningPattern} PATTERN
-{activeWinningPattern > 1 ? "S" : ""}
-                </div>
-
-                <div
-                  style={{
-                    width: "90px",
-                    height: "90px",
-                    display: "grid",
-                    gridTemplateColumns: "repeat(5, 1fr)",
-                    gap: "3px",
-                    padding: "5px",
-                    borderRadius: "8px",
-                    background: "rgba(15, 23, 42, 0.9)",
-                    border: "2px solid #ffd700",
-                    boxShadow: "0 0 15px rgba(255, 215, 0, 0.5)",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  {Array.from({ length: 25 }).map((_, index) => {
-                    const row = Math.floor(index / 5);
-                    const col = index % 5;
-                    const cellKey = `${row}-${col}`;
-
-                    const highlighted =
-                      displayedWinningPatterns?.includes(cellKey) ?? false;
-
-                    return (
-                      <div
-                        key={index}
-                        style={{
-                          borderRadius: "2px",
-                         background:
-  row === 2 && col === 2
-    ? "#22c55e"   // ⭐ CENTER / FREE SPACE
-    : highlighted
-      ? "#ffd700" // 🏆 Winning pattern
-      : "rgba(100, 116, 139, 0.25)",
-                          boxShadow: highlighted
-                            ? "0 0 7px rgba(255, 215, 0, 0.9)"
-                            : "none",
-                          transition: "all 0.3s ease",
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
 
             {/* 2. RIGHT SIDE: ROLLING MACHINE CAGE */}
             <div className="cage-container">
@@ -3346,6 +3412,10 @@ setWinningCells(
           </div>
 
         </div>
+
+
+
+
 
   {/* =====================================================
       ARROW BUTTON
@@ -3583,88 +3653,151 @@ setWinningCells(
             style={{  
               display: "flex",  
               justifyContent: "center",  
-              gap: "15px",  
+              gap: "8px",  
               alignItems: "center",  
-              minHeight: "52px",  
+              minHeight: "72px",  
               width: "100%",  
               overflow: "hidden",  
             }}     
            > 
-            {incomingHistoryBalls.length > 0 ? (
-              incomingHistoryBalls.map((ballStr, idx) => {
-                const parts = String(ballStr).trim().split(/\s+/);
-                const letter = parts[0];
-                const num = parts[1];
+          {incomingHistoryBalls.length > 0 ? (
+  incomingHistoryBalls.map((ballStr, idx) => {
+    const parts = String(ballStr).trim().split(/\s+/);
+    const letter = parts[0];
+    const num = parts[1];
 
-                const theme =
-                  columnColorStyles[letter] || {
-                    border: "2px solid #fff",
-                    labelBg: "#fff",
-                    textShadow: "0 0 5px #fff",
-                  };
+    // 🎨 BINGO BALL COLORS
+    const ballColors = {
+      B: {
+        border: "#35a9ff",
+        glow: "rgba(53,169,255,0.55)",
+      },
+      I: {
+        border: "#f2d35c",
+        glow: "rgba(242,211,92,0.55)",
+      },
+      N: {
+        border: "#35a9ff",
+        glow: "rgba(53,169,255,0.55)",
+      },
+      G: {
+        border: "#35d68a",
+        glow: "rgba(53,214,138,0.55)",
+      },
+      O: {
+        border: "#ff6b6b",
+        glow: "rgba(255,107,107,0.55)",
+      },
+    };
 
-                return (
-                  <div
-                    key={`${ballStr}-${idx}`}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: "#0d162d",
-                      border: theme.border,
-                      borderRadius: "5px",
-                      width: "72px",
-                      height: "70px",
-                      flexShrink: 0,
-                      position: "relative",
-                      opacity: Math.max(0.45, 1 - idx * 0.12),
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        background: theme.labelBg,
-                        color: "#000",
-                        fontSize: "25px",
-                        fontWeight: "900",
-                        textAlign: "center",
-                        lineHeight: "15px",
-                        borderRadius: "3px 3px 0 0",
-                      }}
-                    >
-                      {letter}
-                    </div>
+    const ball = ballColors[letter] || {
+      border: "#ffffff",
+      glow: "rgba(255,255,255,0.4)",
+    };
 
-                    <div
-                      style={{
-                        fontSize: "59px",
-                        fontWeight: "900",
-                        color: "#fff",
-                        textShadow: theme.textShadow,
-                        marginTop: "8px",
-                      }}
-                    >
-                      {num}
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div
-                style={{
-                  fontSize: "20px",
-                  color: "#4b5970",
-                  fontStyle: "italic",
-                }}
-              >
-                {t.waitingToBegin}
-              </div>
-            )}    <button
+    return (
+      <div
+        key={`${ballStr}-${idx}`}
+        style={{
+          width: "140px",
+          height: "140px",
+          minWidth: "67px",
+          borderRadius: "50%",
+
+          /* 🎯 COLORED OUTER RING */
+          border: `4px solid ${ball.border}`,
+
+          /* 🎯 BALL CENTER */
+          background:
+            "radial-gradient(circle at 35% 30%, #ffffff 0%, #f4f5f7 55%, #d8dce2 100%)",
+
+          /* 🎯 DEPTH / GLOW */
+          boxShadow: `
+            0 0 7px ${ball.glow},
+            inset 0 1px 3px rgba(255,255,255,0.9),
+            inset 0 -3px 5px rgba(0,0,0,0.18),
+            0 2px 4px rgba(0,0,0,0.45)
+          `,
+
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+
+          position: "relative",
+          boxSizing: "border-box",
+
+          /* Keep your fade effect */
+          opacity: Math.max(0.55, 1 - idx * 0.08),
+
+          flexShrink: 0,
+        }}
+      >
+      {/* ✅ OVERLAP-PROOF STRUCTURAL SEPARATION VALVE */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column", /* Forces the letter to stack vertically on top of the number cleanly */
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    height: "100%", /* Lets the internal text scale naturally to fill the circle area */
+    padding: "2px 0",
+    boxSizing: "border-box"
+  }}
+>
+  {/* 🔤 TOP TRACK LETTER */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "45px", /* Balanced down perfectly to fit above the digits */
+      fontWeight: "900",
+      color: "#FFFFFF", /* Forced high-visibility pure white matching your image layout */
+      lineHeight: "1.1",
+      textTransform: "uppercase",
+      letterSpacing: "0.5px",
+      margin: "0",
+      padding: "0"
+    }}
+  >
+    {letter}
+  </div>
+
+  {/* 🔢 MAIN LARGE NUMBER VALUE */}
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: "70px", /* Scaled to casino-grade balance scale so 2-digit rows cannot bleed out */
+      fontWeight: "900",
+      color: "#D1D5DB", /* High-contrast clean off-white tone mimicking phone layout specular reflection lights */
+      lineHeight: "0.95",
+      marginTop: "1px",
+      marginRight: "2px", /* Precision nudge to guarantee dual digits stay dead centered */
+      padding: "0"
+    }}
+  >
+    {num}
+  </div>
+</div>
+
+      </div>
+    );
+  })
+) : (
+  <div
+    style={{
+      fontSize: "20px",
+      color: "#4b5970",
+      fontStyle: "italic",
+    }}
+  >
+    {t.waitingToBegin}
+  </div>
+)}   <button
   type="button"
   onClick={() => setShowGameControls((prev) => !prev)}
   title={showGameControls ? "Hide game controls" : "Show game controls"}
@@ -4204,8 +4337,8 @@ setWinningCells(
 
         <input
           type="range"
-          min="-20"
-          max="40"
+          min="-2"
+          max="5"
           step="1"
           value={voiceDepth}
           onChange={(e) => {
