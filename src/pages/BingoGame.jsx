@@ -1042,18 +1042,7 @@ function stopAndResetAudio() {
 
 function applyVoiceDepth(audio) {
   try {
-    // ==========================================================
-    // SAFETY
-    // ==========================================================
-
-    if (!audio) {
-      console.warn("⚠️ NO AUDIO ELEMENT FOR VOICE DEPTH");
-      return null;
-    }
-
-    // ==========================================================
-    // CREATE ONE AUDIO CONTEXT
-    // ==========================================================
+    if (!audio) return null;
 
     if (!audioContextRef.current) {
       const AudioContextClass =
@@ -1061,10 +1050,6 @@ function applyVoiceDepth(audio) {
         window.webkitAudioContext;
 
       if (!AudioContextClass) {
-        console.warn(
-          "⚠️ WEB AUDIO NOT SUPPORTED — PLAYING OROMO AUDIO NORMALLY"
-        );
-
         return null;
       }
 
@@ -1072,216 +1057,114 @@ function applyVoiceDepth(audio) {
         new AudioContextClass();
     }
 
-    const ctx =
-      audioContextRef.current;
-
-    // ==========================================================
-    // RESUME CONTEXT
-    // ==========================================================
+    const ctx = audioContextRef.current;
 
     if (ctx.state === "suspended") {
       ctx.resume().catch(() => {});
     }
 
-    // ==========================================================
-    // SPEED
-    // ==========================================================
+    const depth = Math.max(
+      -20,
+      Math.min(
+        11,
+        Number(voiceDepthRef.current) || 0
+      )
+    );
 
-    audio.preservesPitch = true;
-
-    const selectedSpeed =
-      Number(voiceSpeedRef.current) || 1;
-
-    audio.playbackRate =
-      Math.max(
-        0.5,
-        Math.min(
-          2.0,
-          selectedSpeed
-        )
-      );
-
-    // ==========================================================
-    // DEPTH
-    // ==========================================================
-
-    const rawDepth =
-      Number(voiceDepthRef.current) || 0;
-
-    const depth =
-      Math.max(
-        -20,
-        Math.min(
-          20,
-          rawDepth
-        )
-      );
-
-    // ==========================================================
-    // IMPORTANT
-    //
-    // NEVER reuse an old MediaElementSource.
-    //
-    // Each Audio element gets its own source.
-    // ==========================================================
+    // =====================================
+    // ALREADY CREATED
+    // UPDATE LIVE VALUES
+    // =====================================
 
     if (audio._voiceNodes) {
+
+      audio._voiceNodes.bassFilter.gain.value =
+        depth * 3;
+
+      audio._voiceNodes.bodyFilter.gain.value =
+        depth * 2;
+
+      audio._voiceNodes.lowMidFilter.gain.value =
+        depth * 1.5;
+
+      audio._voiceNodes.warmthFilter.frequency.value =
+        depth > 0
+          ? 4500
+          : 12000;
+
+      audio._voiceNodes.compressor.ratio.value =
+        depth > 0
+          ? 8
+          : 3;
+
       console.log(
-        "⚠️ AUDIO ALREADY HAS VOICE NODES"
+        "🎙️ DEPTH UPDATED:",
+        depth
       );
 
       return audio._voiceNodes;
     }
 
-    // ==========================================================
-    // MEDIA SOURCE
-    // ==========================================================
+    // =====================================
+    // CREATE SOURCE
+    // =====================================
 
-    let source;
-
-    try {
-      source =
-        ctx.createMediaElementSource(audio);
-    } catch (error) {
-
-      console.warn(
-        "⚠️ MEDIA SOURCE CREATION FAILED — USING NORMAL OROMO AUDIO:",
-        error
-      );
-
-      // VERY IMPORTANT:
-      // Do not stop the Bingo game because the
-      // voice-depth engine failed.
-
-      return null;
-    }
-
-    // ==========================================================
-    // BASS
-    // ==========================================================
+    const source =
+      ctx.createMediaElementSource(audio);
 
     const bassFilter =
       ctx.createBiquadFilter();
 
-    bassFilter.type =
-      "lowshelf";
-
-    bassFilter.frequency.value =
-      120;
-
-    bassFilter.gain.value =
-      depth * 1.15;
-
-    // ==========================================================
-    // VOCAL BODY
-    // ==========================================================
+    bassFilter.type = "lowshelf";
+    bassFilter.frequency.value = 175;
+    bassFilter.gain.value = depth * 2;
 
     const bodyFilter =
       ctx.createBiquadFilter();
 
-    bodyFilter.type =
-      "peaking";
-
-    bodyFilter.frequency.value =
-      180;
-
-    bodyFilter.Q.value =
-      0.9;
-
-    bodyFilter.gain.value =
-      depth * 0.75;
-
-    // ==========================================================
-    // LOW MID
-    // ==========================================================
+    bodyFilter.type = "peaking";
+    bodyFilter.frequency.value = 150;
+    bodyFilter.Q.value = 1;
+    bodyFilter.gain.value = depth * 1;
 
     const lowMidFilter =
       ctx.createBiquadFilter();
 
-    lowMidFilter.type =
-      "peaking";
-
-    lowMidFilter.frequency.value =
-      280;
-
-    lowMidFilter.Q.value =
-      0.8;
-
-    lowMidFilter.gain.value =
-      depth * 0.45;
-
-    // ==========================================================
-    // WARMTH
-    // ==========================================================
+    lowMidFilter.type = "peaking";
+    lowMidFilter.frequency.value = 200;
+    lowMidFilter.Q.value = 1;
+    lowMidFilter.gain.value = depth * 0.4;
 
     const warmthFilter =
       ctx.createBiquadFilter();
 
-    warmthFilter.type =
-      "lowpass";
-
+    warmthFilter.type = "lowpass";
     warmthFilter.frequency.value =
       depth > 0
-        ? 7000
-        : 12000;
-
-    // ==========================================================
-    // COMPRESSOR
-    // ==========================================================
+        ? 10000
+        : 14000;
 
     const compressor =
       ctx.createDynamicsCompressor();
 
-    compressor.threshold.value =
-      -20;
-
-    compressor.knee.value =
-      10;
-
+    compressor.threshold.value = -24;
     compressor.ratio.value =
       depth > 0
-        ? 4.5
-        : 3;
-
-    compressor.attack.value =
-      0.003;
-
-    compressor.release.value =
-      0.22;
-
-    // ==========================================================
-    // OUTPUT
-    // ==========================================================
+        ? 4
+        : 2;
 
     const outputGain =
       ctx.createGain();
 
-    outputGain.gain.value =
-      depth > 0
-        ? 1.0
-        : 0.95;
-
-    // ==========================================================
-    // CONNECT
-    // ==========================================================
+    outputGain.gain.value = 1;
 
     source.connect(bassFilter);
-
     bassFilter.connect(bodyFilter);
-
     bodyFilter.connect(lowMidFilter);
-
     lowMidFilter.connect(warmthFilter);
-
     warmthFilter.connect(compressor);
-
     compressor.connect(outputGain);
-
     outputGain.connect(ctx.destination);
-
-    // ==========================================================
-    // SAVE NODES ON AUDIO
-    // ==========================================================
 
     const nodes = {
       source,
@@ -1293,73 +1176,22 @@ function applyVoiceDepth(audio) {
       outputGain
     };
 
-    audio._voiceNodes =
-      nodes;
+    audio._voiceNodes = nodes;
 
-    // ==========================================================
-    // SAVE REFS
-    // ==========================================================
-
-    audioSourceRef.current =
-      source;
-
-    bassFilterRef.current =
-      bassFilter;
-
-    // ==========================================================
-    // DEBUG
-    // ==========================================================
+    bassFilterRef.current = bassFilter;
 
     console.log(
-      "🎙️ AFFAN OROMO VOICE ENGINE"
-    );
-
-    console.log(
-      "🎚️ DEPTH:",
+      "🎙️ DEPTH ENGINE CREATED:",
       depth
-    );
-
-    console.log(
-      "⚡ SPEED:",
-      audio.playbackRate
-    );
-
-    console.log(
-      "🔊 VOLUME:",
-      audio.volume
-    );
-
-    console.log(
-      "🎙️ BASS:",
-      bassFilter.gain.value
-    );
-
-    console.log(
-      "🎤 BODY:",
-      bodyFilter.gain.value
-    );
-
-    console.log(
-      "🎤 LOW-MID:",
-      lowMidFilter.gain.value
     );
 
     return nodes;
 
   } catch (error) {
-
     console.error(
-      "❌ VOICE DEPTH ENGINE ERROR — OROMO AUDIO WILL CONTINUE:",
+      "❌ VOICE DEPTH ERROR:",
       error
     );
-
-    // ==========================================================
-    // IMPORTANT
-    //
-    // Voice depth is OPTIONAL.
-    // The recorded Affan Oromo voice must NEVER depend
-    // on the Web Audio effects engine to work.
-    // ==========================================================
 
     return null;
   }
@@ -1539,9 +1371,24 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
 
     audio.defaultPlaybackRate = audio.playbackRate;
 
-    activeAudioRef.current = audio;
+  activeAudioRef.current = audio;
 
-    let finished = false;
+// 🎙️ ATTACH VOICE DEPTH ENGINE
+try {
+  const nodes = applyVoiceDepth(audio);
+
+  console.log(
+    "🎙️ DEPTH ENGINE ATTACHED:",
+    !!nodes
+  );
+} catch (error) {
+  console.error(
+    "❌ DEPTH ENGINE ATTACH FAILED:",
+    error
+  );
+}
+
+let finished = false;
 
     const cleanup = () => {
       if (finished) return;
@@ -3767,8 +3614,8 @@ setWinningCells(
                       background: "#0d162d",
                       border: theme.border,
                       borderRadius: "5px",
-                      width: "60px",
-                      height: "60px",
+                      width: "72px",
+                      height: "70px",
                       flexShrink: 0,
                       position: "relative",
                       opacity: Math.max(0.45, 1 - idx * 0.12),
@@ -3783,7 +3630,7 @@ setWinningCells(
                         right: 0,
                         background: theme.labelBg,
                         color: "#000",
-                        fontSize: "18px",
+                        fontSize: "25px",
                         fontWeight: "900",
                         textAlign: "center",
                         lineHeight: "15px",
@@ -3795,7 +3642,7 @@ setWinningCells(
 
                     <div
                       style={{
-                        fontSize: "40px",
+                        fontSize: "59px",
                         fontWeight: "900",
                         color: "#fff",
                         textShadow: theme.textShadow,
