@@ -101,7 +101,9 @@ const audioLoadingRef = useRef(false);
   const stateRef = useRef({ called, paused, speed, current, game });
   const [volume, setVolume] = useState(0.7);
   const volumeRef = useRef(0.7);
- 
+ const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+const [audioDuration, setAudioDuration] = useState(0);
+
   const selectedWinningPattern =
   location.state?.winningPatternCount ??
   location.state?.game?.winningPatternCount ??
@@ -374,7 +376,9 @@ const callIntervalChangeRef = useRef(null);
   // ============================================
   // CALL NUMBER API (prevents spam)
   // ============================================
- 
+
+const [callIntervalTimeLeft, setCallIntervalTimeLeft] = useState(0);
+
 
   
   // ============================================
@@ -387,6 +391,31 @@ const callIntervalChangeRef = useRef(null);
   const increaseVoiceSpeed = () => {
     setVoiceSpeed(prev => Math.min(2.0, +(prev + 0.1).toFixed(1)));
   };
+// Dynamic countdown tracking for the interval pacing delay between numbers
+// Synchronizes the countdown state loop every full second
+useEffect(() => {
+  if (paused || loopTimeoutRef.current === null) {
+    setCallIntervalTimeLeft(0);
+    return;
+  }
+
+  const targetTime = Date.now() + (Number(callIntervalRef.current) * 1000);
+  
+  // Set interval to update every 1000 milliseconds (1 second) instead of 100ms
+  const timer = setInterval(() => {
+    const remaining = Math.max(0, (targetTime - Date.now()) / 1000);
+    setCallIntervalTimeLeft(remaining);
+    
+    if (remaining <= 0) {
+      clearInterval(timer);
+    }
+  }, 1000);
+
+  return () => clearInterval(timer);
+}, [current, paused, callInterval]);
+
+
+
   useEffect(() => {
   console.log("🧹 NEW GAME DETECTED:", id);
 
@@ -1317,12 +1346,26 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
     audio.onstalled = null;
     audio.oncanplay = null;
     audio.onloadstart = null;
+    audio.ontimeupdate = null;
+    audio.ondurationchange = null;
 
     audio.src = path;
 
+    // Initialize display states safely
+    setAudioCurrentTime(resumeTime);
+    setAudioDuration(0);
+
     // ============================================================
-    // NEW DEBUGGING
+    // LIVE UI TRACKING BINDINGS
     // ============================================================
+    audio.ontimeupdate = () => {
+      setAudioCurrentTime(audio.currentTime);
+    };
+
+    audio.ondurationchange = () => {
+      setAudioDuration(audio.duration || 0);
+    };
+
     audio.load();
 
     console.log("📦 AUDIO LOAD REQUEST:", completeName);
@@ -1342,8 +1385,6 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
     audio.onstalled = () => {
       console.error("🚨 AUDIO STALLED:", completeName);
     };
-
-    // ============================================================
 
     const selectedVolume = Number(volumeRef.current);
 
@@ -1371,24 +1412,17 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
 
     audio.defaultPlaybackRate = audio.playbackRate;
 
-  activeAudioRef.current = audio;
+    activeAudioRef.current = audio;
 
-// 🎙️ ATTACH VOICE DEPTH ENGINE
-try {
-  const nodes = applyVoiceDepth(audio);
+    // 🎙️ ATTACH VOICE DEPTH ENGINE
+    try {
+      const nodes = applyVoiceDepth(audio);
+      console.log("🎙️ DEPTH ENGINE ATTACHED:", !!nodes);
+    } catch (error) {
+      console.error("❌ DEPTH ENGINE ATTACH FAILED:", error);
+    }
 
-  console.log(
-    "🎙️ DEPTH ENGINE ATTACHED:",
-    !!nodes
-  );
-} catch (error) {
-  console.error(
-    "❌ DEPTH ENGINE ATTACH FAILED:",
-    error
-  );
-}
-
-let finished = false;
+    let finished = false;
 
     const cleanup = () => {
       if (finished) return;
@@ -1406,6 +1440,12 @@ let finished = false;
       audio.onstalled = null;
       audio.oncanplay = null;
       audio.onloadstart = null;
+      audio.ontimeupdate = null;
+      audio.ondurationchange = null;
+
+      // Clear layout states smoothly
+      setAudioCurrentTime(0);
+      setAudioDuration(0);
 
       try {
         audio.pause();
@@ -1415,15 +1455,9 @@ let finished = false;
     };
 
     const onCanPlayThrough = () => {
-      audio.removeEventListener(
-        "canplaythrough",
-        onCanPlayThrough
-      );
+      audio.removeEventListener("canplaythrough", onCanPlayThrough);
 
-      console.log(
-        "🎯 CANPLAYTHROUGH RECEIVED:",
-        completeName
-      );
+      console.log("🎯 CANPLAYTHROUGH RECEIVED:", completeName);
 
       if (
         stateRef.current.paused ||
@@ -1436,17 +1470,9 @@ let finished = false;
       if (resumeTime > 0) {
         try {
           audio.currentTime = Number(resumeTime);
-
-          console.log(
-            "🎯 REUSABLE SINGLETON PRE-SEEK SUCCESSFUL AT TIME POSITION:",
-            resumeTime,
-            "s"
-          );
+          console.log("🎯 REUSABLE SINGLETON PRE-SEEK SUCCESSFUL AT TIME POSITION:", resumeTime, "s");
         } catch (e) {
-          console.warn(
-            "⚠️ Audio singleton pre-seek layout warning skipped safely:",
-            e
-          );
+          console.warn("⚠️ Audio singleton pre-seek layout warning skipped safely:", e);
         }
       }
 
@@ -1464,29 +1490,15 @@ let finished = false;
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log(
-              "▶️ REUSABLE AUDIO LANE PLAYING SUCCESSFULLY:",
-              completeName
-            );
+            console.log("▶️ REUSABLE AUDIO LANE PLAYING SUCCESSFULLY:", completeName);
           })
           .catch((error) => {
             if (error.name === "AbortError") {
-              console.log(
-                "⏸️ REUSABLE STREAM INTENTIONALLY ABORTED BY SYSTEM CONTROLS"
-              );
-
+              console.log("⏸️ REUSABLE STREAM INTENTIONALLY ABORTED BY SYSTEM CONTROLS");
               cleanup();
-
-              resolve({
-                paused: true,
-                completed: false,
-              });
+              resolve({ paused: true, completed: false });
             } else {
-              console.error(
-                "❌ PLAY PROMISE ERROR:",
-                error
-              );
-
+              console.error("❌ PLAY PROMISE ERROR:", error);
               cleanup();
               reject(error);
             }
@@ -1494,72 +1506,44 @@ let finished = false;
       }
     };
 
-    audio.addEventListener(
-      "canplaythrough",
-      onCanPlayThrough
-    );
+    audio.addEventListener("canplaythrough", onCanPlayThrough);
 
     audio.onended = () => {
       if (finished) return;
-
       console.log("✅ VOICE FINISHED:", completeName);
-
       cleanup();
 
       try {
         onFinished();
       } catch (error) {
-        console.error(
-          "❌ BINGO COMPLETION CALLBACK ERROR:",
-          error
-        );
+        console.error("❌ BINGO COMPLETION CALLBACK ERROR:", error);
       }
 
       resolve({ completed: true });
     };
 
     audio.onerror = (error) => {
-      audio.removeEventListener(
-        "canplaythrough",
-        onCanPlayThrough
-      );
+      audio.removeEventListener("canplaythrough", onCanPlayThrough);
 
       if (stateRef.current.paused) {
         cleanup();
-        resolve({
-          paused: true,
-          completed: false,
-        });
+        resolve({ paused: true, completed: false });
         return;
       }
 
-      if (
-        generationId !== audioGenerationRef.current
-      ) {
+      if (generationId !== audioGenerationRef.current) {
         cleanup();
-
-        resolve({
-          cancelled: true,
-          completed: false,
-        });
-
+        resolve({ cancelled: true, completed: false });
         return;
       }
 
-      console.error(
-        "❌ VOICE AUDIO ERROR:",
-        path,
-        error
-      );
-
+      console.error("❌ VOICE AUDIO ERROR:", path, error);
       cleanup();
-
-      reject(
-        new Error(`Could not play ${path}`)
-      );
+      reject(new Error(`Could not play ${path}`));
     };
   });
 }
+
 
 
 
@@ -2676,9 +2660,7 @@ setWinningCells(
   // Auto-call every 6 seconds when NOT paused
 
 
-  
-
- return (
+  return (
  <div className="bingo-wrapper">
     {/* SMALL BACK BUTTON */}
     <button
@@ -2751,156 +2733,1057 @@ setWinningCells(
         padding: 0
       }}
     >
+ {/* =======================================================
+    1. MASTER BINGO GRID (STAYS UP TOP FULL WIDTH)
+    ======================================================= */}
+{/* =======================================================
+    1. MASTER LAYOUT CONTAINER (BOARD + SIDEBAR ROW)
+    ======================================================= */}
+<div 
+  style={{ 
+    display: "flex", 
+    alignItems: "flex-start",     /* Aligns the top edge of the board with the top edge of the widgets */
+    justifyContent: "center",     /* Centers the whole layout on the screen */
+    gap: "20px",                  /* Horizontal distance between the board and the sidebar */
+    margin: "0 auto", 
+    width: "max-content",
+    padding: "10px"
+  }}
+>
+ <div 
+  style={{ 
+    display: "flex", 
+    flexDirection: "column", 
+    alignItems: "stretch", 
+    width: "100%", 
+  }} 
+>
+  {/* ---------------------------------------------------
+      A: MASTER BINGO GRID (LEFT SIDE)
+      --------------------------------------------------- */}
+  {/* ============================================================
+    LEFT SIDE — BINGO BOARD + CALLING HISTORY
+    ============================================================ */}
 
-        {/* --- 1. BINGO BOARD --- */}
-        <section className="board-section" style={{ margin: 0, padding: 0 }}>
-          <div className="bingo-board">
-            {['B', 'I', 'N', 'G', 'O'].map((letter) => (
-              <div key={letter} className="board-row">
-                <div className={`letter-header ${letter.toLowerCase()}`}>{letter}</div>
-                <div className="row-numbers">
-                  {getRowNumbers(letter).map((num) => {
-                    const active = isNumberCalled(letter, num);
-                    const activeClass = active ? `active-${letter.toLowerCase()}` : '';
-                    return (
-                      <div key={num} className={`number-cell ${activeClass}`}>
-                        {num}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "stretch",
+    flexShrink: 0,
+    width: "max-content",
+  }}
+>
+
+  {/* ================= BINGO BOARD ================= */}
+
+  <section
+    className="board-section"
+    style={{
+      margin: 0,
+      padding: 0,
+    }}
+  >
+    <div className="bingo-board">
+      {['B', 'I', 'N', 'G', 'O'].map((letter) => (
+        <div key={letter} className="board-row">
+
+          <div className={`letter-header ${letter.toLowerCase()}`}>
+            {letter}
           </div>
-        </section>
 
-        {/* --- 2. LEFT | MIDDLE | RIGHT DASHBOARD (TOUCHES BINGO BOARD IMMEDIATELY) --- */}
+          <div className="row-numbers">
+            {getRowNumbers(letter).map((num) => {
+              const active = isNumberCalled(letter, num);
+              const activeClass = active
+                ? `active-${letter.toLowerCase()}`
+                : '';
+
+              return (
+                <div
+                  key={num}
+                  className={`number-cell ${activeClass}`}
+                >
+                  {num}
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      ))}
+    </div>
+  </section>
+
+ {/* ============================================================ 
+    3. CALLED BALL HISTORY + LARGE CURRENT BALL 
+    ============================================================ */} 
+ 
+<div 
+  className="called-section" 
+  style={{ 
+   
+ 
+    background: "rgba(0,0,0,0.25)", 
+  width: "100%", 
+    margin: "0", 
+    padding: "8px 10px", 
+    boxSizing: "border-box", 
+    borderRadius: "0 0 10px 10px", 
+ 
+    display: "flex", 
+    alignItems: "center", 
+ 
+    gap: "18px", 
+ 
+    overflow: "hidden", 
+  }} 
+> 
+ 
+  {/* ============================================================ 
+      LEFT — LARGE CURRENT BALL 
+      ============================================================ */} 
+ 
+  <div 
+    style={{ 
+      width: "210px", 
+      minWidth: "210px", 
+      height: "165px", 
+ 
+      display: "flex", 
+      flexDirection: "column", 
+ 
+      alignItems: "center", 
+      justifyContent: "center", 
+ 
+      boxSizing: "border-box", 
+ 
+      border: "2px solid rgba(255,90,165,0.8)", 
+ 
+      borderRadius: "12px", 
+ 
+      background: 
+        "linear-gradient(145deg, rgba(255,90,165,0.10), rgba(0,0,0,0.55))", 
+ 
+      boxShadow: 
+        "0 0 15px rgba(255,90,165,0.25)", 
+ 
+      flexShrink: 0, 
+    }} 
+  > 
+ 
+    {/* CURRENT BALL TITLE */} 
+ 
+    
+ 
+    {/* ======================================================== 
+        LARGE CURRENT BALL 
+        ======================================================== */} 
+ 
+    <div 
+      style={{ 
+        width: "170px", 
+        height: "170px", 
+ 
+        borderRadius: "50%", 
+ 
+        display: "flex", 
+ 
+        alignItems: "center", 
+        justifyContent: "center", 
+ 
+        background: 
+          "radial-gradient(circle at 35% 30%, #ffffff 0%, #f4f5f7 48%, #cfd4dc 100%)", 
+ 
+        border: 
+          "5px solid #ff5aa5", 
+ 
+        boxShadow: 
+          ` 
+          0 0 10px rgba(255,90,165,0.9), 
+          0 0 25px rgba(255,90,165,0.55), 
+          inset 0 2px 5px rgba(255,255,255,0.95), 
+          inset 0 -6px 8px rgba(0,0,0,0.2), 
+          0 4px 10px rgba(0,0,0,0.55) 
+          `, 
+ 
+        flexShrink: 0, 
+ 
+        transform: current 
+          ? "scale(1.08)" 
+          : "scale(1)", 
+ 
+        transition: 
+          "transform 0.25s ease, box-shadow 0.25s ease", 
+      }} 
+    > 
+ 
+      {current ? ( 
+ 
         <div 
-          className="main-display" 
-          style={{
-            margin: '0',
-            padding: '0',
-            display: 'grid',
-            gridTemplateColumns: '1fr 1.2fr 1fr',
-            alignItems: 'center',
-            border: '1px solid rgba(255,255,255,0.05)'
-          }}
-        >
-         
-          {/* 1. Left Wing: Check Winner Interface */}
+          style={{ 
+            display: "flex", 
+            flexDirection: "column", 
+ 
+            alignItems: "center", 
+            justifyContent: "center", 
+ 
+            lineHeight: "1", 
+ 
+            color: "#172033", 
+ 
+            fontWeight: "900", 
+          }} 
+        > 
+ 
+          {/* CURRENT LETTER */} 
+ 
+          <span 
+            style={{ 
+              fontSize: "55px", 
+              fontWeight: "900", 
+ 
+              lineHeight: "1", 
+ 
+              marginBottom: "4px", 
+            }} 
+          > 
+            {current.split(" ")[0]} 
+          </span> 
+ 
+ 
+          {/* CURRENT NUMBER */} 
+ 
+          <span 
+            style={{ 
+              fontSize: "90px", 
+              fontWeight: "900", 
+ 
+              lineHeight: "0.9", 
+            }} 
+          > 
+            {current.split(" ")[1]} 
+          </span> 
+ 
+        </div> 
+ 
+      ) : ( 
+ 
+        <span 
+          style={{ 
+            fontSize: "18px", 
+ 
+            letterSpacing: "0.5px", 
+ 
+            color: "#8c9cb3", 
+ 
+            fontWeight: "bold", 
+          }} 
+        > 
+          {t.ready} 
+        </span> 
+ 
+      )} 
+ 
+    </div> 
+ 
+ 
+    {/* STATUS DOTS */} 
+ 
+    <div 
+      style={{ 
+        marginTop: "5px", 
+ 
+        gap: "3px", 
+ 
+        display: "flex", 
+      }} 
+    > 
+ 
+      <div 
+        style={{ 
+          width: "4px", 
+          height: "4px", 
+ 
+          borderRadius: "50%", 
+ 
+          background: 
+            !paused 
+              ? "#00ff66" 
+              : "#8c9cb3", 
+        }} 
+      /> 
+ 
+      <div 
+        style={{ 
+          width: "4px", 
+          height: "4px", 
+ 
+          borderRadius: "50%", 
+ 
+          background: 
+            !paused 
+              ? "#00ff66" 
+              : "#8c9cb3", 
+        }} 
+      /> 
+ 
+    </div> 
+ 
+  </div> 
+ 
+ 
+  {/* ============================================================ 
+      MIDDLE — CALLING HISTORY 
+      ============================================================ */} 
+ 
+  <div 
+    style={{ 
+      flex: "1", 
+ 
+      minWidth: "0", 
+ 
+      display: "flex", 
+      flexDirection: "column", 
+ 
+      justifyContent: "center", 
+ 
+      overflow: "hidden", 
+    }} 
+  > 
+  {/* CALLING HISTORY TITLE + COUNT */} 
+ 
+    <div 
+      style={{ 
+        display: "flex", 
+ 
+        alignItems: "center", 
+ 
+        gap: "10px", 
+ 
+        marginBottom: "5px", 
+ 
+        color: "#8c9cb3", 
+ 
+        fontWeight: "bold", 
+      }} 
+    > 
+ 
+      <span 
+        style={{ 
+          fontSize: "20px", 
+ 
+          color: "#00f0ff", 
+ 
+          fontWeight: "900", 
+ 
+          letterSpacing: "1px", 
+        }} 
+      > 
+        
+      </span> 
+ 
+ 
+      <span 
+        style={{ 
+          fontSize: "12px", 
+ 
+          color: "#070707", 
+ 
+          fontWeight: "900", 
+        }} 
+      > 
+        {called.length}
+      </span> 
+ 
+    </div> 
+ 
+ 
+   
+    {/* ======================================================== 
+        HISTORY BALLS 
+        ======================================================== */} 
+ 
+    <div 
+      style={{ 
+        display: "flex", 
+ 
+        justifyContent: "flex-start", 
+ 
+        alignItems: "center", 
+ 
+        gap: "8px", 
+ 
+        minHeight: "115px", 
+ 
+        width: "100%", 
+ 
+        overflow: "hidden", 
+      }} 
+    > 
+ 
+      {incomingHistoryBalls.length > 0 ? ( 
+ 
+        incomingHistoryBalls.map((ballStr, idx) => { 
+ 
+          const parts = 
+            String(ballStr) 
+              .trim() 
+              .split(/\s+/); 
+ 
+          const letter = parts[0]; 
+ 
+          const num = parts[1]; 
+ 
+ 
+          /* ================================================== 
+             BINGO BALL COLORS 
+             ================================================== */ 
+ 
+          const ballColors = { 
+ 
+            B: { 
+              border: "#35a9ff", 
+              glow: "rgba(53,169,255,0.55)", 
+            }, 
+ 
+            I: { 
+              border: "#f2d35c", 
+              glow: "rgba(242,211,92,0.55)", 
+            }, 
+ 
+            N: { 
+              border: "#35a9ff", 
+              glow: "rgba(53,169,255,0.55)", 
+            }, 
+ 
+            G: { 
+              border: "#35d68a", 
+              glow: "rgba(53,214,138,0.55)", 
+            }, 
+ 
+            O: { 
+              border: "#ff6b6b", 
+              glow: "rgba(255,107,107,0.55)", 
+            }, 
+ 
+          }; 
+ 
+ 
+          const ball = 
+            ballColors[letter] || { 
+ 
+              border: "#ffffff", 
+ 
+              glow: 
+                "rgba(255,255,255,0.4)", 
+ 
+            }; 
+ 
+ 
+          return ( 
+ 
+            <div 
+              key={`${ballStr}-${idx}`} 
+              style={{ 
+                width: "150px", 
+                height: "150px", 
+ 
+                minWidth: "105px", 
+ 
+                borderRadius: "50%", 
+ 
+                border: 
+                  `4px solid ${ball.border}`, 
+ 
+                background: 
+                  "radial-gradient(circle at 35% 30%, #ffffff 0%, #f4f5f7 55%, #d8dce2 100%)", 
+ 
+                boxShadow: 
+                  ` 
+                  0 0 7px ${ball.glow}, 
+                  inset 0 1px 3px rgba(255,255,255,0.9), 
+                  inset 0 -3px 5px rgba(0,0,0,0.18), 
+                  0 2px 4px rgba(0,0,0,0.45) 
+                  `, 
+ 
+                display: "flex", 
+ 
+                flexDirection: "column", 
+ 
+                alignItems: "center", 
+ 
+                justifyContent: "center", 
+ 
+                boxSizing: "border-box", 
+ 
+                opacity: 
+                  Math.max( 
+                    0.55, 
+                    1 - idx * 0.08 
+                  ), 
+ 
+                flexShrink: 0, 
+              }} 
+            > 
+ 
+              {/* LETTER */} 
+ 
+              <div 
+                style={{ 
+                  fontSize: "50px", 
+ 
+                  fontWeight: "900", 
+ 
+                  color: "#172033", 
+ 
+                  lineHeight: "1", 
+ 
+                  marginBottom: "3px", 
+                }} 
+              > 
+                {letter} 
+              </div> 
+ 
+ 
+              {/* NUMBER */} 
+ 
+              <div 
+                style={{ 
+                  fontSize: "85px", 
+ 
+                  fontWeight: "900", 
+ 
+                  color: "#172033", 
+ 
+                  lineHeight: "0.9", 
+                }} 
+              > 
+                {num} 
+              </div> 
+ 
+            </div> 
+ 
+          ); 
+ 
+        }) 
+ 
+      ) : ( 
+ 
+        <div 
+          style={{ 
+            fontSize: "20px", 
+ 
+            color: "#4b5970", 
+ 
+            fontStyle: "italic", 
+          }} 
+        > 
+          {t.waitingToBegin} 
+        </div> 
+ 
+      )} 
+ 
+    </div> 
+ 
+  </div> 
+ 
+
+
+  {/* ============================================================
+      RIGHT — SHOW/HIDE BUTTON
+      ============================================================ */}
+
+  <button
+    type="button"
+
+    onClick={() =>
+      setShowSoldCartelas(
+        (prev) => !prev
+      )
+    }
+
+    title={
+      showSoldCartelas
+        ? "Hide sold Cartelas"
+        : "Show sold Cartelas"
+    }
+
+    style={{
+      width: "42px",
+
+      height: "42px",
+
+      minWidth: "42px",
+
+      minHeight: "42px",
+
+      borderRadius: "50%",
+
+      border:
+        "2px solid rgba(0,240,255,0.8)",
+
+      background:
+        "rgba(0,0,0,0.65)",
+
+      color: "#00f0ff",
+
+      cursor: "pointer",
+
+      display: "flex",
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      fontSize: "28px",
+
+      fontWeight: "bold",
+
+      padding: 0,
+
+      margin: 0,
+
+      lineHeight: 1,
+
+      position: "relative",
+
+      zIndex: 1000001,
+
+      boxShadow:
+        "0 2px 12px rgba(0,0,0,0.6)",
+
+      flexShrink: 0,
+    }}
+  >
+    {showSoldCartelas
+      ? "◀"
+      : "▶"}
+  </button>
+ </div>
+</div>
+</div>
+
+    
+{/* ============================================================
+    RIGHT SIDE — KEEP YOUR EXISTING VERTICAL COLUMN HERE
+    ============================================================ */}
+
+{/* 🚨 STRICTLY FORCED VERTICAL COLUMN */}
+
+<div 
+  style={{ 
+    display: "flex", 
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center", 
+    gap: "16px",
+    flexShrink: 0,
+    width: "max-content"
+  }}
+>
+ {/* =======================================================
+    🏆 ITEM 1: WINNING PATTERN PREVIEW CARD
+    ======================================================= */}
+{activeWinningPattern && (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "5px",
+      width: "100%"
+    }}
+  >
+    {/* 🏆 TITLE */}
+    <div
+      style={{
+        fontSize: "11px",
+        fontWeight: "900",
+        color: "#ffffff", /* Fixed to white for dark backgrounds */
+        letterSpacing: "0.7px",
+        marginBottom: "2px",
+        textAlign: "center",
+      }}
+    >
+      🏆 {activeWinningPattern} PATTERN
+      {activeWinningPattern > 1 ? "S" : ""}
+    </div>
+
+    {/* 🎟️ BINGO CARD MATRIX */}
+    <div
+      style={{
+        width: "200px",
+        height: "200px",
+        background: "#dce8f2",
+        border: "2px solid #657789",
+        borderRadius: "6px",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        boxShadow: "0 2px 5px rgba(0,0,0,0.18)",
+      }}
+    >
+      {/* 🔤 BINGO HEADER */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          height: "27px",
+          background: "#536b82",
+          borderBottom: "2px solid #71869a",
+        }}
+      >
+        {["B", "I", "N", "G", "O"].map((letter) => (
           <div
-            className="left-panel"
+            key={letter}
             style={{
-              padding: "6px",
               display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-              borderRight: "1px solid rgba(255,255,255,0.05)",
-              height: "100%",
+              alignItems: "center",
               justifyContent: "center",
-              position: "relative",
-              zIndex: 1,
+              color: "#ffffff",
+              fontSize: "12px",
+              fontWeight: "900",
+              textShadow: "0 1px 1px rgba(0,0,0,0.25)",
+              borderRight: "1px solid rgba(255,255,255,0.18)",
+              boxSizing: "border-box",
             }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-              <input
-                type="text"
-                value={cartelaId}
-                onChange={(e) => setCartelaId(e.target.value)}
-                placeholder={t.cardIdPlaceholder}
-                style={{
-                  background: "rgba(12, 22, 45, 0.85)",
-                  border: "1.5px solid #00ff37",
-                  color: "#ffffff",
-                  borderRadius: "30px",
-                  padding: "2px 8px",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  outline: "none",
-                  textAlign: "center",
-                  height: "22px",
-                  boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
-                }}
-              />
+            {letter}
+          </div>
+        ))}
+      </div>
 
-              <button
-                className="ctrl-btn green-border"
-                style={{
-                  justifyContent: "center",
-                  padding: "2px",
-                  fontSize: "10px",
-                  fontWeight: "bold",
-                  letterSpacing: "0.5px",
-                  borderRadius: "30px",
-                  height: "22px",
-                  boxShadow: "0 0 10px rgba(0, 255, 55, 0.3)",
-                  cursor: "pointer"
-                }}
-                onClick={checkWinner}
-              >
-                <span>{t.verifyCard}</span>
-              </button>
-            </div>
+      {/* 🔲 5 × 5 GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(5, 1fr)",
+          gridTemplateRows: "repeat(5, 1fr)",
+          width: "100%",
+          height: "calc(100% - 27px)",
+          background: "#dce8f2",
+        }}
+      >
+        {Array.from({ length: 25 }).map((_, index) => {
+          const row = Math.floor(index / 5);
+          const col = index % 5;
+          const cellKey = `${row}-${col}`;
 
+          const highlighted = displayedWinningPatterns?.includes(cellKey) ?? false;
+
+          return (
             <div
-              className="info-card"
+              key={index}
               style={{
-                padding: "6px",
-                background: "rgba(13, 29, 45, 0.6)",
-                borderRadius: "14px",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
-                backdropFilter: "blur(4px)",
-                boxShadow: "0 0 12px rgba(0, 200, 255, 0.15)",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: highlighted ? "#cbdbea" : "#e3edf5",
+                borderRight: col < 4 ? "1px solid #91a5b8" : "none",
+                borderBottom: row < 4 ? "1px solid #91a5b8" : "none",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-                <button
-                  className="ctrl-btn gold-border"
-                  style={{
-                    padding: "2px 8px",
-                    fontSize: "11px",
-                    fontWeight: "800",
-                    flex: 1,
-                    justifyContent: "center",
-                    borderRadius: "100px",
-                    height: "26px",
-                    color: "#000000",
-                    boxShadow: "0 0 10px rgba(0, 200, 255, 0.4)",
-                    cursor: "pointer"
-                  }}
-                  onClick={togglePlayPause}
-                >
-                  <span>{paused ? t.play : t.pause}</span>
-                </button>
-              </div>
-
-              <div style={{ textAlign: "center", marginTop: "4px" }}>
+              {/* 🔵 WINNING CIRCLE */}
+              {highlighted && (
                 <div
                   style={{
-                    fontSize: "22px",
-                    color: "#a0aec0",
-                    fontWeight: "bold",
-                    letterSpacing: "1px"
+                    width: "72%",
+                    height: "72%",
+                    maxWidth: "24px",
+                    maxHeight: "24px",
+                    minWidth: "11px",
+                    minHeight: "11px",
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle at 35% 30%, #4d9cff, #0066d6 65%, #0054b8)",
+                    border: "1px solid #004fa8",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
                   }}
-                >
-                  የጨዋታው ደራሽ
-                </div>
-
-                <div
-                  style={{
-                    fontSize: "60px",
-                    color: "#00f0ff",
-                    fontWeight: "900",
-                    textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
-                    lineHeight: "1.1"
-                  }}
-                >
-                  {game.netIncome ? game.netIncome : game.prize} ብር
-                </div>
-              </div>
+                />
+              )}
             </div>
-          </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+)}
 
+    {/* =======================================================
+        💙 ITEM 2: LEFT PANEL INTERFACE (CONTROLS & INCOME)
+        ======================================================= */}
+    <div
+      className="left-panel"
+      style={{
+        padding: "6px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "6px",
+        borderTop: "1px solid rgba(255,255,255,0.05)", /* Subtle top line separating from Item 1 */
+        width: "100%",
+        justifyContent: "center",
+        position: "relative",
+        zIndex: 1,
+      }}
+    >
+      {/* CARD ID VERIFICATION SLOT */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        <input
+          type="text"
+          value={cartelaId}
+          onChange={(e) => setCartelaId(e.target.value)}
+          placeholder={t.cardIdPlaceholder}
+          style={{
+            background: "rgba(12, 22, 45, 0.85)",
+            border: "1.5px solid #00ff37",
+            color: "#ffffff",
+            borderRadius: "30px",
+            padding: "3px 10px",
+            fontSize: "10px",
+            fontWeight: "bold",
+            outline: "none",
+            textAlign: "center",
+            height: "22px",
+            boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
+          }}
+        />
+
+        <button
+          className="ctrl-btn green-border"
+          style={{
+            justifyContent: "center",
+            padding: "2px",
+            fontSize: "18px",
+            fontWeight: "bold",
+            letterSpacing: "0.5px",
+            borderRadius: "30px",
+            height: "22px",
+            boxShadow: "0 0 10px rgba(0, 255, 55, 0.3)",
+            cursor: "pointer"
+          }}
+          onClick={checkWinner}
+        >
+          <span>{t.verifyCard}</span>
+        </button>
+      </div>
+
+      {/* PLAY/PAUSE ACTION AND INCOME STATUS CARD */}
+      <div
+        className="info-card"
+        style={{
+          padding: "6px",
+          background: "rgba(13, 29, 45, 0.6)",
+          borderRadius: "14px",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          backdropFilter: "blur(4px)",
+          boxShadow: "0 0 12px rgba(0, 200, 255, 0.15)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+          <button
+            className="ctrl-btn gold-border"
+            style={{
+              padding: "2px 8px",
+              fontSize: "17px",
+              fontWeight: "800",
+              flex: 1,
+              justifyContent: "center",
+              borderRadius: "100px",
+              height: "26px",
+              color: "#000000",
+              boxShadow: "0 0 10px rgba(0, 200, 255, 0.4)",
+              cursor: "pointer"
+          }}
+          onClick={togglePlayPause}
+        >
+          <span>{paused ? t.play : t.pause}</span>
+        </button>
+      </div>
+
+      <div style={{ textAlign: "center", marginTop: "4px" }}>
+        <div
+          style={{
+            fontSize: "35px",
+            color: "#a0aec0",
+            fontWeight: "bold",
+            letterSpacing: "1px"
+          }}
+        >
+          የጨዋታው ደራሽ
+        </div>
+
+        <div
+          style={{
+            fontSize: "60px",
+            color: "#00f0ff",
+            fontWeight: "900",
+            textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
+            lineHeight: "1.1"
+          }}
+        >
+          {game.netIncome ? game.netIncome : game.prize}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* =======================================================
+        ITEM 3: High-Visibility Current Called Display
+        ======================================================= */}
+     {/* CALLING HISTORY TITLE + COUNT */} 
+ 
+    <div 
+      style={{ 
+        display: "flex", 
+ 
+        alignItems: "center", 
+ 
+        gap: "10px", 
+ 
+        marginBottom: "5px", 
+ 
+        color: "#8c9cb3", 
+ 
+        fontWeight: "bold", 
+      }} 
+    > 
+ 
+      <span 
+        style={{ 
+          fontSize: "20px", 
+ 
+          color: "#00f0ff", 
+ 
+          fontWeight: "900", 
+ 
+          letterSpacing: "1px", 
+        }} 
+      > 
+        
+      </span> 
+ 
+ 
+      <span 
+        style={{ 
+          fontSize: "80px", 
+ 
+          color: "#070707", 
+ 
+          fontWeight: "900", 
+        }} 
+      > 
+        {called.length}
+      </span> 
+ 
+    </div> 
+ 
+ 
+   
+    {/* =======================================================
+        🎙️ ITEM 4: TEXT-ONLY COUNTDOWN DISPLAY
+        ======================================================= */}
+    {/* =======================================================
+    🎙️ ITEM 4: RECTANGULAR EDITABLE COUNTDOWN DISPLAY
+    ======================================================= */}
+{(() => {
+  // 🎨 EDITABLE STYLE CONFIGURATION VARIABLES (Change these values to adjust size/fonts)
+  const BOX_WIDTH = "50%";       // Width of the rectangle box container
+  const BOX_HEIGHT = "100px";      // Height of the rectangle box container
+  const BOX_BG = "#09090a";       // Background color of the rectangle box
+ const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)"; // Border color and style
+const BOX_RADIUS = "8px"; // Box corner roundness
+  
+  const FONT_SIZE = "100px";       // General editable font size for the countdown texts
+  const FONT_WEIGHT = "1200";      // Editable font weight boldness
+  
+  // Editable individual state text colors
+  const COLOR_PAUSED = "#ffffffff"; 
+  const COLOR_VOICE = "#ffffffff";  
+  const COLOR_DELAY = "#fffffffffff";  
+  const COLOR_DEFAULT = "#ffffffff"; 
+
+  return (
+    <div 
+      style={{ 
+        width: "100%",
+        borderTop: "1px solid rgba(255,255,255,0.05)", /* Divider separating from Item 3 */
+        paddingTop: "12px",
+        marginTop: "4px",
+        display: "flex",
+        justifyContent: "center"
+      }}
+    >
+      <div 
+        className="countdown-rectangular-box"
+        style={{ 
+          fontStyle: "normal", 
+          display: "flex", 
+          alignItems: "center", 
+          justifyContent: "center",
+          flexShrink: 0,
+          width: BOX_WIDTH,
+          height: BOX_HEIGHT,
+          background: BOX_BG,
+          border: BOX_BORDER,
+          borderRadius: BOX_RADIUS,
+          boxSizing: "border-box",
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.9)"
+        }}
+      >
+        {paused ? (
+          <span style={{ color: COLOR_PAUSED, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
+           
+          </span>
+        ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? (
+          /* Voice playback countdown - strictly whole seconds */
+           <span style={{ color: COLOR_VOICE, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
+             {Math.ceil(Math.max(0, audioDuration - audioCurrentTime))}s
+          </span>
+        ) : current && callIntervalTimeLeft > 0 ? (
+          /* Delay pacing interval countdown - strictly whole seconds */
+          <span style={{ color: COLOR_DELAY, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
+            ⏳ {Math.ceil(callIntervalTimeLeft)}s
+          </span>
+        ) : (
+          /* Default state (Also handles drawing fallback automatically) */
+          <span style={{ color: COLOR_DEFAULT, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
+           
+          </span>
+        )}
+      </div>
+    </div>
+  );
+})()}
+
+  </div> {/* Closes vertical column wrapper */}
+</div> {/* Closes horizontal side-by-side board wrapper */}
+  
+  {/* =======================================================
+    2. MIDDLE CONTROLS ROW (TOUCHING IMMEDIATELY UNDER THE BOARD)
+    ======================================================= */}
+<div 
+  style={{ 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center", /* Packs everything closely into the center */
+    gap: "20px",              /* Tight spacing between items */
+    margin: "0 auto",         /* Centers the container horizontally */
+    padding: "4px 24px",      /* Small padding to keep things compact */
+    width: "max-content",     /* Prevents container from stretching across the screen */
+    background: "rgba(255, 255, 255, 0.02)",
+    borderRadius: "12px",
+    border: "1px solid rgba(255, 255, 255, 0.05)"
+  }}
+>
+  
+  {/* 💡 PASTE YOUR MIDDLE ITEMS (LIKE THE BALL MIXER) DIRECTLY IN HERE */}
+
+
+
+
+          
           {/* CENTER AREA: WINNING PATTERN (LEFT) + ROLLING MACHINE (RIGHT) */}
           <div
             style={{
@@ -3201,273 +4084,21 @@ setWinningCells(
                 </div>
               </div>
             )}
-          
-{/* 1. LEFT SIDE: WINNING PATTERN PREVIEW (COMPLETELY WHITE BOARD SHIELD ENFORCED) */}
-{/* 🏆 1:1 REACT JSX OVERHAUL: PURE WHITE GRID TILE MATRIX BACKGROUND */}
-{activeWinningPattern && (
-  <div
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "5px",
-    }}
-  >
-    {/* 🏆 TITLE */}
-    <div
-      style={{
-        fontSize: "11px",
-        fontWeight: "900",
-        color: "#111827",
-        letterSpacing: "0.7px",
-        marginBottom: "2px",
-        textAlign: "center",
-      }}
-    >
-      🏆 {activeWinningPattern} PATTERN
-      {activeWinningPattern > 1 ? "S" : ""}
-    </div>
-
-    {/* 🎟️ BINGO CARD */}
-    <div
-      style={{
-        width: "125px",
-        height: "145px",
-        background: "#dce8f2",
-        border: "2px solid #657789",
-        borderRadius: "6px",
-        overflow: "hidden",
-        boxSizing: "border-box",
-        boxShadow: "0 2px 5px rgba(0,0,0,0.18)",
-      }}
-    >
-      {/* 🔤 BINGO HEADER */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          height: "27px",
-          background: "#536b82",
-          borderBottom: "2px solid #71869a",
-        }}
-      >
-        {["B", "I", "N", "G", "O"].map((letter) => (
-          <div
-            key={letter}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#ffffff",
-              fontSize: "12px",
-              fontWeight: "900",
-              textShadow: "0 1px 1px rgba(0,0,0,0.25)",
-              borderRight: "1px solid rgba(255,255,255,0.18)",
-              boxSizing: "border-box",
-            }}
-          >
-            {letter}
-          </div>
-        ))}
-      </div>
-
-      {/* 🔲 5 × 5 GRID */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gridTemplateRows: "repeat(5, 1fr)",
-          width: "100%",
-          height: "calc(100% - 27px)",
-          background: "#dce8f2",
-        }}
-      >
-        {Array.from({ length: 25 }).map((_, index) => {
-          const row = Math.floor(index / 5);
-          const col = index % 5;
-          const cellKey = `${row}-${col}`;
-
-          const highlighted =
-            displayedWinningPatterns?.includes(cellKey) ?? false;
-
-          return (
-            <div
-              key={index}
-              style={{
-                position: "relative",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: highlighted
-                  ? "#cbdbea"
-                  : "#e3edf5",
-                borderRight:
-                  col < 4
-                    ? "1px solid #91a5b8"
-                    : "none",
-                borderBottom:
-                  row < 4
-                    ? "1px solid #91a5b8"
-                    : "none",
-                boxSizing: "border-box",
-              }}
-            >
-              {/* 🔵 WINNING CIRCLE */}
-              {highlighted && (
-                <div
-                  style={{
-                    width: "72%",
-                    height: "72%",
-                    maxWidth: "24px",
-                    maxHeight: "24px",
-                    minWidth: "11px",
-                    minHeight: "11px",
-                    borderRadius: "50%",
-                    background:
-                      "radial-gradient(circle at 35% 30%, #4d9cff, #0066d6 65%, #0054b8)",
-                    border: "1px solid #004fa8",
-                    boxShadow:
-                      "0 1px 2px rgba(0,0,0,0.25)",
-                  }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  </div>
-)}
-
-            {/* 2. RIGHT SIDE: ROLLING MACHINE CAGE */}
-            <div className="cage-container">
-              <div className="cage-sphere">
-                <div className="glass-reflection-light"></div>
-                <div className="glass-reflection-dark"></div>
-
-                {cageBalls?.map((ball) => (
-                  <div
-                    key={ball.id}
-                    className="mini-ball"
-                    style={{
-                      left: `${ball.x}%`,
-                      top: `${ball.y}%`,
-                      backgroundColor: ball.color,
-                    }}
-                  >
-                    <span className="mini-ball-num">{ball.num}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="machine-handle"></div>
-              <div className="ball-exit">
-                {current && (
-                  <div className="called-ball">
-                    {current.includes(" ") ? current.split(" ")[1] : current}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Right Wing: High-Visibility Current Called Display */}
-         <div
-  className="ball-column"
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "200%",
-    height: "200px",
-    boxSizing: "border-box",
-    borderLeft: "1px solid rgba(255,255,255,0.05)",
-  }}
->
-            <span style={{ fontSize: '20px', fontWeight: 'bold', color: '#ff5aa5', letterSpacing: '1px', marginBottom: '2px' }}>
-              {t.currentBall}
-            </span>
             
-            <div className="current-ball-display">
-              <div className="neon-ball-inner">
-                {current ? (
-                  <>
-                    <span className="ball-letter">{current.split(" ")[0]}</span>
-                    <span className="ball-number">{current.split(" ")[1]}</span>
-                  </>
-                ) : (
-                  <span className="ball-letter" style={{ fontSize: '18px', letterSpacing: '0.5px', color: '#8c9cb3' }}>
-                    {t.ready}
-                  </span>
-                )}
-              </div>
-            </div>
+ 
+    
+        
 
-            <div className="indicator-dots" style={{ marginTop: '2px', gap: '3px', display: 'flex' }}>
-              <div className="dot" style={{ width: '4px', height: '4px', background: !paused ? '#00ff66' : '#8c9cb3' }} />
-              <div className="dot" style={{ width: '4px', height: '4px', background: !paused ? '#00ff66' : '#8c9cb3' }} />
-            </div>
+  
           </div>
 
+  
         </div>
+        
+    
 
-
-
-
-
-  {/* =====================================================
-      ARROW BUTTON
-      ===================================================== */}
-
-  <button
-    type="button"
-    onClick={() =>
-      setShowSoldCartelas((prev) => !prev)
-    }
-    title={
-      showSoldCartelas
-        ? "Hide sold Cartelas"
-        : "Show sold Cartelas"
-    }
-    style={{
-      width: "42px",
-      height: "42px",
-      minWidth: "42px",
-      minHeight: "42px",
-
-      borderRadius: "50%",
-      border: "2px solid rgba(0, 240, 255, 0.8)",
-
-      background: "rgba(0, 0, 0, 0.65)",
-
-      color: "#00f0ff",
-
-      cursor: "pointer",
-
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-
-      fontSize: "28px",
-      fontWeight: "bold",
-
-      padding: 0,
-      margin: 0,
-
-      lineHeight: 1,
-
-      position: "relative",
-
-      zIndex: 1000001,
-
-      boxShadow:
-        "0 2px 12px rgba(0, 0, 0, 0.6)"
-    }}
-  >
-    {showSoldCartelas ? "◀" : "▶"}
-  </button>
+        
+ 
        {/* =========================================================
     SOLD CARTELAS OVERLAY
     ALL NUMBERS VISIBLE — NO SCROLLING
@@ -3618,186 +4249,7 @@ setWinningCells(
 
   </div>
 )}
-        {/* --- 3. CALLED BALL HISTORY (TOUCHES DASHBOARD IMMEDIATELY) --- */}
-        <div
-          className="called-section"
-          style={{
-            width: "100%",
-            margin: "0",
-            padding: "0px",
-            boxSizing: "border-box",
-            background: "rgba(0,0,0,0.25)",
-            borderRadius: "0 0 10px 10px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "15px",
-              marginBottom: "5px",
-              color: "#8c9cb3",
-              fontWeight: "bold",
-              textAlign: "center",
-            }}
-          >
-        <span
-  style={{
-    fontSize: "45px",
-    fontWeight: "bold",
-  }}
->
-  ({called.length}/75)
-</span>
-          </div>  
-  
-          <div  
-            style={{  
-              display: "flex",  
-              justifyContent: "center",  
-              gap: "8px",  
-              alignItems: "center",  
-              minHeight: "72px",  
-              width: "100%",  
-              overflow: "hidden",  
-            }}     
-           > 
-          {incomingHistoryBalls.length > 0 ? (
-  incomingHistoryBalls.map((ballStr, idx) => {
-    const parts = String(ballStr).trim().split(/\s+/);
-    const letter = parts[0];
-    const num = parts[1];
-
-    // 🎨 BINGO BALL COLORS
-    const ballColors = {
-      B: {
-        border: "#35a9ff",
-        glow: "rgba(53,169,255,0.55)",
-      },
-      I: {
-        border: "#f2d35c",
-        glow: "rgba(242,211,92,0.55)",
-      },
-      N: {
-        border: "#35a9ff",
-        glow: "rgba(53,169,255,0.55)",
-      },
-      G: {
-        border: "#35d68a",
-        glow: "rgba(53,214,138,0.55)",
-      },
-      O: {
-        border: "#ff6b6b",
-        glow: "rgba(255,107,107,0.55)",
-      },
-    };
-
-    const ball = ballColors[letter] || {
-      border: "#ffffff",
-      glow: "rgba(255,255,255,0.4)",
-    };
-
-    return (
-      <div
-        key={`${ballStr}-${idx}`}
-        style={{
-          width: "140px",
-          height: "140px",
-          minWidth: "67px",
-          borderRadius: "50%",
-
-          /* 🎯 COLORED OUTER RING */
-          border: `4px solid ${ball.border}`,
-
-          /* 🎯 BALL CENTER */
-          background:
-            "radial-gradient(circle at 35% 30%, #ffffff 0%, #f4f5f7 55%, #d8dce2 100%)",
-
-          /* 🎯 DEPTH / GLOW */
-          boxShadow: `
-            0 0 7px ${ball.glow},
-            inset 0 1px 3px rgba(255,255,255,0.9),
-            inset 0 -3px 5px rgba(0,0,0,0.18),
-            0 2px 4px rgba(0,0,0,0.45)
-          `,
-
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-
-          position: "relative",
-          boxSizing: "border-box",
-
-          /* Keep your fade effect */
-          opacity: Math.max(0.55, 1 - idx * 0.08),
-
-          flexShrink: 0,
-        }}
-      >
-      {/* ✅ OVERLAP-PROOF STRUCTURAL SEPARATION VALVE */}
-<div
-  style={{
-    display: "flex",
-    flexDirection: "column", /* Forces the letter to stack vertically on top of the number cleanly */
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    height: "100%", /* Lets the internal text scale naturally to fill the circle area */
-    padding: "2px 0",
-    boxSizing: "border-box"
-  }}
->
-  {/* 🔤 TOP TRACK LETTER */}
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "45px", /* Balanced down perfectly to fit above the digits */
-      fontWeight: "900",
-      color: "#FFFFFF", /* Forced high-visibility pure white matching your image layout */
-      lineHeight: "1.1",
-      textTransform: "uppercase",
-      letterSpacing: "0.5px",
-      margin: "0",
-      padding: "0"
-    }}
-  >
-    {letter}
-  </div>
-
-  {/* 🔢 MAIN LARGE NUMBER VALUE */}
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: "70px", /* Scaled to casino-grade balance scale so 2-digit rows cannot bleed out */
-      fontWeight: "900",
-      color: "#D1D5DB", /* High-contrast clean off-white tone mimicking phone layout specular reflection lights */
-      lineHeight: "0.95",
-      marginTop: "1px",
-      marginRight: "2px", /* Precision nudge to guarantee dual digits stay dead centered */
-      padding: "0"
-    }}
-  >
-    {num}
-  </div>
-</div>
-
-      </div>
-    );
-  })
-) : (
-  <div
-    style={{
-      fontSize: "20px",
-      color: "#4b5970",
-      fontStyle: "italic",
-    }}
-  >
-    {t.waitingToBegin}
-  </div>
-)}   <button
+         <button
   type="button"
   onClick={() => setShowGameControls((prev) => !prev)}
   title={showGameControls ? "Hide game controls" : "Show game controls"}
@@ -3833,10 +4285,11 @@ setWinningCells(
     zIndex: 1000001,
   }}
 >
+
+ 
   {showGameControls ? "◀" : "▶"}
 </button>
-          </div>
-        </div>
+         
 
         {/* --- 4. REMAINING UI / FOOTER CONSOLE BAR (TOUCHES CALLED BALLS IMMEDIATELY) --- */}
        {/* =========================================================

@@ -1,573 +1,1436 @@
 /* ==========================================================================
-   1. GLOBAL RESET, CONFIGURATION, & SCROLLABLE VIEWPORT
+   BINGO DASHBOARD — ADJUSTABLE LEFT / RIGHT LAYOUT
    ========================================================================== */
 :root {
-    /* Authoritative Core Canvas Containers (Decoded directly from screenshot) */
+    --left-width: 220px;
+    --cage-width: 130px;
+    --right-width: 250px;
+
+    --display-height: 300px;
+}
+:root {
+
+    /* ================================================================
+       MAIN COLORS
+       ================================================================ */
+
     --bg-main-midnight: #0B1320;
     --bg-panel-slate: #121B2A;
-    
-    /* Number Board State Variable Containers */
+
     --color-uncalled-box: #2A323D;
     --color-uncalled-text: #8A99A8;
-    
-    /* Active State Highlights */
+
     --color-active-green: #39E703;
     --color-active-text-dark: #000000;
+
     --color-coral-alert: #FF5653;
     --color-neon-cyan: #00F0D1;
-    
-    /* Typography Overhaul Elements */
+
     --text-primary-white: #FFFFFF;
     --text-muted-gray: #5F6E7D;
+
     --border-operational-blue: #1e3b5d;
+
+
+    /* ================================================================
+       ⭐ LEFT / RIGHT SIZE CONTROL
+
+       CHANGE ONLY THIS VALUE
+
+       50% = equal
+       60% = bigger LEFT
+       70% = much bigger LEFT
+       80% = very big LEFT
+
+       The RIGHT side automatically gets the rest.
+       ================================================================ */
+
+    --left-width: 70%;
+    --right-width: 30%;
+
+
+    /* Space between left and right */
+
+    --side-divider-width: 2px;
 }
+
+
+/* ==========================================================================
+   1. GLOBAL RESET
+   ========================================================================== */
 
 * {
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     margin: 0;
     padding: 0;
-    width: 100vw;
+
+    width: 100%;
     min-height: 100vh;
-    overflow-x: hidden;
-    overflow-y: auto; /* Enables vertical scrolling when content exceeds view height */
-    background-color: var(--bg-main-midnight);
+
+    background-color:
+        var(--bg-main-midnight);
+
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+body {
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 }
 
 #root {
     width: 100%;
     min-height: 100vh;
-    overflow-x: hidden;
+
+    overflow-x: auto;
     overflow-y: auto;
 }
+
+
+/* ==========================================================================
+   2. MAIN BINGO WRAPPER
+   ========================================================================== */
 
 .bingo-wrapper {
-    width: 100vw;
+
+    width: 100%;
     min-height: 100vh;
-    overflow-x: hidden;
-    overflow-y: auto;
-    background: var(--bg-main-midnight);
+
+    background:
+        var(--bg-main-midnight);
+
     display: flex;
     flex-direction: column;
+
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
-.bingo-container {
+
+/* ==========================================================================
+   3. TWO-SIDE DASHBOARD
+
+   LEFT = EXISTING BINGO UI
+   RIGHT = NEW UI SPACE
+   ========================================================================== */
+
+.bingo-split-layout {
+
     width: 100%;
-    max-width: 1400px;
+
+    min-width: 1100px;
+
     min-height: 100vh;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    padding: 4px 8px;
-    gap: 4px;
-    justify-content: space-between;
+
+    display: grid;
+
+    grid-template-columns:
+        var(--left-width)
+        var(--right-width);
+
+    align-items: stretch;
+
+    margin: 0;
+    padding: 0;
+
     box-sizing: border-box;
+}
+
+
+/* ==========================================================================
+   4. LEFT SIDE
+   ========================================================================== */
+
+.bingo-left-side {
+
+    width: 100%;
+
+    min-width: 0;
+
+    min-height: 100vh;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: stretch;
+
+    justify-content: flex-start;
+
+    background:
+        var(--bg-main-midnight);
+
+    border-right:
+        var(--side-divider-width)
+        solid
+        rgba(0,240,209,0.25);
+
     overflow: visible;
+
+    box-sizing: border-box;
+}
+
+
+/* ==========================================================================
+   5. EXISTING BINGO CONTAINER
+   ========================================================================== */
+
+.bingo-container {
+
+    width: 100%;
+
+    min-width: 0;
+
+    max-width: none;
+
+    min-height: 100vh;
+
+    margin: 0;
+
+    padding: 16px 16px;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 4px;
+
+    justify-content: space-between;
+
+    box-sizing: border-box;
+
+    overflow: visible;
+
     flex: 1 1 auto;
+}
+
+
+/* ==========================================================================
+   6. BINGO BOARD SECTION
+   ========================================================================== */
+
+.board-section {
+
+    width: 100%;
+
+    flex-shrink: 0;
+
+    margin-bottom: -1px;
+
+}
+/* ==========================================================================
+   7. MAIN BINGO DISPLAY
+
+   LEFT CONTROL | CAGE | CURRENT BALL
+   ========================================================================== */
+
+.main-display {
+
+    width: calc(
+        var(--left-width) +
+        var(--cage-width) +
+        var(--right-width)
+    );
+
+    height: var(--display-height);
+
+    display: grid;
+
+    grid-template-columns:
+        var(--left-width)
+        var(--cage-width)
+        var(--right-width);
+
+    align-items: center;
+
+    column-gap: 2px;
+
+    box-sizing: border-box;
+
+    overflow: visible;
 }
 
 /* ==========================================================================
-   2. BINGO BOARD GRID SECTION (UPDATED FOR BOLD WHITE CALLED CELLS)
+   8. BINGO BOARD
    ========================================================================== */
-.board-section {
-    width: 100%;
-    flex-shrink: 0;
-    margin-bottom: -1px;
-}
-
-.main-display {
-    margin-top: 0 !important;
-    flex: 1 1 auto;
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    align-items: center;
-    justify-items: center;
-}
 
 .bingo-board {
+
+    width: 1500px;
+    height: 500px;
+
     display: flex;
     flex-direction: column;
+
     gap: 3px;
-    background: var(--bg-panel-slate);
+
+    background:
+        var(--bg-panel-slate);
+
     padding: 4px;
+
     border-radius: 12px;
-    border: 2px solid var(--border-operational-blue);
-    box-shadow: 0 0 20px rgba(255, 255, 255, .05);
+
+    border:
+        2px solid
+        var(--border-operational-blue);
+
+    box-shadow:
+        0 0 20px rgba(255,255,255,.05);
+
+    overflow: visible;
+
+    flex-shrink: 0;
+
+    box-sizing: border-box;
 }
+/* ==========================================================================
+   9. BINGO BOARD ROW
+   ========================================================================== */
 
 .board-row {
     display: grid;
-    grid-template-columns: minmax(30px, 50px) 1fr;
+
+    grid-template-columns:
+        50px
+        1fr;
+
     gap: 4px;
-    align-items: center;
+
+    align-items: stretch;
+
+    width: 100%;
+
+    flex: 1;
+
+    overflow: visible;
+
+    box-sizing: border-box;
 }
+
+/* ==========================================================================
+   10. BINGO LETTER HEADER
+   ========================================================================== */
 
 .letter-header {
-    height: clamp(28px, 4vw, 45px);
+
+    width: 50px;
+
+  height: 100%;
     display: flex;
+
     justify-content: center;
+
     align-items: center;
-    font-size: clamp(29px, 2.5vw, 40px);
+
+    font-size: 40px;
+
+    line-height: 45px;
+
     font-weight: 990;
+
     border-radius: 6px;
-    color: var(--text-primary-white);
-    background: var(--bg-main-midnight); 
+
+    border:
+        1px solid
+        rgba(255,255,255,0.1) !important;
+
+    color:
+        var(--text-primary-white);
+
+    background:
+        var(--bg-main-midnight);
+
+    flex-shrink: 0;
+
+    box-sizing: border-box;
 }
+
 
 /* ==========================================================================
-   🎯 EXACT SCREENSHOT MATCH: B I N G O ROW HEADERS
+   11. NUMBER ROW
    ========================================================================== */
-/* ==========================================================================
-   🎯 EXACT SCREENSHOT MATCH: CHROME DASHBOARD BINGO ROW HEADERS
-   ========================================================================== */
-/* ==========================================================================
-   🎯 EXACT MATCH: BINGO ROW HEADERS WITH INDIVIDUAL CASINO COLORS
-   ========================================================================== */
-.letter-header {
-    height: clamp(28px, 4vw, 45px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: clamp(29px, 2.5vw, 40px);
-    font-weight: 990;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-/* 🟥 B - Vibrant Casino Orange-Red */
-.letter-header.b { 
-    background: #2650dc !important; 
-    color: #FFFFFF !important; 
-    box-shadow: 0 0 10px rgba(217, 70, 39, 0.3);
-}
-
-/* ⬜ I - Crisp Matte White Box with Deep Dark Text */
-.letter-header.i { 
-    background: #0c2cc9 !important; 
-    color: #FFFFFF !important; 
-    box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-}
-
-/* 🟪 N - Deep Coral Red / Velvet Crimson */
-.letter-header.n { 
-    background: #2b3ae2 !important; 
-    color: #FFFFFF !important; 
-    box-shadow: 0 0 10px rgba(226, 43, 67, 0.3);
-}
-
-/* 🟩 G - Electric Lime Green with Deep Dark Text */
-.letter-header.g { 
-    background: #0b28e4 !important; 
-    color: #0B1320 !important; 
-    box-shadow: 0 0 10px rgba(57, 231, 3, 0.4);
-}
-
-/* 🟨 O - Bright Amber Orange-Gold */
-.letter-header.o { 
-    background: #1636d4 !important; 
-    color: #FFFFFF !important; 
-    box-shadow: 0 0 10px rgba(231, 155, 3, 0.3);
-}
-
 
 .row-numbers {
+
     display: grid;
-    grid-template-columns: repeat(15, minmax(0, 1fr));
+
+    /*
+       15 cells share the entire available width
+    */
+    grid-template-columns:
+        repeat(15, 1fr);
+
     gap: 3px;
+
+    width: 100%;
+height: 100%;
+    overflow: visible;
+
+    box-sizing: border-box;
 }
+
+
+/* ==========================================================================
+   12. NUMBER CELL
+   ========================================================================== */
 
 .number-cell {
-    height: clamp(36px, 4vw, 55px);
+
+    width: 100%;
+
+    min-width: 0;
+
+  height: 100%;
+min-height: 0;
     display: flex;
+
     justify-content: center;
+
     align-items: center;
-    font-size: clamp(50px, 1.8vw, 60px);
+
+    font-size: 60px;
+
+ line-height: 1;
+
     font-weight: bold;
+
     border-radius: 6px;
-    background: var(--color-uncalled-box);
-    border: 1px solid var(--border-operational-blue);
-    transition: transform .25s ease, background-color .25s ease, color .25s ease, box-shadow .25s ease;
-    color: var(--color-uncalled-text);
+
+    background:
+        var(--color-uncalled-box);
+
+    border:
+        1px solid
+        var(--border-operational-blue);
+
+    color:
+        var(--color-uncalled-text);
+
+    transition:
+        transform .25s ease,
+        background-color .25s ease,
+        color .25s ease,
+        box-shadow .25s ease;
+
+    flex-shrink: 0;
+
+    white-space: nowrap;
+
+    overflow: visible;
+
+    box-sizing: border-box;
 }
+
 
 .number-cell:hover {
-    transform: scale(1.05);
+
+    transform:
+        scale(1.05);
 }
 
-/* ✅ PURE BOLD WHITE MATCH: Replaces the lime green completely across all rows!
-   When a ball is called, its background box style stays uniform while the text flashes bright bold white. */
-.active-b, .active-i, .active-n, .active-g, .active-o { 
-    background-color: var(--color-uncalled-box) !important; 
-    border: 1px solid var(--text-primary-white) !important;
-    color: var(--text-primary-white) !important; 
-    font-weight: 900 !important;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
-    box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.1);
+
+/* ACTIVE */
+
+.active-b,
+.active-i,
+.active-n,
+.active-g,
+.active-o {
+
+    background-color:
+        var(--color-uncalled-box) !important;
+
+    border:
+        1px solid
+        var(--text-primary-white) !important;
+
+    color:
+        var(--text-primary-white) !important;
+
+    font-weight:
+        900 !important;
+
+    text-shadow:
+        0 0 10px rgba(255,255,255,.6);
+
+    box-shadow:
+        inset 0 0 8px rgba(255,255,255,.1);
 }
 /* ==========================================================================
-   3. MIDDLE CONTROL DASHBOARD PANEL (HIGH CONTRAST HIGHLIGHTS)
+   13. CONTROL PANEL
    ========================================================================== */
+
 .left-panel {
+
     padding: 2px;
+
     width: 100%;
+
     max-width: 300px;
+
     justify-self: start;
-    background-color: var(--bg-panel-slate);
-    border: 1px solid rgba(0, 240, 209, 0.15);
+
+    background-color:
+        var(--bg-panel-slate);
+
+    border:
+        1px solid
+        rgba(0,240,209,0.15);
+
     border-radius: 4px;
+
+    overflow: visible;
 }
+
+
+/* INPUT */
 
 input {
+
     width: 50%;
+
     height: 20px;
+
     font-size: 14px;
+
     font-weight: bold;
+
     text-align: center;
-    background: var(--color-uncalled-box);
+
+    background:
+        var(--color-uncalled-box);
+
     border-radius: 6px;
-    border: 2px solid var(--color-neon-cyan);
-    color: var(--text-primary-white);
+
+    border:
+        2px solid
+        var(--color-neon-cyan);
+
+    color:
+        var(--text-primary-white);
 }
 
+
+/* BUTTON */
+
 .ctrl-btn {
+
     cursor: pointer;
+
     border: none;
+
     height: 36px;
+
     border-radius: 8px;
+
     font-size: 12px;
+
     font-weight: bold;
-    transition: transform .3s ease;
-    color: var(--color-active-text-dark);
+
+    transition:
+        transform .3s ease;
+
+    color:
+        var(--color-active-text-dark);
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
+
     padding: 0 12px;
+
+    white-space: nowrap;
 }
 
 .ctrl-btn:hover {
-    transform: translateY(-1px);
+
+    transform:
+        translateY(-1px);
 }
 
-/* Resilient button colors matching your validation indicator flows */
-.green-border { background: var(--color-active-green); color: var(--color-active-text-dark); }
-.gold-border { background: var(--color-neon-cyan); color: var(--color-active-text-dark); }
-.red-border { background: var(--color-coral-alert); color: var(--text-primary-white); }
-.blue-border { background: var(--color-uncalled-box); color: var(--text-primary-white); border: 1px solid var(--text-muted-gray); }
 
-/* Bright Neon Cyan text shadow layers (The "160.00 ብር" panel profile) */
+/* BUTTON COLORS */
+
+.green-border {
+
+    background:
+        var(--color-active-green);
+
+    color:
+        var(--color-active-text-dark);
+}
+
+.gold-border {
+
+    background:
+        var(--color-neon-cyan);
+
+    color:
+        var(--color-active-text-dark);
+}
+
+.red-border {
+
+    background:
+        var(--color-coral-alert);
+
+    color:
+        var(--text-primary-white);
+}
+
+.blue-border {
+
+    background:
+        var(--color-uncalled-box);
+
+    color:
+        var(--text-primary-white);
+
+    border:
+        1px solid
+        var(--text-muted-gray);
+}
+
+
+/* INFO CARD */
+
 .info-card {
-    background: var(--bg-main-midnight);
+
+    background:
+        var(--bg-main-midnight);
+
     padding: 6px;
+
     border-radius: 8px;
-    color: var(--color-neon-cyan);
+
+    color:
+        var(--color-neon-cyan);
+
     font-weight: bold;
-    text-shadow: 0 0 8px rgba(0, 240, 209, 0.3);
+
+    text-shadow:
+        0 0 8px rgba(0,240,209,.3);
 }
+
 
 /* ==========================================================================
-   4. SCALED 3D BINGO MACHINE CAGE (CENTERED SHIELD)
+   14. CAGE
    ========================================================================== */
+
 .cage-container {
+
     width: 130px;
-    height: 130px; 
+
+    height: 130px;
+
+    min-width: 130px;
+
+    min-height: 130px;
+
     position: relative;
+
     display: flex;
+
     justify-content: center;
+
     align-items: center;
+
     flex-shrink: 0;
+
     justify-self: center;
+
     margin: 0 auto;
+
+    overflow: visible;
 }
 
 .cage-sphere {
+
     width: 110px;
+
     height: 110px;
+
+    min-width: 110px;
+
+    min-height: 110px;
+
     border-radius: 50%;
+
     position: relative;
+
     overflow: hidden;
-    background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.15), rgba(0, 240, 209, 0.05) 60%, rgba(11, 19, 32, 0.9) 100%);
-    border: 3px solid var(--color-neon-cyan);
-    box-shadow: 0 0 20px rgba(0, 240, 209, 0.2), inset 0 0 15px rgba(255, 255, 255, 0.1);
+
+    background:
+        radial-gradient(
+            circle at 30% 30%,
+            rgba(255,255,255,.15),
+            rgba(0,240,209,.05) 60%,
+            rgba(11,19,32,.9) 100%
+        );
+
+    border:
+        3px solid
+        var(--color-neon-cyan);
+
+    box-shadow:
+        0 0 20px rgba(0,240,209,.2),
+        inset 0 0 15px rgba(255,255,255,.1);
 }
 
+
+/* REFLECTION */
+
 .glass-reflection-light {
+
     position: absolute;
+
     top: 8px;
+
     left: 12px;
+
     width: 35px;
+
     height: 18px;
+
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.25);
-    transform: rotate(-30deg);
-    filter: blur(1px);
+
+    background:
+        rgba(255,255,255,.25);
+
+    transform:
+        rotate(-30deg);
+
+    filter:
+        blur(1px);
+
     pointer-events: none;
+
     z-index: 5;
 }
 
 .glass-reflection-dark {
+
     position: absolute;
+
     bottom: 6px;
+
     right: 12px;
+
     width: 50px;
+
     height: 12px;
+
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.6);
-    filter: blur(2px);
+
+    background:
+        rgba(0,0,0,.6);
+
+    filter:
+        blur(2px);
+
     pointer-events: none;
+
     z-index: 5;
 }
 
+
+/* CAGE BARS */
+
 .cage-container::before,
 .cage-container::after {
+
     content: "";
+
     position: absolute;
+
     bottom: 5px;
+
     width: 6px;
+
     height: 55px;
-    background: linear-gradient(var(--color-neon-cyan), var(--bg-panel-slate));
+
+    background:
+        linear-gradient(
+            var(--color-neon-cyan),
+            var(--bg-panel-slate)
+        );
+
     border-radius: 30px;
 }
 
 .cage-container::before {
-    left: calc(50% - 35px);
-    transform: rotate(15deg);
+
+    left:
+        calc(50% - 35px);
+
+    transform:
+        rotate(15deg);
 }
 
 .cage-container::after {
-    right: calc(50% - 35px);
-    transform: rotate(-15deg);
+
+    right:
+        calc(50% - 35px);
+
+    transform:
+        rotate(-15deg);
 }
 
+
+/* MINI BALL */
+
 .mini-ball {
+
     position: absolute;
+
     width: 16px;
+
     height: 16px;
+
     border-radius: 50%;
+
     display: flex;
+
     align-items: center;
+
     justify-content: center;
-    transform: translate(-50%, -50%);
-    box-shadow: inset -1px -1px 2px rgba(0, 0, 0, 0.6), inset 1px 1px 2px rgba(255, 255, 255, 0.5), 0 0 4px rgba(0, 0, 0, 0.5);
-    will-change: left, top;
+
+    transform:
+        translate(-50%, -50%);
+
+    box-shadow:
+        inset -1px -1px 2px rgba(0,0,0,.6),
+        inset 1px 1px 2px rgba(255,255,255,.5),
+        0 0 4px rgba(0,0,0,.5);
+
+    will-change:
+        left,
+        top;
+
     z-index: 2;
-    background-color: var(--color-active-green); /* Sync cage balls color natively */
+
+    background-color:
+        var(--color-active-green);
 }
 
 .mini-ball-num {
+
     font-size: 8px;
+
     font-weight: 900;
-    color: var(--color-active-text-dark);
+
+    color:
+        var(--color-active-text-dark);
+
     text-shadow: none;
+
     line-height: 1;
+
     user-select: none;
 }
 
+
+/* MACHINE HANDLE */
+
 .machine-handle {
+
     position: absolute;
-    right: calc(50% - 75px);
+
+    right:
+        calc(50% - 75px);
+
     width: 35px;
+
     height: 4px;
-    background: linear-gradient(#fff, #666);
+
+    background:
+        linear-gradient(#fff,#666);
+
     border-radius: 10px;
 }
 
 .machine-handle::after {
+
     content: "";
+
     position: absolute;
+
     right: -8px;
+
     top: -4px;
+
     width: 12px;
+
     height: 12px;
+
     border-radius: 50%;
-    background: var(--color-neon-cyan);
-    box-shadow: 0 0 10px var(--color-neon-cyan);
+
+    background:
+        var(--color-neon-cyan);
+
+    box-shadow:
+        0 0 10px
+        var(--color-neon-cyan);
 }
+
+
+/* BALL EXIT */
 
 .ball-exit {
+
     position: absolute;
-    right: calc(50% - 90px);
+
+    right:
+        calc(50% - 90px);
+
     width: 65px;
+
     height: 17px;
-    background: var(--color-neon-cyan);
+
+    background:
+        var(--color-neon-cyan);
+
     border-radius: 20px;
-    box-shadow: 0 0 8px var(--color-neon-cyan);
+
+    box-shadow:
+        0 0 8px
+        var(--color-neon-cyan);
 }
 
-/* Floating carousel bubble configuration anchor lines */
-.called-ball {
-    width: 9px;
-    height: 12px;
-    border-radius: 50%;
-    background: var(--color-coral-alert);
-    color: var(--text-primary-white);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-    font-size: 12px;
-    box-shadow: inset -1px -1px 3px rgba(0,0,0,0.6), 0 0 6px var(--color-coral-alert);
-    animation: dropBall 0.7s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
 
-@keyframes dropBall {
-    0% { top: -15px; transform: scale(.3) rotate(0deg); }
-    60% { top: 14px; transform: scale(1.15) rotate(180deg); }
-    80% { top: 3px; transform: scale(0.95) rotate(270deg); }
-    100% { top: 6px; transform: scale(1) rotate(360deg); }
-}
 /* ==========================================================================
-   5. RIGHT CURRENT DISPLAY & FOOTER SECTION (RESTORED TO 3D CASINO GRADIENT)
+   15. CURRENT BALL
    ========================================================================== */
 
-/* Main wrapper layout row container */
 .ball-column {
+
+    width: 100%;
+
+    min-width: 0;
+
+    height: 200px;
+
     display: flex;
+
     flex-direction: column;
+
     align-items: center;
+
     justify-content: center;
+
+    box-sizing: border-box;
+
+    overflow: visible;
 }
 
-/* 🔮 THE COMPLETE ORIGINAL 3D SPHERICAL BALL CASINO OUTER FRAME */
+
+/* CURRENT BALL — KEEP 150x150 */
+
 .current-ball-display {
+
     width: 150px !important;
+
     height: 150px !important;
+
+    min-width: 150px !important;
+
+    min-height: 150px !important;
+
+    max-width: 150px !important;
+
+    max-height: 150px !important;
+
     border-radius: 50% !important;
+
     display: flex !important;
+
     align-items: center !important;
+
     justify-content: center !important;
+
     position: relative !important;
-    
-    /* Pure high-end 3D glossy metallic radial gradient fill properties mapping */
-    background: radial-gradient(circle at 35% 35%, #2D3A4F 0%, #151E2E 55%, #070B14 100%) !important;
-    
-    /* Rich structural Dodger Blue border ring matching your image styles */
-    border: 4px solid #1E82D4 !important; 
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 
-                inset 0 0 20px rgba(255, 255, 255, 0.15), 
-                0 0 15px rgba(30, 130, 212, 0.3) !important;
-    overflow: hidden !important;
+
+    flex-shrink: 0 !important;
+
+    background:
+        radial-gradient(
+            circle at 35% 35%,
+            #2D3A4F 0%,
+            #151E2E 55%,
+            #070B14 100%
+        ) !important;
+
+    border:
+        4px solid
+        #1E82D4 !important;
+
+    box-shadow:
+        0 8px 24px rgba(0,0,0,.5),
+        inset 0 0 20px rgba(255,255,255,.15),
+        0 0 15px rgba(30,130,212,.3) !important;
+
+    overflow:
+        hidden !important;
 }
 
-/* Glass surface specular reflection light overlay layer effect */
+
+/* BALL REFLECTION */
+
 .current-ball-display::before {
+
     content: "" !important;
+
     position: absolute !important;
+
     top: 10px !important;
+
     left: 22px !important;
+
     width: 50px !important;
+
     height: 24px !important;
+
     border-radius: 50% !important;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 100%) !important;
-    transform: rotate(-25deg) !important;
-    filter: blur(0.5px) !important;
-    pointer-events: none !important;
-    z-index: 4 !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(255,255,255,.35) 0%,
+            rgba(255,255,255,0) 100%
+        ) !important;
+
+    transform:
+        rotate(-25deg) !important;
+
+    filter:
+        blur(.5px) !important;
+
+    pointer-events:
+        none !important;
+
+    z-index:
+        4 !important;
 }
 
-/* Internal vertical column flex layout for stacking text tokens safely */
+
+/* INNER BALL */
+
 .neon-ball-inner {
+
     display: flex !important;
-    flex-direction: column !important; /* ✅ CRITICAL: Force vertical alignment stacking rules */
+
+    flex-direction: column !important;
+
     align-items: center !important;
+
     justify-content: center !important;
+
     width: 100% !important;
+
     height: 100% !important;
-    background: transparent !important;
+
+    background:
+        transparent !important;
+
     border: none !important;
+
     box-shadow: none !important;
+
     padding: 0 !important;
+
+    overflow: visible !important;
 }
 
-/* 🔤 TOP TRACK LETTER: Crisp structural separation layout block */
+
+/* LETTER */
+
 .ball-letter {
+
     height: 30px !important;
+
+    min-height: 30px !important;
+
     display: flex !important;
+
     align-items: flex-end !important;
+
     justify-content: center !important;
-    font-size: 47px !important; /* Large bold readable letter tracking */
+
+    font-size: 47px !important;
+
     line-height: 30px !important;
+
     font-weight: 900 !important;
-    color: #FFFFFF !important; /* Pure White font focus */
+
+    color: #060606 !important;
+
     z-index: 3 !important;
-    letter-spacing: 0.5px !important;
+
+    letter-spacing: .5px !important;
+
     margin: 0 !important;
+
     padding: 0 !important;
+
     text-transform: uppercase !important;
+
+    flex-shrink: 0 !important;
 }
 
-/* 🔢 MAIN LARGE DIGIT VALUE VALUE */
+
+/* NUMBER */
+
 .ball-number {
+
     height: 56px !important;
+
+    min-height: 56px !important;
+
     display: flex !important;
+
     align-items: center !important;
+
     justify-content: center !important;
-    font-size: 79px !important; /* Massive scale factor so numbers stand out on venue screens */
+
+    font-size: 79px !important;
+
     line-height: 56px !important;
+
     font-weight: 900 !important;
-    color: #FFFFFF !important; /* High-visibility Pure White digits */
+
+    color: #FFFFFF !important;
+
     z-index: 3 !important;
+
     margin-top: 1px !important;
+
     padding: 0 !important;
+
+    flex-shrink: 0 !important;
 }
 
-/* Bottom blinking status indicator lights styles alignment */
+
+/* INDICATOR */
+
 .indicator-dots {
+
     display: flex;
+
     justify-content: center;
+
     align-items: center;
 }
 
 .dot {
+
     border-radius: 50% !important;
-    transition: background-color 0.3s ease;
+
+    transition:
+        background-color .3s ease;
 }
 
+
 /* ==========================================================================
-   🏁 THE ULTIMATE PURE WHITE BOARD CSS OVERRIDE SHIELD 
+   16. CALLED HISTORY
    ========================================================================== */
 
-/* 1. Force the pattern wrapper elements completely white over global traits */
+.called-section {
+
+    width: 100%;
+
+    max-width: 100%;
+
+    flex-shrink: 0;
+
+    overflow: visible;
+
+    box-sizing: border-box;
+}
+
+
+/* ==========================================================================
+   17. WINNING PATTERN
+   ========================================================================== */
+
 .bingo-wrapper div[style*="background: #FFFFFF"],
 .bingo-wrapper div[style*="background: rgb(255, 255, 255)"],
 .bingo-container div[style*="background: #FFFFFF"] {
-    background: #FFFFFF !important;
-    background-color: #FFFFFF !important;
-    border: 2px solid #E2E8F0 !important;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2) !important;
+
+    background:
+        #FFFFFF !important;
+
+    background-color:
+        #FFFFFF !important;
+
+    border:
+        2px solid
+        #E2E8F0 !important;
+
+    box-shadow:
+        0 4px 10px rgba(0,0,0,.2) !important;
 }
 
-/* 2. Force the internal 5x5 cell tiles loops to stay clean white */
+
 .main-display div div[style*="background: #FFFFFF"],
 .main-display div div[style*="background: rgb(255, 255, 255)"] {
-    background: #FFFFFF !important;
-    background-color: #FFFFFF !important;
+
+    background:
+        #FFFFFF !important;
+
+    background-color:
+        #FFFFFF !important;
 }
 
-/* 3. Force the letters header container bar cleanly white */
+
 .main-display div div[style*="height: 26px"] {
-    background: #FFFFFF !important;
-    background-color: #FFFFFF !important;
-    border-bottom: 1px solid #E2E8F0 !important;
+
+    background:
+        #FFFFFF !important;
+
+    background-color:
+        #FFFFFF !important;
+
+    border-bottom:
+        1px solid
+        #E2E8F0 !important;
 }
 
-/* 4. Force the letter text tokens to stand out as dark charcoal font elements */
+
 .main-display div div[style*="height: 26px"] div {
-    color: #FFFFFF !important;
-    font-weight: 900 !important;
+
+    color:
+        #FFFFFF !important;
+
+    font-weight:
+        900 !important;
 }
 
-/* 5. Keep the graph paper background line partition grid at soft gray */
+
 .main-display div div[style*="gridTemplateRows"][style*="gridTemplateColumns"] {
-    background: #E2E8F0 !important;
-    background-color: #E2E8F0 !important;
+
+    background:
+        #E2E8F0 !important;
+
+    background-color:
+        #E2E8F0 !important;
 }
 
-/* 6. Ensure the target pattern spots fill as deep Royal Blue circles */
+
 .main-display div div div[style*="backgroundColor: #0055D4"],
 .main-display div div div[style*="background-color: rgb(0, 85, 212)"] {
-    background: #0055D4 !important;
-    background-color: #0055D4 !important;
-    box-shadow: 0 1px 3px rgba(0, 85, 212, 0.3) !important;
+
+    background:
+        #0055D4 !important;
+
+    background-color:
+        #0055D4 !important;
+
+    box-shadow:
+        0 1px 3px rgba(0,85,212,.3) !important;
 }
+
+
+/* ==========================================================================
+   18. RIGHT SIDE
+   ========================================================================== */
+
+.bingo-right-side {
+
+    width: 100%;
+
+    min-width: 0;
+
+    min-height: 100vh;
+
+    padding: 10px;
+
+    background:
+        #0D1725;
+
+    box-sizing: border-box;
+
+    overflow-y: auto;
+
+    overflow-x: hidden;
+}
+
+
+/* RIGHT CONTENT */
+
+.right-side-content {
+
+    width: 100%;
+
+    min-height: 100%;
+
+    padding: 12px;
+
+    box-sizing: border-box;
+
+    background:
+        rgba(18,27,42,.75);
+
+    border:
+        1px solid
+        rgba(0,240,209,.15);
+
+    border-radius: 10px;
+
+    box-shadow:
+        inset 0 0 20px rgba(0,0,0,.2);
+}
+
+
+/* RIGHT TITLE */
+
+.right-side-title {
+
+    margin: 0 0 12px 0;
+
+    padding: 8px;
+
+    text-align: center;
+
+    font-size: 20px;
+
+    font-weight: 900;
+
+    letter-spacing: 1px;
+
+    color:
+        var(--color-neon-cyan);
+
+    border-bottom:
+        1px solid
+        rgba(0,240,209,.2);
+}
+
+
+/* RIGHT BUTTONS */
+
+.right-side-buttons {
+
+    width: 100%;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+
+.right-ui-card {
+
+    width: 100%;
+
+    padding: 10px;
+
+    box-sizing: border-box;
+
+    border-radius: 8px;
+
+    background:
+        var(--bg-main-midnight);
+
+    border:
+        1px solid
+        rgba(255,255,255,.08);
+}
+
+
+.right-ui-button {
+
+    width: 100%;
+
+    min-height: 40px;
+
+    padding: 8px 12px;
+
+    border: none;
+
+    border-radius: 7px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    font-weight: 800;
+
+    color: #FFFFFF;
+
+    background:
+        var(--color-uncalled-box);
+
+    border:
+        1px solid
+        rgba(255,255,255,.12);
+
+    transition:
+        transform .2s ease,
+        background-color .2s ease;
+}
+
+.right-ui-button:hover {
+
+    transform:
+        translateY(-1px);
+
+    background:
+        #354253;
+}
+
+
+/* ==========================================================================
+   19. IMPORTANT — NO SHRINKING
+   ========================================================================== */
+
+.number-cell,
+.letter-header,
+.current-ball-display,
+.cage-container,
+.cage-sphere {
+
+    flex-shrink:
+        0 !important;
+}
+
+
+/* ==========================================================================
+   20. NARROW SCREEN
+
+   DO NOT SHRINK THE BINGO UI.
+   ALLOW THE WHOLE DASHBOARD TO BE VIEWED BY SCROLLING.
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+
+    html,
+    body,
+    #root,
+    .bingo-wrapper {
+
+        overflow-x: auto;
+    }
+
+    .bingo-split-layout {
+
+        min-width:
+            1100px;
+    }
+}
+
+
+/* ==========================================================================
+   END
+   ========================================================================== */
