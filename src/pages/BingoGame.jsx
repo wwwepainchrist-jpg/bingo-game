@@ -2780,7 +2780,7 @@ setWinningCells(
 <section
   className="board-section"
   style={{
-    margin: "0 0 43px 0",   // ← SPACE BELOW THE BINGO BOARD
+    margin: "0 0 50px 0",   // ← SPACE BELOW THE BINGO BOARD
     padding: 0,
   }}
 >
@@ -3284,86 +3284,62 @@ setWinningCells(
       )} 
  
     </div> 
- 
+   {/* ============================================================
+    RIGHT — SHOW/HIDE SOLD CARTELAS BUTTON
+    ============================================================ */}
+
+<button
+  type="button"
+  onClick={() => setShowSoldCartelas((prev) => !prev)}
+  title={showSoldCartelas ? "Hide sold Cartelas" : "Show sold Cartelas"}
+  style={{
+    width: "28px",
+    height: "28px",
+    minWidth: "28px",
+    minHeight: "28px",
+
+    borderRadius: "6px",
+    border: "1px solid rgba(0,240,255,0.8)",
+
+    background: "#0b1320",
+    color: "#00f0ff",
+
+    cursor: "pointer",
+
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+
+    fontSize: "35px",
+    fontWeight: "900",
+
+    padding: 0,
+    margin: 0,
+    lineHeight: 1,
+
+    position: "absolute",
+    right: "6px",
+    top: "60%",
+    transform: "translateY(-50%)",
+
+    zIndex: 1000001,
+
+    boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
+
+    flexShrink: 0,
+  }}
+>
+  {showSoldCartelas ? "◀" : "▶"}
+</button>
+</div> </div> </div>
+
+
   </div> 
  
 
 
-  {/* ============================================================
-      RIGHT — SHOW/HIDE BUTTON
-      ============================================================ */}
+ 
 
-  <button
-    type="button"
-
-    onClick={() =>
-      setShowSoldCartelas(
-        (prev) => !prev
-      )
-    }
-
-    title={
-      showSoldCartelas
-        ? "Hide sold Cartelas"
-        : "Show sold Cartelas"
-    }
-
-    style={{
-      width: "42px",
-
-      height: "42px",
-
-      minWidth: "42px",
-
-      minHeight: "42px",
-
-      borderRadius: "50%",
-
-      border:
-        "2px solid rgba(0,240,255,0.8)",
-
-      background:
-        "rgba(0,0,0,0.65)",
-
-      color: "#00f0ff",
-
-      cursor: "pointer",
-
-      display: "flex",
-
-      alignItems: "center",
-
-      justifyContent: "center",
-
-      fontSize: "30px",
-
-      fontWeight: "bold",
-
-      padding: 0,
-
-      margin: 0,
-
-      lineHeight: 1,
-
-      position: "relative",
-
-      zIndex: 1000001,
-
-      boxShadow:
-        "0 2px 12px rgba(0,0,0,0.6)",
-
-      flexShrink: 0,
-    }}
-  >
-    {showSoldCartelas
-      ? "◀"
-      : "▶"}
-  </button>
- </div>
-</div>
-</div>
-
-    
 {/* ============================================================
     RIGHT SIDE — KEEP YOUR EXISTING VERTICAL COLUMN HERE
     ============================================================ */}
@@ -3521,7 +3497,7 @@ setWinningCells(
         flexDirection: "column",
         gap: "6px",
         borderTop: "1px solid rgba(255,255,255,0.05)", /* Subtle top line separating from Item 1 */
-        width: "100%",
+        width: "70%",
         justifyContent: "center",
         position: "relative",
         zIndex: 1,
@@ -3540,7 +3516,7 @@ setWinningCells(
             color: "#ffffff",
             borderRadius: "30px",
             padding: "3px 10px",
-            fontSize: "15px",
+            fontSize: "27px",
             fontWeight: "bold",
             outline: "none",
             textAlign: "center",
@@ -3606,7 +3582,7 @@ setWinningCells(
       <div style={{ textAlign: "center", marginTop: "4px" }}>
         <div
           style={{
-            fontSize: "42px",
+            fontSize: "65px",
             color: "#ffffffff",
             fontWeight: "bold",
             letterSpacing: "1px"
@@ -3617,7 +3593,7 @@ setWinningCells(
 
         <div
           style={{
-            fontSize: "99px",
+            fontSize: "70px",
             color: "#ffffffff",
             fontWeight: "900",
             textShadow: "0 0 12px rgba(2, 2, 2, 0.07)",
@@ -3776,320 +3752,512 @@ const BOX_RADIUS = "8px"; // Box corner roundness
 
 
           
-          {/* CENTER AREA: WINNING PATTERN (LEFT) + ROLLING MACHINE (RIGHT) */}
+         {/* ============================================================
+    CENTER AREA: WINNING PATTERN (LEFT) + ROLLING MACHINE (RIGHT)
+    ============================================================ */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    width: "100%",
+    height: "100%",
+    boxSizing: "border-box",
+  }}
+>
+  {checkedCartela && (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        background: "rgba(0, 0, 0, 0.65)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "8px",
+        boxSizing: "border-box",
+      }}
+    >
+      {/* ========================================================
+          VERIFICATION CARTELA
+          CHANGE ONLY width / height BELOW
+          EVERYTHING INSIDE WILL GROW WITH IT
+          ======================================================== */}
+      <div
+        style={{
+          position: "relative",
+
+          /* ======================================================
+             ⭐ MAIN SIZE CONTROL ⭐
+             Change these two values.
+             Example:
+             700px x 700px
+             800px x 800px
+             900px x 750px
+             ====================================================== */
+          width: "700px",
+          height: "700px",
+
+          maxWidth: "92vw",
+          maxHeight: "92vh",
+
+          background: "#090f1d",
+
+          border:
+            verificationStatus === "WINNER"
+              ? "3px solid #00ff66"
+              : verificationStatus === "CHECKING"
+                ? "3px solid #00c8ff"
+                : "3px solid #ff3344",
+
+          borderRadius: "14px",
+
+          padding: "10px 12px 10px",
+
+          boxSizing: "border-box",
+
+          boxShadow:
+            verificationStatus === "WINNER"
+              ? "0 0 30px rgba(0,255,102,0.3)"
+              : "0 0 30px rgba(255,51,68,0.25)",
+
+          display: "flex",
+          flexDirection: "column",
+
+          overflow: "hidden",
+        }}
+      >
+        {/* ======================================================
+            CLOSE
+            ====================================================== */}
+        <button
+          onClick={closeVerificationBoard}
+          style={{
+            position: "absolute",
+            top: "8px",
+            right: "9px",
+
+            width: "30px",
+            height: "30px",
+
+            borderRadius: "50%",
+            background: "#182236",
+            border: "1px solid #475569",
+
+            color: "#fff",
+            fontSize: "16px",
+            fontWeight: "900",
+
+            cursor: "pointer",
+
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+
+            zIndex: 10,
+
+            padding: 0,
+          }}
+        >
+          ✕
+        </button>
+
+        {/* ======================================================
+            STATUS
+            ====================================================== */}
+        <div
+          style={{
+            textAlign: "center",
+
+            marginBottom: "1%",
+            paddingRight: "30px",
+
+            flexShrink: 0,
+          }}
+        >
+          <div
+            style={{
+              fontSize: "clamp(16px, 2.5vw, 30px)",
+              fontWeight: "900",
+
+              color:
+                verificationStatus === "WINNER"
+                  ? "#00ff66"
+                  : "#ff3344",
+
+              lineHeight: "1.1",
+            }}
+          >
+            {verificationStatus === "WINNER"
+              ? `🎉 ${t.winner}!`
+              : "❌ NO BINGO YET"}
+          </div>
+
+          <div
+            style={{
+              marginTop: "1px",
+
+              fontSize: "clamp(12px, 1.5vw, 20px)",
+              color: "#94a3b8",
+              fontWeight: "700",
+
+              lineHeight: "1.1",
+            }}
+          >
+            Cartela #{checkedCartela.id || checkedCartela.cartelaId}
+          </div>
+        </div>
+
+        {/* ======================================================
+            B I N G O HEADER
+            ====================================================== */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(5, 1fr)",
+
+            gap: "0.6%",
+
+            width: "100%",
+
+            height: "8%",
+
+            marginBottom: "0.6%",
+
+            flexShrink: 0,
+
+            boxSizing: "border-box",
+          }}
+        >
+          {["B", "I", "N", "G", "O"].map((letter, index) => (
+            <div
+              key={index}
+              style={{
+                width: "100%",
+                height: "100%",
+
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+
+                borderRadius: "6px",
+
+                background: "#111c31",
+
+                border: "2px solid #00c8ff",
+
+                color: "#00c8ff",
+
+                /*
+                 * Header text grows with popup width
+                 */
+                fontSize: "clamp(16px, 3vw, 36px)",
+
+                fontWeight: "900",
+
+                boxSizing: "border-box",
+
+                lineHeight: "1",
+              }}
+            >
+              {letter}
+            </div>
+          ))}
+        </div>
+
+        {/* ======================================================
+            CARTELA
+            ====================================================== */}
+        <div
+          style={{
+            display: "grid",
+
+            gridTemplateColumns: "repeat(5, 1fr)",
+            gridTemplateRows: "repeat(5, 1fr)",
+
+            gap: "0.6%",
+
+            width: "100%",
+
+            /*
+             * The 5 rows share the available height.
+             */
+            flex: "1 1 auto",
+
+            minHeight: 0,
+
+            boxSizing: "border-box",
+          }}
+        >
+          {checkedCartela.matrix.map((row, rIdx) =>
+            row.map((cell, cIdx) => {
+              const isFree = cell === "FREE";
+
+              const isWinnerCell =
+                winningCells.includes(`${rIdx}-${cIdx}`);
+
+              let num = cell;
+
+              if (!isFree) {
+                if (typeof cell === "string") {
+                  const parts = cell.trim().split(/\s+/);
+                  num = parts[1] || cell;
+                }
+
+                num = Number(num);
+              }
+
+              const isCalled =
+                !isFree &&
+                called.some((item) => {
+                  const parts = String(item).trim().split(/\s+/);
+
+                  const calledNumber =
+                    parts.length > 1
+                      ? Number(parts[1])
+                      : Number(parts[0]);
+
+                  return calledNumber === num;
+                });
+
+              return (
+                <div
+                  key={`${rIdx}-${cIdx}`}
+                  style={{
+                    /*
+                     * IMPORTANT:
+                     * No fixed 38px height.
+                     * Every cell fills its grid row.
+                     */
+                    width: "100%",
+                    height: "100%",
+
+                    minWidth: 0,
+                    minHeight: 0,
+
+                    background: isFree
+                      ? "#1f1e1d"
+                      : isWinnerCell
+                        ? "#FF0000"
+                        : isCalled
+                          ? "#1555df"
+                          : "#1E293B",
+
+                    color: isFree ? "#000" : "#fff",
+
+                    border: isWinnerCell
+                      ? "2px solid #FF6666"
+                      : isCalled
+                        ? "2px solid #00ff66"
+                        : isFree
+                          ? "2px solid #FFD700"
+                          : "1px solid #334155",
+
+                    borderRadius: "6px",
+
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+
+                    position: "relative",
+
+                    boxSizing: "border-box",
+
+                    overflow: "hidden",
+
+                    boxShadow: isWinnerCell
+                      ? "0 0 14px rgba(255,0,0,0.8)"
+                      : isCalled
+                        ? "0 0 10px rgba(0,255,102,0.5)"
+                        : "none",
+                  }}
+                >
+                  {/* ==================================================
+                      CHECK MARK
+                      ================================================== */}
+                  {isCalled && (
+                    <div
+                      style={{
+                        position: "absolute",
+
+                        top: "2%",
+                        right: "2%",
+
+                        /*
+                         * Check mark scales with the cell.
+                         */
+                        width: "clamp(13px, 2vw, 30px)",
+                        height: "clamp(13px, 2vw, 30px)",
+
+                        borderRadius: "50%",
+
+                        background: "#1555df",
+
+                        color: "#000",
+
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+
+                        fontSize: "clamp(9px, 1.2vw, 18px)",
+
+                        fontWeight: "900",
+
+                        lineHeight: "1",
+
+                        zIndex: 2,
+                      }}
+                    >
+                      ✓
+                    </div>
+                  )}
+
+                  {/* ==================================================
+                      NUMBER
+                      ================================================== */}
+                  <span
+                    style={{
+                      /*
+                       * NUMBER SCALES WITH THE POPUP
+                       */
+                      fontSize: isFree
+                        ? "clamp(12px, 2vw, 28px)"
+                        : "clamp(20px, 4vw, 52px)",
+
+                      fontWeight: "900",
+
+                      lineHeight: "1",
+
+                      textAlign: "center",
+
+                      maxWidth: "100%",
+
+                      position: "relative",
+
+                      zIndex: 1,
+                    }}
+                  >
+                    {isFree ? "FREE" : num}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* ======================================================
+            LEGEND
+            ====================================================== */}
+        <div
+          style={{
+            marginTop: "1%",
+
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+
+            gap: "2%",
+
+            flexWrap: "wrap",
+
+            /*
+             * Legend scales too.
+             */
+            fontSize: "clamp(10px, 1.2vw, 18px)",
+
+            fontWeight: "700",
+
+            color: "#cbd5e1",
+
+            flexShrink: 0,
+
+            lineHeight: "1.1",
+          }}
+        >
+          {/* CALLED */}
           <div
             style={{
               display: "flex",
-              flexDirection: "row",
               alignItems: "center",
-              justifyContent: "center",
-              gap: "16px",
-              width: "100%",
+              gap: "4px",
             }}
-          >   
-            {checkedCartela && (
-              <div
-                style={{
-                  position: "fixed",
-                  inset: 0,
-                  zIndex: 9999,
-                  background: "rgba(0, 0, 0, 0.65)",
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  padding: "8px",
-                  boxSizing: "border-box",
-                }}
-              >
-                {/* MEDIUM VERIFICATION CARTELA */}
-                <div
-                  style={{
-                    position: "relative",
-                    width: "min(92vw, 480px)",
-                    background: "#090f1d",
-                    border:
-                      verificationStatus === "WINNER"
-                        ? "3px solid #00ff66"
-                        : verificationStatus === "CHECKING"
-                          ? "3px solid #00c8ff"
-                          : "3px solid #ff3344",
-                    borderRadius: "14px",
-                    padding: "10px 12px 10px",
-                    boxSizing: "border-box",
-                    boxShadow:
-                      verificationStatus === "WINNER"
-                        ? "0 0 30px rgba(0,255,102,0.3)"
-                        : "0 0 30px rgba(255,51,68,0.25)",
-                  }}
-                >
-                  {/* CLOSE */}
-                  <button
-                    onClick={closeVerificationBoard}
-                    style={{
-                      position: "absolute",
-                      top: "8px",
-                      right: "9px",
-                      width: "30px",
-                      height: "30px",
-                      borderRadius: "50%",
-                      background: "#182236",
-                      border: "1px solid #475569",
-                      color: "#fff",
-                      fontSize: "16px",
-                      fontWeight: "900",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    ✕
-                  </button>
+          >
+            <span
+              style={{
+                width: "clamp(10px, 1.2vw, 18px)",
+                height: "clamp(10px, 1.2vw, 18px)",
 
-                  {/* STATUS */}
-                  <div
-                    style={{
-                      textAlign: "center",
-                      marginBottom: "6px",
-                      paddingRight: "30px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: "16px",
-                        fontWeight: "900",
-                        color:
-                          verificationStatus === "WINNER"
-                            ? "#00ff66"
-                            : "#ff3344",
-                      }}
-                    >
-                      {verificationStatus === "WINNER"
-                        ? `🎉 ${t.winner}!`
-                        : "❌ NO BINGO YET"}
-                    </div>
+                background: "#1555df",
 
-                    <div
-                      style={{
-                        marginTop: "1px",
-                        fontSize: "12px",
-                        color: "#94a3b8",
-                        fontWeight: "700",
-                      }}
-                    >
-                      Cartela #{checkedCartela.id || checkedCartela.cartelaId}
-                    </div>
-                  </div>
+                border: "1.5px solid #1555df",
 
-                  {/* B I N G O HEADER */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(5, 1fr)",
-                      gap: "4px",
-                      marginBottom: "4px",
-                    }}
-                  >
-                    {["B", "I", "N", "G", "O"].map((letter, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          height: "26px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          borderRadius: "6px",
-                          background: "#111c31",
-                          border: "2px solid #00c8ff",
-                          color: "#00c8ff",
-                          fontSize: "16px",
-                          fontWeight: "900",
-                        }}
-                      >
-                        {letter}
-                      </div>
-                    ))}
-                  </div>
+                borderRadius: "2px",
 
-                  {/* CARTELA */}
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(5, 1fr)",
-                      gap: "4px",
-                    }}
-                  >
-                    {checkedCartela.matrix.map((row, rIdx) =>
-                      row.map((cell, cIdx) => {
-                        const isFree = cell === "FREE";
+                flexShrink: 0,
+              }}
+            />
 
-                        const isWinnerCell =
-                          winningCells.includes(`${rIdx}-${cIdx}`);
-
-                        let num = cell;
-
-                        if (!isFree) {
-                          if (typeof cell === "string") {
-                            const parts = cell.trim().split(/\s+/);
-                            num = parts[1] || cell;
-                          }
-
-                          num = Number(num);
-                        }
-
-                        const isCalled =
-                          !isFree &&
-                          called.some((item) => {
-                            const parts = String(item).trim().split(/\s+/);
-
-                            const calledNumber =
-                              parts.length > 1
-                                ? Number(parts[1])
-                                : Number(parts[0]);
-
-                            return calledNumber === num;
-                          });
-
-                        return (
-                          <div
-                            key={`${rIdx}-${cIdx}`}
-                            style={{
-                              height: "38px",
-                              background: isFree
-                                ? "#FFD700"
-                                : isWinnerCell
-                                ? "#FF0000"
-                                : isCalled
-                                ? "#00C853"
-                                : "#1E293B",
-                              color: isFree ? "#000" : "#fff",
-                              border: isWinnerCell
-                                ? "2px solid #FF6666"
-                                : isCalled
-                                ? "2px solid #00ff66"
-                                : isFree
-                                ? "2px solid #FFD700"
-                                : "1px solid #334155",
-                              borderRadius: "6px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              position: "relative",
-                              boxSizing: "border-box",
-                              boxShadow: isWinnerCell
-                                ? "0 0 14px rgba(255,0,0,0.8)"
-                                : isCalled
-                                ? "0 0 10px rgba(0,255,102,0.5)"
-                                : "none",
-                            }}
-                          >
-                            {/* CHECK MARK */}
-                            {isCalled && (
-                              <div
-                                style={{
-                                  position: "absolute",
-                                  top: "2px",
-                                  right: "3px",
-                                  width: "13px",
-                                  height: "13px",
-                                  borderRadius: "50%",
-                                  background: "#00ff66",
-                                  color: "#000",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: "9px",
-                                  fontWeight: "900",
-                                }}
-                              >
-                                ✓
-                              </div>
-                            )}
-
-                            {/* NUMBER */}
-                            <span
-                              style={{
-                                fontSize: isFree ? "11px" : "18px",
-                                fontWeight: "900",
-                                lineHeight: "1",
-                              }}
-                            >
-                              {isFree ? "FREE" : num}
-                            </span>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-
-                  {/* LEGEND */}
-                  <div
-                    style={{
-                      marginTop: "8px",
-                      display: "flex",
-                      justifyContent: "center",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      color: "#cbd5e1",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          background: "#00C853",
-                          border: "1.5px solid #00ff66",
-                          borderRadius: "2px",
-                        }}
-                      />
-                      Called
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          background: "#1E293B",
-                          border: "1px solid #334155",
-                          borderRadius: "2px",
-                        }}
-                      />
-                      Not Called
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span
-                        style={{
-                          width: "10px",
-                          height: "10px",
-                          background: "#FFD700",
-                          borderRadius: "2px",
-                        }}
-                      />
-                      Free
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
- 
-    
-        
-
-  
+            Called
           </div>
 
-  
-        </div>
-        
-    
+          {/* NOT CALLED */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <span
+              style={{
+                width: "clamp(10px, 1.2vw, 18px)",
+                height: "clamp(10px, 1.2vw, 18px)",
 
-        
+                background: "#1E293B",
+
+                border: "1px solid #334155",
+
+                borderRadius: "2px",
+
+                flexShrink: 0,
+              }}
+            />
+
+            Not Called
+          </div>
+
+          {/* FREE */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <span
+              style={{
+                width: "clamp(10px, 1.2vw, 18px)",
+                height: "clamp(10px, 1.2vw, 18px)",
+
+                background: "#FFD700",
+
+                borderRadius: "2px",
+
+                flexShrink: 0,
+              }}
+            />
+
+            Free
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+</div>
+ </div>       
  
        {/* =========================================================
     SOLD CARTELAS OVERLAY
@@ -4170,7 +4338,7 @@ const BOX_RADIUS = "8px"; // Box corner roundness
           gridTemplateColumns:
             "repeat(auto-fit, minmax(65px, 1fr))",
 
-          gap: "10px",
+          gap: "40px",
 
           alignItems: "center",
 
@@ -4205,11 +4373,11 @@ const BOX_RADIUS = "8px"; // Box corner roundness
               border:
                 "2px solid rgba(0, 240, 255, 0.55)",
 
-              borderRadius: "9px",
+              borderRadius: "40px",
 
               color: "#ffffff",
 
-              fontSize: "100px",
+              fontSize: "40px",
 
               fontWeight: "bold",
 
