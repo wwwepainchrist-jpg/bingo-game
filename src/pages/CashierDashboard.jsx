@@ -600,7 +600,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               fontWeight: "800",
               boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
             }}>
-             {<span style={{ fontSize: "70px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "80px", fontWeight: "900", color: "#000000", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
+             {<span style={{ fontSize: "70px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "80px", fontWeight: "900", color: "#ffffff", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
             </div>     
           </div>
 
