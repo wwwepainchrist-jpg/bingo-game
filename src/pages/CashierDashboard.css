@@ -1,53 +1,55 @@
-
 /* ============================================================
-   CASHIER DASHBOARD — FULL WHITE BACKGROUND
+   CASHIER DASHBOARD
+   BLUE BACKGROUND + WHITE CARTELA CELLS
    ============================================================ */
 
-.dashboard-container,
-.dashboard-wrapper {
-  background: #ffffff !important;
-  color: #1e293b;
-}
+/* ============================================================
+   PAGE / ROOT
+   ============================================================ */
 
-/* Make the main page/body white as well */
 html,
 body,
 #root {
-  background: #ffffff !important;
   margin: 0;
   min-height: 100%;
+  width: 100%;
+  background: #171b55 !important;
 }
 
-/* Main dashboard area */
+/* ============================================================
+   DASHBOARD MAIN CONTAINER
+   ============================================================ */
+
 .dashboard-container {
   min-height: 100vh;
   width: 100%;
-  padding: 24px;
-  box-sizing: border-box;
-}
-
-/* ==========================================================================
-   Dashboard Main Container (Full screen auto-expand)
-   ========================================================================== */
-.dashboard-container {
-  background-color: #ffffff; /* Set background to white */
-  color: #1e293b;            /* Dark text color for contrast */
-  min-height: 100vh;
   padding: 24px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  background: #010534 !important;
+  color: #ffffff;
 }
+
+/* ============================================================
+   DASHBOARD WRAPPER
+   ============================================================ */
 
 .dashboard-wrapper {
   width: 100%;
-  max-width: 100%; /* Removes the 1440px cap so it fills available screen width */
+  max-width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
+  background: transparent !important;
+  color: #ffffff;
 }
+
+/* ============================================================
+   CARTELA GRID
+   ============================================================ */
 
 .cartela-scroll-grid {
   display: grid;
@@ -59,17 +61,177 @@ body,
   max-height: calc(100vh - 110px);
   box-sizing: border-box;
 }
-/* Scalable Matrix Cartela Button */
-.grid-cell-btn {
-  padding: 12px 0 !important;
-  border-radius: 10px;
+
+/* ============================================================
+   BASE CARTELA BUTTON (APPLIES TO ALL STATES)
+   ============================================================ */
+
+button.grid-cell-btn {
+  width: 100% !important;
+  height: 70px !important;
+  font-size: 55px !important;
   font-weight: 900 !important;
-  font-size: 2.8rem !important; /* Scalable font size using rem units */
   line-height: 1 !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 55px;
+  text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+  scale: none !important;
+  outline: none !important;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+  cursor: pointer !important;
+}
+
+/* ============================================================
+   NORMAL / AVAILABLE CARTELA
+   ============================================================ */
+
+button.grid-cell-btn.available {
+  background: #707070 !important;
+  background-color: #707070 !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border: 1px solid #888888 !important;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+}
+
+button.grid-cell-btn.available:hover {
+  background: #e8fbff !important;
+  background-color: #e8fbff !important;
+  color: #171b55 !important;
+  border: 2px solid #00e5ff !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+button.grid-cell-btn.available:active,
+button.grid-cell-btn.available:focus {
+  transform: none !important;
+  scale: none !important;
+}
+
+/* ============================================================
+   SELECTED CARTELA (SAME SIZE, ONLY COLOR CHANGES)
+   ============================================================ */
+
+button.grid-cell-btn.selected,
+button.grid-cell-btn.selected:hover,
+button.grid-cell-btn.selected:active,
+button.grid-cell-btn.selected:focus {
+  width: 100% !important;
+  height: 70px !important;
+  font-size: 40px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  background: #00e5ff !important;
+  background-color: #00e5ff !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border: 2px solid #00e5ff !important;
+  box-shadow: none !important;
+  transform: none !important;
+  scale: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ============================================================
+   SOLD CARTELA
+   ============================================================ */
+
+button.grid-cell-btn.sold,
+button.grid-cell-btn.sold:hover {
+  background: #086de0 !important;
+  background-color: #086de0 !important;
+  color: #ffffff !important;
+  border: 2px solid #448bef !important;
+  box-shadow: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ============================================================
+   DISABLED BUTTONS
+   ============================================================ */
+
+.grid-cell-btn:disabled {
+  opacity: 1 !important;
+}
+
+/* ============================================================
+   INNER ELEMENTS (SPAN / DIV / B)
+   ============================================================ */
+
+.grid-cell-btn.selected span,
+.grid-cell-btn.selected div,
+.grid-cell-btn.selected strong,
+.grid-cell-btn.selected b,
+.grid-cell-btn.sold span,
+.grid-cell-btn.sold div,
+.grid-cell-btn.sold strong,
+.grid-cell-btn.sold b {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #ffffff !important;
+  font-size: inherit !important;
+}
+
+.grid-cell-btn.available span,
+.grid-cell-btn.available div,
+.grid-cell-btn.available strong,
+.grid-cell-btn.available b {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: inherit !important;
+  font-size: inherit !important;
+}
+
+/* ============================================================
+   DASHBOARD HEADINGS & CARDS
+   ============================================================ */
+
+.dashboard-container h1,
+.dashboard-container h2,
+.dashboard-container h3,
+.dashboard-container h4,
+.dashboard-container h5,
+.dashboard-container h6 {
+  color: #ffffff;
+}
+
+.dashboard-container .card,
+.dashboard-container .panel {
+  background: #ffffff;
+  color: #171b55;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+
+.cartela-scroll-grid::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-track {
+  background: #111644;
+  border-radius: 10px;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-thumb {
+  background: #00e5ff;
+  border-radius: 10px;
+}
+
+.cartela-scroll-grid::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff;
 }
