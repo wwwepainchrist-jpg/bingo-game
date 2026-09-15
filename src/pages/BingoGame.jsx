@@ -2823,7 +2823,7 @@ setWinningCells(
   style={{ 
    
  
-    background: "rgba(0,0,0,0.25)", 
+    background: "rgb(0, 0, 0)", 
   width: "100%", 
     margin: "0", 
     padding: "8px 10px", 
@@ -3440,7 +3440,7 @@ setWinningCells(
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#ffffff",
+              color: "#0054b8",
               fontSize: "12px",
               fontWeight: "900",
               textShadow: "0 1px 1px rgba(0,0,0,0.25)",
@@ -3536,7 +3536,7 @@ setWinningCells(
           placeholder={t.cardIdPlaceholder}
           style={{
             background: "rgba(12, 22, 45, 0.85)",
-            border: "1.5px solid #00ff37",
+            border: "1.5px solid #edf6ef",
             color: "#ffffff",
             borderRadius: "30px",
             padding: "3px 10px",
@@ -3555,11 +3555,12 @@ setWinningCells(
             justifyContent: "center",
             padding: "2px",
             fontSize: "18px",
+            background: "rgb(25, 111, 216)",
             fontWeight: "bold",
             letterSpacing: "0.5px",
             borderRadius: "30px",
             height: "22px",
-            boxShadow: "0 0 10px rgba(0, 255, 55, 0.3)",
+            boxShadow: "0 0 10px rgba(0, 84, 184, 0.3)",
             cursor: "pointer"
           }}
           onClick={checkWinner}
@@ -3587,6 +3588,7 @@ setWinningCells(
               padding: "2px 8px",
               fontSize: "17px",
               fontWeight: "800",
+              background: "#2278e1",
               flex: 1,
               justifyContent: "center",
               borderRadius: "100px",
@@ -3615,7 +3617,7 @@ setWinningCells(
 
         <div
           style={{
-            fontSize: "77px",
+            fontSize: "99px",
             color: "#ffffffff",
             fontWeight: "900",
             textShadow: "0 0 12px rgba(2, 2, 2, 0.07)",
@@ -3631,54 +3633,45 @@ setWinningCells(
   {/* =======================================================
         ITEM 3: High-Visibility Current Called Display
         ======================================================= */}
-     {/* CALLING HISTORY TITLE + COUNT */} 
- 
-    <div 
-      style={{ 
-        display: "flex", 
- 
-        alignItems: "center", 
- 
-        gap: "10px", 
- 
-        marginBottom: "5px", 
- 
-        color: "#8c9cb3", 
- 
-        fontWeight: "bold", 
-      }} 
-    > 
- 
-      <span 
-        style={{ 
-          fontSize: "30px", 
- 
-          color: "#00f0ff", 
- 
-          fontWeight: "900", 
- 
-          letterSpacing: "1px", 
-        }} 
-      > 
-        
-      </span> 
- 
- 
-      <span 
-        style={{ 
-          fontSize: "100px", 
- 
-          color: "#070707", 
- 
-          fontWeight: "900", 
-        }} 
-      > 
-        {called.length}
-      </span> 
- 
-    </div> 
- 
- 
+  {/* CALLING HISTORY TITLE + COUNT */}
+
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "2px",
+    marginBottom: "5px",
+    color: "#8c9cb3",
+    fontWeight: "bold",
+  }}
+>
+  {/* TOTAL CALLS */}
+  <span
+    style={{
+      fontSize: "28px",
+      color: "#ffffff",
+      fontWeight: "900",
+      letterSpacing: "2px",
+      lineHeight: "1",
+    }}
+  >
+    TOTAL CALLS
+  </span>
+
+  {/* NUMBER */}
+  <span
+    style={{
+      fontSize: "140px",
+      color: "#ffffff",
+      fontWeight: "900",
+      lineHeight: "0.9",
+    }}
+  >
+    {called.length}
+  </span>
+</div>
    
     {/* =======================================================
         🎙️ ITEM 4: TEXT-ONLY COUNTDOWN DISPLAY
@@ -3695,7 +3688,7 @@ setWinningCells(
 const BOX_RADIUS = "8px"; // Box corner roundness
   
   const FONT_SIZE = "90px";       // General editable font size for the countdown texts
-  const FONT_WEIGHT = "2000";      // Editable font weight boldness
+  const FONT_WEIGHT = "3000";      // Editable font weight boldness
   
   // Editable individual state text colors
   const COLOR_PAUSED = "#ffffffff"; 

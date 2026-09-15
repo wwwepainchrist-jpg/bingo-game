@@ -605,7 +605,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
           </div>
 
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
-            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "45px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "45px", background: "#2278e1", lineHeight: 1.2, textTransform: "none" }}>
               {t?.resetGame || "Reset Game"}
             </button>
             
@@ -620,6 +620,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               style={{
                 opacity: isInsufficientPackage ? 0.4 : 1,
                 cursor: isInsufficientPackage ? "not-allowed" : "pointer",
+                 background: "#2278e1",
                 padding: "2px 6px",
                 fontSize: "50px",
                 lineHeight: 1.2,
@@ -635,14 +636,14 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   : (t?.start || "START GAME")}
             </button>
             
-            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", background: "#2278e1", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.finance || "FINANCE"}
             </button>
 
             <button 
               onClick={() => setShowQrModal(true)} 
               className="btn btn-neutral"
-              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}
+              style={{ background: "#2278e1", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}
             >
               📱 {t?.qr || "PLAYER QR CODE"}
             </button>
@@ -712,7 +713,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
   WebkitBackdropFilter: "blur(8px)",
   border: "1px solid rgba(255, 255, 255, 0.15)",
   boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-  color: "#ffffff",
+  color: "#000000",
   fontWeight: "bold",
   fontSize: "30px",       // 👈 NUMBER SIZE
   borderRadius: "8px",
@@ -725,7 +726,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   btnClass = "grid-cell-btn sold";
                   cellGlassStyle = {
                     ...cellGlassStyle,
-                    background: "rgba(38, 113, 198, 0.58)",
+                    background: "rgba(8, 109, 224, 0.97)",
                     border: "1px solid rgba(68, 139, 239, 0.6)",
                     boxShadow: "0 9px 12px rgba(32, 123, 208, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
                     color: "#ffffff"
@@ -734,7 +735,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   btnClass = "grid-cell-btn selected";
                   cellGlassStyle = {
                     ...cellGlassStyle,
-                    background: "rgba(56, 189, 248, 0.45)",
+                    background: "rgba(8, 109, 224, 0.97)",
                     border: "1px solid rgba(56, 189, 248, 0.8)",
                     boxShadow: "0 0 12px rgba(56, 189, 248, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.4)",
                     color: "#ffffff"
