@@ -2707,7 +2707,7 @@ setWinningCells(
         alignItems: "center",
         justifyContent: "center",
 
-        fontSize: "12px",
+        fontSize: "30px",
         fontWeight: "bold",
 
         cursor: "pointer",
@@ -2775,46 +2775,45 @@ setWinningCells(
   }}
 >
 
-  {/* ================= BINGO BOARD ================= */}
+ {/* ================= BINGO BOARD ================= */}
 
-  <section
-    className="board-section"
-    style={{
-      margin: 0,
-      padding: 0,
-    }}
-  >
-    <div className="bingo-board">
-      {['B', 'I', 'N', 'G', 'O'].map((letter) => (
-        <div key={letter} className="board-row">
+<section
+  className="board-section"
+  style={{
+    margin: "0 0 43px 0",   // ← SPACE BELOW THE BINGO BOARD
+    padding: 0,
+  }}
+>
+  <div className="bingo-board">
+    {['B', 'I', 'N', 'G', 'O'].map((letter) => (
+      <div key={letter} className="board-row">
 
-          <div className={`letter-header ${letter.toLowerCase()}`}>
-            {letter}
-          </div>
-
-          <div className="row-numbers">
-            {getRowNumbers(letter).map((num) => {
-              const active = isNumberCalled(letter, num);
-              const activeClass = active
-                ? `active-${letter.toLowerCase()}`
-                : '';
-
-              return (
-                <div
-                  key={num}
-                  className={`number-cell ${activeClass}`}
-                >
-                  {num}
-                </div>
-              );
-            })}
-          </div>
-
+        <div className={`letter-header ${letter.toLowerCase()}`}>
+          {letter}
         </div>
-      ))}
-    </div>
-  </section>
 
+        <div className="row-numbers">
+          {getRowNumbers(letter).map((num) => {
+            const active = isNumberCalled(letter, num);
+            const activeClass = active
+              ? `active-${letter.toLowerCase()}`
+              : '';
+
+            return (
+              <div
+                key={num}
+                className={`number-cell ${activeClass}`}
+              >
+                {num}
+              </div>
+            );
+          })}
+        </div>
+
+      </div>
+    ))}
+  </div>
+</section>
  {/* ============================================================ 
     3. CALLED BALL HISTORY + LARGE CURRENT BALL 
     ============================================================ */} 
@@ -2834,7 +2833,7 @@ setWinningCells(
     display: "flex", 
     alignItems: "center", 
  
-    gap: "18px", 
+    gap: "100px", 
  
     overflow: "hidden", 
   }} 
@@ -2858,7 +2857,7 @@ setWinningCells(
  
       boxSizing: "border-box", 
  
-      border: "2px solid rgba(255,90,165,0.8)", 
+      border: "2px solid rgba(244, 237, 240, 0.8)", 
  
       borderRadius: "12px", 
  
@@ -2882,8 +2881,8 @@ setWinningCells(
  
     <div 
       style={{ 
-        width: "170px", 
-        height: "170px", 
+        width: "217px", 
+        height: "217px", 
  
         borderRadius: "50%", 
  
@@ -2896,7 +2895,7 @@ setWinningCells(
           "radial-gradient(circle at 35% 30%, #ffffff 0%, #f4f5f7 48%, #cfd4dc 100%)", 
  
         border: 
-          "5px solid #ff5aa5", 
+          "5px solid #f5e9ee", 
  
         boxShadow: 
           ` 
@@ -2956,7 +2955,7 @@ setWinningCells(
  
           <span 
             style={{ 
-              fontSize: "90px", 
+              fontSize: "120px", 
               fontWeight: "900", 
  
               lineHeight: "0.9", 
@@ -2975,7 +2974,7 @@ setWinningCells(
  
             letterSpacing: "0.5px", 
  
-            color: "#8c9cb3", 
+            color: "#000000", 
  
             fontWeight: "bold", 
           }} 
@@ -3186,8 +3185,8 @@ setWinningCells(
             <div 
               key={`${ballStr}-${idx}`} 
               style={{ 
-                width: "150px", 
-                height: "150px", 
+                width: "210px", 
+                height: "210px", 
  
                 minWidth: "105px", 
  
@@ -3231,11 +3230,11 @@ setWinningCells(
  
               <div 
                 style={{ 
-                  fontSize: "50px", 
+                  fontSize: "80px", 
  
                   fontWeight: "900", 
  
-                  color: "#172033", 
+                  color: "#000000", 
  
                   lineHeight: "1", 
  
@@ -3250,11 +3249,11 @@ setWinningCells(
  
               <div 
                 style={{ 
-                  fontSize: "85px", 
+                  fontSize: "110px", 
  
                   fontWeight: "900", 
  
-                  color: "#172033", 
+                  color: "#000000", 
  
                   lineHeight: "0.9", 
                 }} 
@@ -3336,7 +3335,7 @@ setWinningCells(
 
       justifyContent: "center",
 
-      fontSize: "28px",
+      fontSize: "30px",
 
       fontWeight: "bold",
 
@@ -3414,8 +3413,8 @@ setWinningCells(
     {/* 🎟️ BINGO CARD MATRIX */}
     <div
       style={{
-        width: "200px",
-        height: "200px",
+        width: "250px",
+        height: "320px",
         background: "#dce8f2",
         border: "2px solid #657789",
         borderRadius: "6px",
@@ -3541,11 +3540,11 @@ setWinningCells(
             color: "#ffffff",
             borderRadius: "30px",
             padding: "3px 10px",
-            fontSize: "10px",
+            fontSize: "15px",
             fontWeight: "bold",
             outline: "none",
             textAlign: "center",
-            height: "22px",
+            height: "45px",
             boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
           }}
         />
@@ -3578,7 +3577,7 @@ setWinningCells(
           borderRadius: "14px",
           border: "1px solid rgba(255, 255, 255, 0.08)",
           backdropFilter: "blur(4px)",
-          boxShadow: "0 0 12px rgba(0, 200, 255, 0.15)",
+          boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
         }}
       >
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
@@ -3592,8 +3591,8 @@ setWinningCells(
               justifyContent: "center",
               borderRadius: "100px",
               height: "26px",
-              color: "#000000",
-              boxShadow: "0 0 10px rgba(0, 200, 255, 0.4)",
+              color: "#ffffffff",
+              boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
               cursor: "pointer"
           }}
           onClick={togglePlayPause}
@@ -3605,21 +3604,21 @@ setWinningCells(
       <div style={{ textAlign: "center", marginTop: "4px" }}>
         <div
           style={{
-            fontSize: "35px",
-            color: "#a0aec0",
+            fontSize: "42px",
+            color: "#ffffffff",
             fontWeight: "bold",
             letterSpacing: "1px"
           }}
         >
-          የጨዋታው ደራሽ
+           ደራሽ
         </div>
 
         <div
           style={{
-            fontSize: "60px",
-            color: "#00f0ff",
+            fontSize: "77px",
+            color: "#ffffffff",
             fontWeight: "900",
-            textShadow: "0 0 12px rgba(0, 240, 255, 0.5)",
+            textShadow: "0 0 12px rgba(2, 2, 2, 0.07)",
             lineHeight: "1.1"
           }}
         >
@@ -3652,7 +3651,7 @@ setWinningCells(
  
       <span 
         style={{ 
-          fontSize: "20px", 
+          fontSize: "30px", 
  
           color: "#00f0ff", 
  
@@ -3667,7 +3666,7 @@ setWinningCells(
  
       <span 
         style={{ 
-          fontSize: "80px", 
+          fontSize: "100px", 
  
           color: "#070707", 
  
@@ -3695,8 +3694,8 @@ setWinningCells(
  const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)"; // Border color and style
 const BOX_RADIUS = "8px"; // Box corner roundness
   
-  const FONT_SIZE = "100px";       // General editable font size for the countdown texts
-  const FONT_WEIGHT = "1200";      // Editable font weight boldness
+  const FONT_SIZE = "90px";       // General editable font size for the countdown texts
+  const FONT_WEIGHT = "2000";      // Editable font weight boldness
   
   // Editable individual state text colors
   const COLOR_PAUSED = "#ffffffff"; 
@@ -4149,7 +4148,7 @@ const BOX_RADIUS = "8px"; // Box corner roundness
       style={{
         color: "#00f0ff",
 
-        fontSize: "22px",
+        fontSize: "70px",
 
         fontWeight: "bold",
 
@@ -4217,7 +4216,7 @@ const BOX_RADIUS = "8px"; // Box corner roundness
 
               color: "#ffffff",
 
-              fontSize: "24px",
+              fontSize: "100px",
 
               fontWeight: "bold",
 

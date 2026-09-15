@@ -521,7 +521,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   background: "transparent",
                   border: "none",
                   color: "#00f0ff",
-                  fontSize: "18px",
+                  fontSize: "42px",
                   fontWeight: "bold",
                   cursor: "pointer",
                   padding: "0 3px",
@@ -548,20 +548,20 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                 border: "1px solid rgba(255, 255, 255, 0.15)", 
                 borderRadius: "6px" 
               }}>
-                <span style={{ fontSize: "31px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
+                <span style={{ fontSize: "60px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
                 </span>
-                <span style={{ fontSize: "32px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
+                <span style={{ fontSize: "60px", fontWeight: "800", color: "#38bdf8", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
                 <div style={{ display: "flex", gap: "4px", marginLeft: "2px" }}>
                   <button 
                     onClick={handleDecreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "19px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "45px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     − 5
                   </button>
                   <button 
                     onClick={handleIncreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "19px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
+                    style={{ padding: "1px 5px", fontSize: "45px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
                   >
                     + 5
                   </button>
@@ -587,7 +587,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
           </div>
           
           {/* STATS */}
-          <div className="header-stats" style={{ margin: "3px 0", fontSize: "22px", display: "flex", gap: "10px", alignItems: "center" }}>
+          <div className="header-stats" style={{ margin: "3px 0", fontSize: "40px", display: "flex", gap: "10px", alignItems: "center" }}>
             <div>{t?.cashier || "Cashier"}: <b className="stat-cashier">{id}</b></div>
             <div>{t?.sold || "Sold Cartelas"}: <b className="stat-sold">{soldCartelas.length}</b></div>
             
@@ -595,17 +595,17 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               background: "rgba(15, 23, 42, 0.8)", 
               padding: "6px 14px", 
               borderRadius: "8px", 
-              border: "2px solid #38bdf8",
-              fontSize: "12px",
+              border: "2px solid #2954d6",
+              fontSize: "70px",
               fontWeight: "800",
               boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
             }}>
-             {<span style={{ fontSize: "23px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "32px", fontWeight: "900", color: "#38bdf8", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
+             {<span style={{ fontSize: "70px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "80px", fontWeight: "900", color: "#000000", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
             </div>     
           </div>
 
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
-            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "45px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.resetGame || "Reset Game"}
             </button>
             
@@ -621,7 +621,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                 opacity: isInsufficientPackage ? 0.4 : 1,
                 cursor: isInsufficientPackage ? "not-allowed" : "pointer",
                 padding: "2px 6px",
-                fontSize: "20px",
+                fontSize: "50px",
                 lineHeight: 1.2,
                 textTransform: "none",
                 backgroundColor: startClicked ? "#dc2626" : undefined,
@@ -635,14 +635,14 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   : (t?.start || "START GAME")}
             </button>
             
-            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}>
+            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
               {t?.finance || "FINANCE"}
             </button>
 
             <button 
               onClick={() => setShowQrModal(true)} 
               className="btn btn-neutral"
-              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "17px", lineHeight: 1.2, textTransform: "none" }}
+              style={{ background: "#7c3aed", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}
             >
               📱 {t?.qr || "PLAYER QR CODE"}
             </button>
@@ -669,12 +669,12 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
             
             {/* GRID HEADER WITH INPUT FORM */}
             <div className="grid-header" style={{ marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-              <h2 style={{ margin: 0, fontSize: "25px", whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
+              <h2 style={{ margin: 0, fontSize: "45px", whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
                 {"CARTELA (Filadhaa : ይምረጡ)"}
               </h2>
 
               {/* INPUT FORM */}
-              <form onSubmit={handleKeyboardSubmit} style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, maxWidth: "260px" }}>
+              <form onSubmit={handleKeyboardSubmit} style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, maxWidth: "400px" }}>
                 <input 
                   type="text"
                   placeholder={t?.typeCartelaPlaceholder || "Type # & press Enter..."}
@@ -683,7 +683,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
                   style={{
                     ...localeFontStyle,
                     width: "100%",
-                    padding: "4px 8px",
+                    padding: "6px 12px",
                     background: "#0f172a",
                     border: "1px solid #38bdf8",
                     borderRadius: "4px",
@@ -705,29 +705,29 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
               {Array.from({ length: 200 }, (_, i) => i + 1).map(num => {
                 const sold = soldCartelas.includes(num);
                 const selected = selectedCartela === num;
-                
-                let cellGlassStyle = {
-                  background: "rgba(255, 255, 255, 0.08)",
-                  backdropFilter: "blur(8px)",
-                  WebkitBackdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255, 255, 255, 0.15)",
-                  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-                  color: "#ffffff",
-                  fontWeight: "bold",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease"
-                };
-
+               
+              let cellGlassStyle = {
+  background: "rgba(255, 255, 255, 0.08)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255, 255, 255, 0.15)",
+  boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+  color: "#ffffff",
+  fontWeight: "bold",
+  fontSize: "30px",       // 👈 NUMBER SIZE
+  borderRadius: "8px",
+  cursor: "pointer",
+  transition: "all 0.2s ease"
+};
                 let btnClass = "grid-cell-btn available";
 
                 if (sold) {
                   btnClass = "grid-cell-btn sold";
                   cellGlassStyle = {
                     ...cellGlassStyle,
-                    background: "rgba(239, 68, 68, 0.45)",
-                    border: "1px solid rgba(239, 68, 68, 0.6)",
-                    boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
+                    background: "rgba(38, 113, 198, 0.58)",
+                    border: "1px solid rgba(68, 139, 239, 0.6)",
+                    boxShadow: "0 9px 12px rgba(32, 123, 208, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.3)",
                     color: "#ffffff"
                   };
                 } else if (selected) {
@@ -791,7 +791,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
       background: "transparent",
       border: "none",
       color: "#38bdf8",
-      fontSize: "19px",
+      fontSize: "27px",
       fontWeight: "900",
       cursor: "pointer"
     }}
@@ -800,7 +800,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
 
     <span 
       style={{ 
-        fontSize: "14px", 
+        fontSize: "22px", 
         color: "#ffffff" 
       }} 
     > 
@@ -876,7 +876,7 @@ console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
 
                 color: "#ffffff", 
 
-                fontSize: "9px", 
+                fontSize: "22px", 
                 fontWeight: "900", 
 
                 cursor: gameStarted 
