@@ -656,3 +656,81 @@ input {
         min-width: 1400px;
     }
 }
+
+
+/* ==========================================================
+   🎰 GRACEFUL BINGO ROLLING BLINK
+   ========================================================== */
+
+ /* ==========================================================
+    🎰 GOLDEN BINGO ROLLING BLINK
+    ========================================================== */
+
+/* ==========================================================
+   🎰 BOLD WHITE BINGO ROLLING BLINK
+   ========================================================== */
+
+.random-blink-number {
+  position: relative;
+  z-index: 20;
+
+  color: #FFFFFF !important;
+  font-weight: 900 !important;
+
+  animation: whiteBingoBlink 0.55s ease-in-out;
+
+  transform-origin: center;
+
+  text-shadow:
+    0 0 5px #FFFFFF,
+    0 0 12px #FFFFFF,
+    0 0 25px rgba(255, 255, 255, 0.95);
+}
+
+@keyframes whiteBingoBlink {
+
+  0% {
+    opacity: 1;
+    transform: scale(1);
+    color: #FFFFFF;
+    text-shadow:
+      0 0 5px #FFFFFF;
+  }
+
+  25% {
+    opacity: 0.9;
+    transform: scale(1.08);
+    color: #FFFFFF;
+    text-shadow:
+      0 0 8px #FFFFFF,
+      0 0 18px #FFFFFF;
+  }
+
+  50% {
+    opacity: 0.3;
+    transform: scale(1.18);
+    color: #FFFFFF;
+    text-shadow:
+      0 0 10px #FFFFFF,
+      0 0 25px #FFFFFF,
+      0 0 45px rgba(255, 255, 255, 0.95);
+  }
+
+  75% {
+    opacity: 0.9;
+    transform: scale(1.08);
+    color: #FFFFFF;
+    text-shadow:
+      0 0 8px #FFFFFF,
+      0 0 20px #FFFFFF;
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    color: #FFFFFF;
+    text-shadow:
+      0 0 5px #FFFFFF,
+      0 0 12px #FFFFFF;
+  }
+}

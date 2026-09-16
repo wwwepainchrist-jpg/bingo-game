@@ -81,8 +81,99 @@ speechLang: "om-ET",
 
 
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
- 
+ const [blinkingNumber, setBlinkingNumber] = useState(null);
 
+const firstGamePlayRef = useRef(true);
+const bingoBlinkIntervalRef = useRef(null);
+const bingoBlinkTimeoutRef = useRef(null);
+
+// ==========================================================
+// 🎰 FIRST GAME ROLLING EFFECT
+// Runs ONLY once at the beginning of each new game
+// ==========================================================
+// ==========================================================
+// 🎰 RANDOM BINGO NUMBER BLINK
+// ONLY ON FIRST PLAY OF A NEW GAME
+// ==========================================================
+
+// ==========================================================
+// 🎰 RANDOM BINGO BOARD BLINK
+// ONLY DURING INITIAL SHUFFLE
+// ==========================================================
+
+const startRandomBingoBlink = () => {
+  // Only first play of a NEW game
+  if (!firstGamePlayRef.current) {
+    return;
+  }
+
+  // Clean up anything left over
+  if (bingoBlinkTimeoutRef.current) {
+    clearTimeout(bingoBlinkTimeoutRef.current);
+    bingoBlinkTimeoutRef.current = null;
+  }
+
+  if (bingoBlinkIntervalRef.current) {
+    clearInterval(bingoBlinkIntervalRef.current);
+    bingoBlinkIntervalRef.current = null;
+  }
+
+  console.log("🎰 BOARD BLINK TIMER STARTED");
+
+  // Wait 2 seconds
+  bingoBlinkTimeoutRef.current = setTimeout(() => {
+
+    if (stateRef.current.paused) {
+      console.log("⏸️ BLINK NOT STARTED - GAME PAUSED");
+      return;
+    }
+
+    if (!firstGamePlayRef.current) {
+      return;
+    }
+
+    console.log("🎰 RANDOM NUMBER BLINK STARTED");
+
+    bingoBlinkIntervalRef.current = setInterval(() => {
+
+      if (
+        stateRef.current.paused ||
+        !firstGamePlayRef.current
+      ) {
+        return;
+      }
+
+      const randomNumber =
+        Math.floor(Math.random() * 75) + 1;
+
+      setBlinkingNumber(randomNumber);
+
+    }, 180);
+
+  }, 2000);
+};
+
+
+const stopRandomBingoBlink = () => {
+
+  console.log("🛑 STOPPING RANDOM NUMBER BLINK");
+
+  if (bingoBlinkTimeoutRef.current) {
+    clearTimeout(bingoBlinkTimeoutRef.current);
+    bingoBlinkTimeoutRef.current = null;
+  }
+
+  if (bingoBlinkIntervalRef.current) {
+    clearInterval(bingoBlinkIntervalRef.current);
+    bingoBlinkIntervalRef.current = null;
+  }
+
+  setBlinkingNumber(null);
+
+  // IMPORTANT:
+  // This game has now used its initial rolling effect.
+  firstGamePlayRef.current = false;
+};
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
@@ -1944,6 +2035,11 @@ console.log(
   stateRef.current.paused = false;
   setPaused(false);
 
+ // 🎰 ONLY FIRST PLAY OF NEW GAME
+if (firstGamePlayRef.current) {
+  startRandomBingoBlink();
+}
+
   // 🎵 INITIAL MATCH LAUNCH GATING RESTRUCTURE
   if (!hasPlayedShuffleRef.current) {
     hasPlayedShuffleRef.current = true;
@@ -1954,13 +2050,23 @@ console.log(
 
     // ✅ FIX: Fire the shuffle track, but do NOT call generateNumber() here!
     // The number generator is now passed safely as a completion hook inside playShuffleSound.
-    playShuffleSound(() => {
-      if (!stateRef.current.paused) {
-        console.log("🏁 SHUFFLE AUDIO FINISHED: GENERATING NUMBER 1 NOW");
-        isDrawingBallRef.current = false;
-        generateNumber();
-      }
-    });
+   playShuffleSound(() => {
+  console.log("🏁 SHUFFLE AUDIO FINISHED");
+
+  // 🛑 STOP RANDOM NUMBER BLINKING
+  stopRandomBingoBlink();
+
+  if (stateRef.current.paused) {
+    console.log("⏸️ GAME IS PAUSED - NOT GENERATING NUMBER");
+    return;
+  }
+
+  console.log("🎯 GENERATING NUMBER 1 NOW");
+
+  isDrawingBallRef.current = false;
+
+  generateNumber();
+});
     return;
   }
 
@@ -2780,11 +2886,11 @@ setWinningCells(
 <section
   className="board-section"
   style={{
-    margin: "0 0 50px 0",   // ← SPACE BELOW THE BINGO BOARD
+    margin: "0 0 50px 0",
     padding: 0,
   }}
 >
-  <div className="bingo-board">
+ <div className="bingo-board">
     {['B', 'I', 'N', 'G', 'O'].map((letter) => (
       <div key={letter} className="board-row">
 
@@ -2795,14 +2901,20 @@ setWinningCells(
         <div className="row-numbers">
           {getRowNumbers(letter).map((num) => {
             const active = isNumberCalled(letter, num);
+
             const activeClass = active
               ? `active-${letter.toLowerCase()}`
               : '';
 
+            // 🎰 RANDOM ROLLING NUMBER
+            const isBlinking = blinkingNumber === num;
+
             return (
               <div
                 key={num}
-                className={`number-cell ${activeClass}`}
+                className={`number-cell ${activeClass} ${
+                  isBlinking ? "random-blink-number" : ""
+                }`}
               >
                 {num}
               </div>
