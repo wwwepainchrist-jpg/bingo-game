@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-
+import {
+  getLocalGames,
+  getLocalSetting,
+  saveLocalSetting,
+  getLocalPackage,
+  saveLocalPackage,
+} from "../offline/offlineService";
 export default function HouseDashboard() {
   const { id } = useParams(); 
   const navigate = useNavigate();
@@ -45,83 +51,349 @@ const [visibleSummaryDays, setVisibleSummaryDays] = useState(5);
     diamond: 0,
   });
 
-  // Load and synchronize data dynamically from PostgreSQL Backend API
-  const refreshDashboardData = async () => {
+ // Load and synchronize data dynamically from PostgreSQL Backend API
+const refreshDashboardData = async () => {
+  try {
+
+    // ============================================================
+    // 1. FETCH HOUSE PROFILE
+    // ONLINE ONLY
+    // If offline, continue to the other offline-capable sections
+    // ============================================================
+
     try {
-      // 1. Fetch house profile and details
-      const houseRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${id}`);
+      const houseRes = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/houses/${id}`
+      );
+
       if (houseRes.ok) {
         const houseData = await houseRes.json();
         setCurrentHouseUser(houseData);
       }
+    } catch (houseError) {
+      console.warn(
+        "📴 HOUSE PROFILE UNAVAILABLE - CONTINUING OFFLINE:",
+        houseError
+      );
+    }
 
-      // 2. Fetch cashiers belonging to this house
-      const cashiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/cashiers/${id}`);
+    // ============================================================
+    // 2. FETCH CASHIERS
+    // ============================================================
+
+    try {
+      const cashiersRes = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/cashiers/${id}`
+      );
+
       if (cashiersRes.ok) {
         const cashiersData = await cashiersRes.json();
-        if (Array.isArray(cashiersData)) setCashiers(cashiersData);
-      }
 
-      // 3. Fetch games related to this house
-      const gamesRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/games/house/${id}`);
+        if (Array.isArray(cashiersData)) {
+          setCashiers(cashiersData);
+        }
+      }
+    } catch (cashiersError) {
+      console.warn(
+        "📴 CASHIERS UNAVAILABLE - CONTINUING OFFLINE:",
+        cashiersError
+      );
+    }
+
+    // ============================================================
+    // 3. KEEP YOUR EXISTING GAMES SECTION HERE
+    // ============================================================
+    // ============================================================
+    // 3. FETCH GAMES
+    // ONLINE → SERVER
+    // OFFLINE → INDEXEDDB
+    // ============================================================
+
+    try {
+      const gamesRes = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}`
+      );
+
       if (gamesRes.ok) {
         const gamesData = await gamesRes.json();
-        if (Array.isArray(gamesData)) setHouseGames(gamesData);
-      }
 
-      // 4. Fetch house package information
-      const packageRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/houses/${id}/package`);
-      if (packageRes.ok) {
-        const pkgData = await packageRes.json();
-        console.log("Package Data:", pkgData);
-        setPackageInfo({
-          totalAmount: Number(pkgData.total_package ?? pkgData.totalAmount ?? 0),
-          remainingAmount: Number(pkgData.remaining_package ?? pkgData.remainingAmount ?? 0),
-        });
-      }
-
-      // 5. Fetch commission controlled by this house
-      try {
-        const commissionRes = await fetch(
-          `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${id}`
-        );
-
-        if (commissionRes.ok) {
-          const commissionData = await commissionRes.json();
+        if (Array.isArray(gamesData)) {
+          setHouseGames(gamesData);
 
           console.log(
-            "🏠 DATABASE COMMISSION:",
-            commissionData.value
+            "☁️ HOUSE GAMES LOADED FROM SERVER:",
+            gamesData.length
           );
+        }
+      } else {
+        throw new Error(
+          `Games request failed: ${gamesRes.status}`
+        );
+      }
 
-          setCommission(Number(commissionData.value));
+    } catch (onlineGamesError) {
 
-        } else if (commissionRes.status === 404) {
+      console.warn(
+        "📴 INTERNET UNAVAILABLE - LOADING HOUSE GAMES OFFLINE:",
+        onlineGamesError
+      );
+
+      try {
+        const localGames = await getLocalGames(id);
+
+        if (Array.isArray(localGames)) {
+          setHouseGames(localGames);
+
           console.log(
-            `⚠️ No commission setting found for house ${id}`
+            "💾 HOUSE GAMES LOADED FROM OFFLINE DATABASE:",
+            localGames.length
           );
         }
 
-      } catch (err) {
-        console.error("Failed to load house commission:", err);
-      }
+      } catch (offlineGamesError) {
 
-      // 6. Fetch Super Admin tier packages config
-      const tiersRes = await fetch(`https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers`);
-      if (tiersRes.ok) {
-        const tiersData = await tiersRes.json();
-        setTierPackages({
-          silver: tiersData.silver,
-          gold: tiersData.gold,
-          diamond: tiersData.diamond,
-        });
+        console.error(
+          "❌ OFFLINE GAME HISTORY LOAD FAILED:",
+          offlineGamesError
+        );
+
+        setHouseGames([]);
       }
-    } catch (err) {
-      console.error("Error fetching dashboard data from server:", err);
     }
-  };
 
-  useEffect(() => {
+   // ============================================================
+// 4. FETCH HOUSE PACKAGE
+// ONLINE → SERVER
+// OFFLINE → INDEXEDDB
+// ============================================================
+
+try {
+  const packageRes = await fetch(
+    `https://bingo-backend-ccn6.onrender.com/api/houses/${id}/package`
+  );
+
+  if (packageRes.ok) {
+    const pkgData = await packageRes.json();
+
+    console.log(
+      "☁️ PACKAGE LOADED FROM SERVER:",
+      pkgData
+    );
+
+    const packageData = {
+      house_id: String(id),
+
+      totalAmount: Number(
+        pkgData.total_package ??
+        pkgData.totalAmount ??
+        0
+      ),
+
+      remainingAmount: Number(
+        pkgData.remaining_package ??
+        pkgData.remainingAmount ??
+        0
+      ),
+
+      total_package: Number(
+        pkgData.total_package ??
+        pkgData.totalAmount ??
+        0
+      ),
+
+      remaining_package: Number(
+        pkgData.remaining_package ??
+        pkgData.remainingAmount ??
+        0
+      ),
+
+      updated_at: new Date().toISOString(),
+
+      synced: true,
+      offline_created: false,
+    };
+
+    setPackageInfo({
+      totalAmount: packageData.totalAmount,
+      remainingAmount: packageData.remainingAmount,
+    });
+
+    // Save latest server package locally
+    await saveLocalPackage(
+      String(id),
+      packageData
+    );
+
+    console.log(
+      "💾 PACKAGE SAVED LOCALLY:",
+      packageData
+    );
+
+  } else {
+    throw new Error(
+      `Package request failed: ${packageRes.status}`
+    );
+  }
+
+} catch (packageError) {
+
+  console.warn(
+    "📴 PACKAGE SERVER UNAVAILABLE - USING OFFLINE PACKAGE:",
+    packageError
+  );
+
+  try {
+    const localPackage =
+      await getLocalPackage(String(id));
+
+    if (localPackage) {
+
+      console.log(
+        "💾 PACKAGE LOADED FROM OFFLINE DATABASE:",
+        localPackage
+      );
+
+      setPackageInfo({
+        totalAmount: Number(
+          localPackage.totalAmount ??
+          localPackage.total_package ??
+          0
+        ),
+
+        remainingAmount: Number(
+          localPackage.remainingAmount ??
+          localPackage.remaining_package ??
+          0
+        ),
+      });
+
+    } else {
+
+      console.warn(
+        "⚠️ NO OFFLINE PACKAGE FOUND FOR HOUSE:",
+        id
+      );
+
+    }
+
+  } catch (offlinePackageError) {
+
+    console.error(
+      "❌ OFFLINE PACKAGE LOAD FAILED:",
+      offlinePackageError
+    );
+  }
+}
+    // 5. Fetch commission controlled by this house
+    try {
+      const commissionKey =
+        `house_commission_${id}`;
+
+      const commissionRes = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${id}`
+      );
+
+      if (commissionRes.ok) {
+        const commissionData =
+          await commissionRes.json();
+
+        const commissionValue =
+          Number(commissionData.value);
+
+        console.log(
+          "🏠 COMMISSION FROM SERVER:",
+          commissionValue
+        );
+
+        setCommission(
+          commissionValue
+        );
+
+        await saveLocalSetting(
+          commissionKey,
+          commissionValue
+        );
+
+        console.log(
+          "💾 COMMISSION SAVED LOCALLY:",
+          commissionValue
+        );
+
+      } else {
+        throw new Error(
+          `Commission request failed: ${commissionRes.status}`
+        );
+      }
+
+    } catch (onlineCommissionError) {
+
+      console.warn(
+        "📴 COMMISSION SERVER UNAVAILABLE - USING LOCAL COMMISSION"
+      );
+
+      try {
+        const commissionKey =
+          `house_commission_${id}`;
+
+        const localCommission =
+          await getLocalSetting(
+            commissionKey
+          );
+
+        if (
+          localCommission &&
+          localCommission.value !== undefined
+        ) {
+          const localValue =
+            Number(localCommission.value);
+
+          setCommission(
+            localValue
+          );
+
+          console.log(
+            "💾 OFFLINE COMMISSION LOADED:",
+            localValue
+          );
+        }
+
+      } catch (offlineCommissionError) {
+
+        console.error(
+          "❌ OFFLINE COMMISSION LOAD FAILED:",
+          offlineCommissionError
+        );
+      }
+    }
+
+    
+
+   // 6. Fetch Super Admin tier packages config
+// 6. Fetch Super Admin tier packages config
+const tiersRes = await fetch(
+  `https://bingo-backend-ccn6.onrender.com/api/superadmin/tiers`
+);
+
+if (tiersRes.ok) {
+  const tiersData =
+    await tiersRes.json();
+
+  setTierPackages({
+    silver: tiersData.silver,
+    gold: tiersData.gold,
+    diamond: tiersData.diamond,
+  });
+}
+
+} catch (err) {
+  console.error(
+    "Error fetching dashboard data from server:",
+    err
+  );
+}
+};
+  
+useEffect(() => {
     refreshDashboardData();
 
     // Listen for window focus to resync data
@@ -130,117 +402,641 @@ const [visibleSummaryDays, setVisibleSummaryDays] = useState(5);
       window.removeEventListener("focus", refreshDashboardData);
     };
   }, [id]);
-
   async function updateSetting(key, value) {
-    try {
-      console.log(`💾 SAVING SETTING: ${key} = ${value}`);
 
-      const response = await fetch(
-        "https://bingo-backend-ccn6.onrender.com/api/settings",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            key,
-            value,
-          }),
-        }
+  // =====================================================
+  // 💾 ALWAYS SAVE LOCAL COPY FIRST
+  // =====================================================
+
+  try {
+
+    await saveLocalSetting(
+      key,
+      value
+    );
+
+    console.log(
+      `💾 LOCAL SETTING SAVED: ${key} = ${value}`
+    );
+
+  } catch (offlineError) {
+
+    console.error(
+      "❌ LOCAL SETTING SAVE FAILED:",
+      offlineError
+    );
+  }
+
+  // =====================================================
+  // ☁️ TRY SERVER UPDATE
+  // =====================================================
+
+  try {
+
+    console.log(
+      `☁️ SAVING SETTING TO SERVER: ${key} = ${value}`
+    );
+
+    const response = await fetch(
+      "https://bingo-backend-ccn6.onrender.com/api/settings",
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          key,
+          value,
+        }),
+      }
+    );
+
+    const data =
+      await response.json();
+
+    if (!response.ok) {
+
+      console.error(
+        "❌ SERVER SAVE SETTING FAILED:",
+        data
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("❌ SAVE SETTING FAILED:", data);
-        return false;
-      }
-
-      console.log(`✅ SAVED ${key} = ${value}`, data);
-
-      return true;
-    } catch (err) {
-      console.error("❌ Error updating setting:", err);
       return false;
     }
+
+    console.log(
+      `✅ SERVER SETTING SAVED: ${key} = ${value}`,
+      data
+    );
+
+    // Server is now synchronized
+    await saveLocalSetting(
+      key,
+      value
+    );
+
+    return true;
+
+  } catch (err) {
+
+    console.warn(
+      "📴 OFFLINE MODE - SETTING WILL REMAIN LOCAL:",
+      key,
+      value
+    );
+
+    return false;
   }
+}
 
   // ==========================================================================
   // FETCH PERIODIC STATS FROM BACKEND PERFORMANCE API
   // ==========================================================================
-  useEffect(() => {
-    async function loadPerformance() {
+  // ============================================================
+// PERFORMANCE STATS
+// ONLINE  → SERVER PERFORMANCE API
+// OFFLINE → LOCAL INDEXEDDB GAMES
+// ============================================================
+
+useEffect(() => {
+  console.log("🔥 PERFORMANCE EFFECT STARTED, HOUSE ID:", id);
+
+  async function loadPerformance() {
+    console.log("🔥 LOAD PERFORMANCE STARTED, HOUSE ID:", id);
+
+    if (!id) return;
+
+    // ========================================================
+    // OFFLINE CALCULATION FUNCTION
+    // ========================================================
+
+    const calculateOfflinePerformance = async () => {
       try {
-        const response = await fetch(
-        `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`
+        const localGames =
+          await getLocalGames(String(id));
+
+        console.log(
+          "💾 OFFLINE GAMES FOR PERFORMANCE:",
+          localGames.length
         );
-        const data = await response.json();
-        console.log("🔥 FULL PERFORMANCE RESPONSE:", data);
 
-        if (data.success && data.performance) {
-          setPeriodicStats({
-            daily: {
-              cards: Number(data.performance.daily_cards || 0),
-              commission: Number(data.performance.daily_commission || 0),
-              games: Number(data.performance.daily_games || 0),
-            },
-            weekly: {
-              cards: Number(data.performance.weekly_cards || 0),
-              commission: Number(data.performance.weekly_commission || 0),
-              games: Number(data.performance.weekly_games || 0),
-            },
-            monthly: {
-              cards: Number(data.performance.monthly_cards || 0),
-              commission: Number(data.performance.monthly_commission || 0),
-              games: Number(data.performance.monthly_games || 0),
-            },
-            yearly: {
-              cards: Number(data.performance.yearly_cards || 0),
-              commission: Number(data.performance.yearly_commission || 0),
-              games: Number(data.performance.yearly_games || 0),
-            },
-          });
+        // ======================================================
+        // ETHIOPIA DATE PARTS
+        // Africa/Addis_Ababa timezone
+        // ======================================================
+
+        const getEthiopiaDateParts = (dateValue) => {
+          if (!dateValue) return null;
+
+          const date = new Date(dateValue);
+
+          if (Number.isNaN(date.getTime())) {
+            return null;
+          }
+
+          const parts =
+            new Intl.DateTimeFormat(
+              "en-US",
+              {
+                timeZone: "Africa/Addis_Ababa",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              }
+            ).formatToParts(date);
+
+          return {
+            year: Number(
+              parts.find(
+                (p) => p.type === "year"
+              )?.value
+            ),
+
+            month: Number(
+              parts.find(
+                (p) => p.type === "month"
+              )?.value
+            ),
+
+            day: Number(
+              parts.find(
+                (p) => p.type === "day"
+              )?.value
+            ),
+          };
+        };
+
+        // ======================================================
+        // TODAY IN ETHIOPIA
+        // ======================================================
+
+        const today =
+          getEthiopiaDateParts(new Date());
+
+        if (!today) {
+          throw new Error(
+            "Could not determine Ethiopia date"
+          );
         }
-      } catch (err) {
-        console.error("Failed to load performance stats:", err);
+
+        // ======================================================
+        // DATE → NUMBER
+        // YYYYMMDD
+        // ======================================================
+
+        const dateToNumber = (date) => {
+          if (!date) return null;
+
+          return (
+            date.year * 10000 +
+            date.month * 100 +
+            date.day
+          );
+        };
+
+        const todayNumber =
+          dateToNumber(today);
+
+        // ======================================================
+        // GET GAME DATE
+        // ======================================================
+
+        const getGameDate = (game) => {
+          const value =
+            game.created_at ||
+            game.finished_at ||
+            game.started_at ||
+            game.game_date ||
+            game.date;
+
+          return getEthiopiaDateParts(value);
+        };
+
+        // ======================================================
+        // PERIOD TOTALS
+        // ======================================================
+
+        let dailyCards = 0;
+        let dailyCommission = 0;
+        let dailyGames = 0;
+
+        let weeklyCards = 0;
+        let weeklyCommission = 0;
+        let weeklyGames = 0;
+
+        let monthlyCards = 0;
+        let monthlyCommission = 0;
+        let monthlyGames = 0;
+
+        let yearlyCards = 0;
+        let yearlyCommission = 0;
+        let yearlyGames = 0;
+
+        // ======================================================
+        // WEEK START
+        // MONDAY → SUNDAY
+        // ======================================================
+
+        const todayDate = new Date(
+          today.year,
+          today.month - 1,
+          today.day
+        );
+
+        const dayOfWeek =
+          todayDate.getDay();
+
+        const daysFromMonday =
+          dayOfWeek === 0
+            ? 6
+            : dayOfWeek - 1;
+
+        const weekStart = new Date(
+          todayDate
+        );
+
+        weekStart.setDate(
+          todayDate.getDate() -
+            daysFromMonday
+        );
+
+        const weekStartNumber =
+          Number(
+            `${weekStart.getFullYear()}${String(
+              weekStart.getMonth() + 1
+            ).padStart(2, "0")}${String(
+              weekStart.getDate()
+            ).padStart(2, "0")}`
+          );
+
+        // ======================================================
+        // PROCESS LOCAL GAMES
+        // ======================================================
+
+        localGames.forEach((game) => {
+          const gameDate =
+            getGameDate(game);
+
+          if (!gameDate) return;
+
+          const gameNumber =
+            dateToNumber(gameDate);
+
+          if (!gameNumber) return;
+
+          // ====================================================
+          // CARDS
+          // ====================================================
+
+          const cards = Number(
+            game.cards_sold ??
+            game.cardsSold ??
+            0
+          );
+
+          // ====================================================
+          // COMMISSION
+          // ====================================================
+
+          const commission = Number(
+            game.house_commission ??
+            game.commission_earned ??
+            game.commissionDeducted ??
+            game.commission ??
+            0
+          );
+
+          // ====================================================
+          // DAILY
+          // ====================================================
+
+          if (
+            gameNumber ===
+            todayNumber
+          ) {
+            dailyCards += cards;
+            dailyCommission += commission;
+            dailyGames += 1;
+          }
+
+          // ====================================================
+          // WEEKLY
+          // ====================================================
+
+          if (
+            gameNumber >=
+              weekStartNumber &&
+            gameNumber <=
+              todayNumber
+          ) {
+            weeklyCards += cards;
+            weeklyCommission += commission;
+            weeklyGames += 1;
+          }
+
+          // ====================================================
+          // MONTHLY
+          // ====================================================
+
+          if (
+            gameDate.year ===
+              today.year &&
+            gameDate.month ===
+              today.month
+          ) {
+            monthlyCards += cards;
+            monthlyCommission += commission;
+            monthlyGames += 1;
+          }
+
+          // ====================================================
+          // YEARLY
+          // ====================================================
+
+          if (
+            gameDate.year ===
+            today.year
+          ) {
+            yearlyCards += cards;
+            yearlyCommission += commission;
+            yearlyGames += 1;
+          }
+        });
+
+        // ======================================================
+        // FINAL OFFLINE PERFORMANCE
+        // ======================================================
+
+        const offlinePerformance = {
+          daily: {
+            cards: dailyCards,
+            commission: dailyCommission,
+            games: dailyGames,
+          },
+
+          weekly: {
+            cards: weeklyCards,
+            commission: weeklyCommission,
+            games: weeklyGames,
+          },
+
+          monthly: {
+            cards: monthlyCards,
+            commission: monthlyCommission,
+            games: monthlyGames,
+          },
+
+          yearly: {
+            cards: yearlyCards,
+            commission: yearlyCommission,
+            games: yearlyGames,
+          },
+        };
+
+        setPeriodicStats(
+          offlinePerformance
+        );
+
+        console.log(
+          "💾 OFFLINE PERFORMANCE CALCULATED:",
+          offlinePerformance
+        );
+
+      } catch (offlinePerformanceError) {
+        console.error(
+          "❌ OFFLINE PERFORMANCE CALCULATION FAILED:",
+          offlinePerformanceError
+        );
+
+        setPeriodicStats({
+          daily: {
+            cards: 0,
+            commission: 0,
+            games: 0,
+          },
+
+          weekly: {
+            cards: 0,
+            commission: 0,
+            games: 0,
+          },
+
+          monthly: {
+            cards: 0,
+            commission: 0,
+            games: 0,
+          },
+
+          yearly: {
+            cards: 0,
+            commission: 0,
+            games: 0,
+          },
+        });
       }
+    };
+
+    // ========================================================
+    // 1. ALREADY OFFLINE → DO NOT TRY SERVER
+    // ========================================================
+
+    if (!navigator.onLine) {
+      console.log(
+        "📴 HOUSE DASHBOARD OFFLINE - USING LOCAL PERFORMANCE"
+      );
+
+      await calculateOfflinePerformance();
+
+      return;
     }
 
-    if (id) {
-      loadPerformance();
-    }
-  }, [id]);
+    // ========================================================
+    // 2. ONLINE → TRY SERVER FIRST
+    // ========================================================
 
-  // SORT GAMES: From Current/Newest Date & Time to Oldest
-  const sortedHouseGames = [...houseGames].sort((a, b) => {
-    const dateA = a.date ? new Date(a.date).getTime() : 0;
-    const dateB = b.date ? new Date(b.date).getTime() : 0;
-    return dateB - dateA;
-  });
+    try {
+      const response = await fetch(
+        `https://bingo-backend-ccn6.onrender.com/api/games/house/${id}/performance`
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          `Performance request failed: ${response.status}`
+        );
+      }
+
+      const data = await response.json();
+
+      console.log(
+        "🔥 FULL PERFORMANCE RESPONSE:",
+        data
+      );
+
+      if (
+        data.success &&
+        data.performance
+      ) {
+        setPeriodicStats({
+          daily: {
+            cards: Number(
+              data.performance.daily_cards || 0
+            ),
+            commission: Number(
+              data.performance.daily_commission || 0
+            ),
+            games: Number(
+              data.performance.daily_games || 0
+            ),
+          },
+
+          weekly: {
+            cards: Number(
+              data.performance.weekly_cards || 0
+            ),
+            commission: Number(
+              data.performance.weekly_commission || 0
+            ),
+            games: Number(
+              data.performance.weekly_games || 0
+            ),
+          },
+
+          monthly: {
+            cards: Number(
+              data.performance.monthly_cards || 0
+            ),
+            commission: Number(
+              data.performance.monthly_commission || 0
+            ),
+            games: Number(
+              data.performance.monthly_games || 0
+            ),
+          },
+
+          yearly: {
+            cards: Number(
+              data.performance.yearly_cards || 0
+            ),
+            commission: Number(
+              data.performance.yearly_commission || 0
+            ),
+            games: Number(
+              data.performance.yearly_games || 0
+            ),
+          },
+        });
+
+        console.log(
+          "☁️ PERFORMANCE LOADED FROM SERVER"
+        );
+
+        return;
+      }
+
+      throw new Error(
+        "Invalid performance response"
+      );
+
+    } catch (onlinePerformanceError) {
+
+      // ======================================================
+      // 3. SERVER FAILED WHILE ONLINE → LOCAL FALLBACK
+      // ======================================================
+
+      console.warn(
+        "⚠️ PERFORMANCE SERVER UNAVAILABLE - USING LOCAL PERFORMANCE:",
+        onlinePerformanceError
+      );
+
+      await calculateOfflinePerformance();
+    }
+  }
+
+  loadPerformance();
+}, [id]);
+ // ==========================================================================
+// SORT ALL HOUSE GAMES: NEWEST → OLDEST
+// WORKS WITH ONLINE + OFFLINE GAME RECORDS
+// ==========================================================================
+
+const getGameTimestamp = (game) => {
+  const value =
+    game.created_at ||
+    game.finished_at ||
+    game.started_at ||
+    game.game_date ||
+    game.date;
+
+  if (!value) return 0;
+
+  const timestamp =
+    new Date(value).getTime();
+
+  return Number.isNaN(timestamp)
+    ? 0
+    : timestamp;
+};
+
+const sortedHouseGames = [...houseGames].sort(
+  (a, b) => {
+    return (
+      getGameTimestamp(b) -
+      getGameTimestamp(a)
+    );
+  }
+);
+
+
 // ==========================================================================
 // FILTER GAME HISTORY BY SELECTED CALENDAR PERIOD
+// ETHIOPIAN CALENDAR DAY/WEEK/MONTH/YEAR
 // ==========================================================================
 
 const getEthiopiaDateParts = (dateValue) => {
   if (!dateValue) return null;
 
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "Africa/Addis_Ababa",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date(dateValue));
+  const date = new Date(dateValue);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts =
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Africa/Addis_Ababa",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(date);
 
   return {
-    year: Number(parts.find(p => p.type === "year")?.value),
-    month: Number(parts.find(p => p.type === "month")?.value),
-    day: Number(parts.find(p => p.type === "day")?.value),
+    year: Number(
+      parts.find(
+        (p) => p.type === "year"
+      )?.value
+    ),
+
+    month: Number(
+      parts.find(
+        (p) => p.type === "month"
+      )?.value
+    ),
+
+    day: Number(
+      parts.find(
+        (p) => p.type === "day"
+      )?.value
+    ),
   };
 };
 
+
 const getEthiopiaToday = () => {
-  return getEthiopiaDateParts(new Date());
+  return getEthiopiaDateParts(
+    new Date()
+  );
 };
+
 
 const getGameDateParts = (game) => {
   const value =
@@ -253,6 +1049,7 @@ const getGameDateParts = (game) => {
   return getEthiopiaDateParts(value);
 };
 
+
 const isSameDate = (a, b) => {
   return (
     a &&
@@ -263,80 +1060,477 @@ const isSameDate = (a, b) => {
   );
 };
 
-const filteredHouseGames = sortedHouseGames.filter((game) => {
-  const gameDate = getGameDateParts(game);
 
-  if (!gameDate) return false;
+// ==========================================================================
+// FILTER GAME HISTORY
+// ==========================================================================
 
-  const today = getEthiopiaToday();
+const filteredHouseGames =
+  sortedHouseGames.filter((game) => {
 
-  // ============================================================
-  // DAILY
-  // TODAY'S CALENDAR DAY ONLY
-  // ============================================================
+    const gameDate =
+      getGameDateParts(game);
 
-  if (selectedPeriod === "daily") {
-    return isSameDate(gameDate, today);
+    if (!gameDate) {
+      return false;
+    }
+
+    const today =
+      getEthiopiaToday();
+
+
+    // ============================================================
+    // DAILY
+    // TODAY'S ETHIOPIAN CALENDAR DAY ONLY
+    // ============================================================
+
+    if (selectedPeriod === "daily") {
+      return isSameDate(
+        gameDate,
+        today
+      );
+    }
+
+
+    // ============================================================
+    // WEEKLY
+    // CURRENT MONDAY → SUNDAY WEEK
+    // ============================================================
+
+    if (selectedPeriod === "weekly") {
+
+      const gameDateObj =
+        new Date(
+          Date.UTC(
+            gameDate.year,
+            gameDate.month - 1,
+            gameDate.day
+          )
+        );
+
+      const todayObj =
+        new Date(
+          Date.UTC(
+            today.year,
+            today.month - 1,
+            today.day
+          )
+        );
+
+      const day =
+        todayObj.getUTCDay();
+
+      // Monday = first day of week
+      const daysFromMonday =
+        day === 0
+          ? 6
+          : day - 1;
+
+      const weekStart =
+        new Date(todayObj);
+
+      weekStart.setUTCDate(
+        weekStart.getUTCDate() -
+        daysFromMonday
+      );
+
+      const weekEnd =
+        new Date(weekStart);
+
+      weekEnd.setUTCDate(
+        weekEnd.getUTCDate() + 7
+      );
+
+      return (
+        gameDateObj >= weekStart &&
+        gameDateObj < weekEnd
+      );
+    }
+
+
+    // ============================================================
+    // MONTHLY
+    // CURRENT CALENDAR MONTH
+    // ============================================================
+
+    if (selectedPeriod === "monthly") {
+      return (
+        gameDate.year === today.year &&
+        gameDate.month === today.month
+      );
+    }
+
+
+    // ============================================================
+    // YEARLY
+    // CURRENT CALENDAR YEAR
+    // ============================================================
+
+    if (selectedPeriod === "yearly") {
+      return (
+        gameDate.year === today.year
+      );
+    }
+
+    return false;
+  });
+
+
+// ==========================================================================
+// COMMON HOUSE COMMISSION CALCULATION
+//
+// ONLINE + OFFLINE USE THE SAME CALCULATION
+//
+// EXAMPLE:
+// GROSS = 100
+// COMMISSION = 20%
+// HOUSE COMMISSION EARNED = 20
+// NET = 20
+// ==========================================================================
+
+const calculateGameMoney = (game) => {
+
+  if (!game) {
+    return {
+      gross: 0,
+      commissionPercent: 0,
+      commissionAmount: 0,
+      net: 0,
+      cards: 0,
+      bet: 0,
+    };
   }
 
+
   // ============================================================
-  // WEEKLY
-  // CURRENT CALENDAR WEEK
+  // CARDS SOLD
   // ============================================================
 
-  if (selectedPeriod === "weekly") {
-    const gameDateObj = new Date(
-      Date.UTC(gameDate.year, gameDate.month - 1, gameDate.day)
+  const cards = Number(
+    game.cards_sold ??
+    game.cardsSold ??
+    game.soldCartelas?.length ??
+    0
+  );
+
+
+  // ============================================================
+  // BET PER CARTELA
+  // ============================================================
+
+  const bet = Number(
+    game.bet ??
+    game.bet_amount ??
+    0
+  );
+
+
+  // ============================================================
+  // GROSS
+  // ============================================================
+
+  const storedGross =
+    Number(
+      game.grossIncome ??
+      game.gross_income ??
+      game.totalIncome ??
+      NaN
     );
 
-    const todayObj = new Date(
-      Date.UTC(today.year, today.month - 1, today.day)
+  const calculatedGross =
+    bet * cards;
+
+  const gross =
+    Number.isFinite(storedGross)
+      ? storedGross
+      : calculatedGross;
+
+
+  // ============================================================
+  // COMMISSION PERCENTAGE
+  //
+  // Examples:
+  // game.commission = 20
+  // means 20%
+  //
+  // game.house_commission_percent = 20
+  // also means 20%
+  // ============================================================
+
+  let commissionPercent =
+    Number(
+      game.commission_percent ??
+      game.house_commission_percent ??
+      game.commissionPercentage ??
+      game.houseCommissionPercent ??
+      game.commission ??
+      NaN
     );
 
-    const day = todayObj.getUTCDay();
 
-    // Monday = first day of week
-    const daysFromMonday = day === 0 ? 6 : day - 1;
-
-    const weekStart = new Date(todayObj);
-    weekStart.setUTCDate(
-      weekStart.getUTCDate() - daysFromMonday
-    );
-
-    const weekEnd = new Date(weekStart);
-    weekEnd.setUTCDate(
-      weekEnd.getUTCDate() + 7
-    );
-
-    return (
-      gameDateObj >= weekStart &&
-      gameDateObj < weekEnd
-    );
+  if (
+    !Number.isFinite(
+      commissionPercent
+    )
+  ) {
+    commissionPercent = 0;
   }
 
+
   // ============================================================
-  // MONTHLY
-  // CURRENT CALENDAR MONTH
+  // HOUSE COMMISSION EARNED
+  //
+  // FIRST USE STORED ACTUAL ETB AMOUNT
+  // IF AVAILABLE.
+  //
+  // OTHERWISE CALCULATE:
+  //
+  // GROSS × COMMISSION %
   // ============================================================
 
-  if (selectedPeriod === "monthly") {
-    return (
-      gameDate.year === today.year &&
-      gameDate.month === today.month
+  let commissionAmount =
+    Number(
+      game.commissionDeducted ??
+      game.commission_earned ??
+      game.house_commission_amount ??
+      NaN
     );
-  }
+
 
   // ============================================================
-  // YEARLY
-  // CURRENT CALENDAR YEAR
+  // SOME ONLINE RECORDS STORE THE ACTUAL
+  // HOUSE COMMISSION EARNED IN house_commission.
+  //
+  // IMPORTANT:
+  // We only use it as an actual amount when it is
+  // explicitly available.
   // ============================================================
 
-  if (selectedPeriod === "yearly") {
-    return gameDate.year === today.year;
+  if (
+    !Number.isFinite(
+      commissionAmount
+    )
+  ) {
+
+    const storedHouseCommission =
+      Number(
+        game.house_commission
+      );
+
+    if (
+      Number.isFinite(
+        storedHouseCommission
+      )
+    ) {
+      commissionAmount =
+        storedHouseCommission;
+    }
   }
 
-  return false;
-});
+
+  // ============================================================
+  // IF NO ACTUAL COMMISSION AMOUNT EXISTS,
+  // CALCULATE IT FROM GROSS + COMMISSION %
+  // ============================================================
+
+  if (
+    !Number.isFinite(
+      commissionAmount
+    )
+  ) {
+
+    commissionAmount =
+      gross *
+      (
+        commissionPercent /
+        100
+      );
+  }
+
+
+  // ============================================================
+  // NET
+  //
+  // FOR HOUSE DASHBOARD:
+  //
+  // NET = HOUSE COMMISSION EARNED
+  //
+  // NOT:
+  // gross - commission
+  // ============================================================
+
+  const net =
+    commissionAmount;
+
+
+  return {
+
+    gross:
+      Number(gross) || 0,
+
+    commissionPercent:
+      Number(
+        commissionPercent
+      ) || 0,
+
+    commissionAmount:
+      Number(
+        commissionAmount
+      ) || 0,
+
+    net:
+      Number(net) || 0,
+
+    cards,
+
+    bet,
+  };
+};
+
+
+// ==========================================================================
+// DETAILED GAME HISTORY NET
+//
+// NET = TOTAL HOUSE COMMISSION EARNED
+// ONLINE + OFFLINE
+// ==========================================================================
+
+const detailedHistoryNet =
+  filteredHouseGames.reduce(
+    (total, game) => {
+
+      const money =
+        calculateGameMoney(game);
+
+      return (
+        total +
+        money.commissionAmount
+      );
+    },
+    0
+  );
+
+
+// ==========================================================================
+// PREVIOUS DAYS SUMMARY
+//
+// NET = HOUSE COMMISSION EARNED
+// ONLINE + OFFLINE
+// ==========================================================================
+
+const previousDaysSummary =
+  Object.values(
+
+    houseGames.reduce(
+      (groups, game) => {
+
+        const dateValue =
+          game.created_at ||
+          game.finished_at ||
+          game.started_at ||
+          game.game_date ||
+          game.date;
+
+        const dateParts =
+          getEthiopiaDateParts(
+            dateValue
+          );
+
+        if (!dateParts) {
+          return groups;
+        }
+
+
+        const today =
+          getEthiopiaToday();
+
+
+        // ========================================================
+        // DO NOT PUT TODAY'S GAMES
+        // INTO PREVIOUS DAYS SUMMARY
+        // ========================================================
+
+        if (
+          isSameDate(
+            dateParts,
+            today
+          )
+        ) {
+          return groups;
+        }
+
+
+        const dateKey =
+          `${dateParts.year}-${String(
+            dateParts.month
+          ).padStart(2, "0")}-${String(
+            dateParts.day
+          ).padStart(2, "0")}`;
+
+
+        // ========================================================
+        // SAME CALCULATION FOR ONLINE + OFFLINE
+        // ========================================================
+
+        const money =
+          calculateGameMoney(game);
+
+
+        if (!groups[dateKey]) {
+
+          groups[dateKey] = {
+
+            year:
+              dateParts.year,
+
+            month:
+              dateParts.month,
+
+            day:
+              dateParts.day,
+
+            // NET = HOUSE COMMISSION EARNED
+            netProfit: 0,
+          };
+        }
+
+
+        // ========================================================
+        // ADD HOUSE COMMISSION EARNED
+        //
+        // Example:
+        // Gross 100 × 20% = 20
+        // Net = 20
+        // ========================================================
+
+        groups[dateKey].netProfit +=
+          money.commissionAmount;
+
+
+        return groups;
+      },
+      {}
+    )
+  ).sort(
+    (a, b) => {
+
+      const dateA =
+        Date.UTC(
+          a.year,
+          a.month - 1,
+          a.day
+        );
+
+      const dateB =
+        Date.UTC(
+          b.year,
+          b.month - 1,
+          b.day
+        );
+
+      return dateB - dateA;
+    }
+  );
   // ==========================================================================
   // ISOLATED DELETE FUNCTION FOR THE SELECTED PERIOD ONLY (VIA BACKEND)
   // ==========================================================================
@@ -385,6 +1579,8 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
       alert("Cannot connect to server.");
     }
   };
+
+
 
   // ==========================================================================
   // XY GRAPH LOGIC: DAILY PERFORMANCE AGGREGATION
@@ -931,7 +2127,8 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
         </div>
       )}
 
-      {/* =========================================================
+    
+{/* =========================================================
     HOUSE HISTORY
     TODAY = FULL HISTORY
     PREVIOUS DAYS = NET ONLY
@@ -940,6 +2137,13 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
 {(() => {
   const today = getEthiopiaToday();
 
+  /*
+   * USE THE SAME HOUSE GAMES DATA
+   * THAT YOUR EXISTING CODE ALREADY USES.
+   *
+   * If online data exists -> houseGames contains it.
+   * If offline -> your getLocalGames(id) fallback fills houseGames.
+   */
   const todayGames = sortedHouseGames.filter((game) =>
     isSameDate(getGameDateParts(game), today)
   );
@@ -951,11 +2155,18 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
 
     if (!gameDate) return;
 
+    /*
+     * Do not include today's games
+     * in Previous Days Summary.
+     */
     if (isSameDate(gameDate, today)) return;
 
     const dateKey =
       `${gameDate.year}-${String(gameDate.month).padStart(2, "0")}-${String(gameDate.day).padStart(2, "0")}`;
 
+    /*
+     * KEEP YOUR ORIGINAL CARTELA CALCULATION
+     */
     const cartelasCount = Number(
       game.cards_sold ??
       game.cardsSold ??
@@ -963,15 +2174,28 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
       0
     );
 
+    /*
+     * KEEP YOUR ORIGINAL BET CALCULATION
+     */
     const betAmount = Number(game.bet) || 50;
 
-    const grossPool = betAmount * cartelasCount;
+    const grossPool =
+      betAmount * cartelasCount;
 
-    const commissionRate = Number(game.commission) || 15;
+    /*
+     * KEEP YOUR ORIGINAL COMMISSION LOGIC
+     *
+     * First use actual house commission.
+     * If it does not exist, calculate it using
+     * the original commission percentage.
+     */
+    const commissionRate =
+      Number(game.commission) || 15;
 
     const houseEarned = Number(
       game.house_commission ??
       game.commission_earned ??
+      game.commissionDeducted ??
       grossPool * (commissionRate / 100)
     );
 
@@ -982,35 +2206,52 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
       };
     }
 
-    previousDaysMap[dateKey].net += houseEarned;
+    previousDaysMap[dateKey].net +=
+      houseEarned;
   });
 
-  const previousDays = Object.values(previousDaysMap).sort(
-    (a, b) => new Date(b.date) - new Date(a.date)
+  const previousDays =
+    Object.values(previousDaysMap).sort(
+      (a, b) =>
+        new Date(b.date) -
+        new Date(a.date)
+    );
+
+  /*
+   * TODAY NET
+   *
+   * Same calculation as your original code.
+   */
+  const todayNet = todayGames.reduce(
+    (total, game) => {
+      const cartelasCount = Number(
+        game.cards_sold ??
+        game.cardsSold ??
+        game.soldCartelas?.length ??
+        0
+      );
+
+      const betAmount =
+        Number(game.bet) || 50;
+
+      const grossPool =
+        betAmount * cartelasCount;
+
+      const commissionRate =
+        Number(game.commission) || 15;
+
+      const houseEarned = Number(
+        game.house_commission ??
+        game.commission_earned ??
+        game.commissionDeducted ??
+        grossPool *
+          (commissionRate / 100)
+      );
+
+      return total + houseEarned;
+    },
+    0
   );
-
-  const todayNet = todayGames.reduce((total, game) => {
-    const cartelasCount = Number(
-      game.cards_sold ??
-      game.cardsSold ??
-      game.soldCartelas?.length ??
-      0
-    );
-
-    const betAmount = Number(game.bet) || 50;
-
-    const grossPool = betAmount * cartelasCount;
-
-    const commissionRate = Number(game.commission) || 15;
-
-    const houseEarned = Number(
-      game.house_commission ??
-      game.commission_earned ??
-      grossPool * (commissionRate / 100)
-    );
-
-    return total + houseEarned;
-  }, 0);
 
   return (
     <>
@@ -1020,12 +2261,29 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Date & Time</th>
-              <th style={styles.th}>Game ID</th>
-              <th style={styles.th}>Cashier</th>
-              <th style={styles.th}>Cartelas Sold</th>
-              <th style={styles.th}>Total Bet Pool</th>
-              <th style={styles.th}>House Commission Earned</th>
+              <th style={styles.th}>
+                Date & Time
+              </th>
+
+              <th style={styles.th}>
+                Game ID
+              </th>
+
+              <th style={styles.th}>
+                Cashier
+              </th>
+
+              <th style={styles.th}>
+                Cartelas Sold
+              </th>
+
+              <th style={styles.th}>
+                Total Bet Pool
+              </th>
+
+              <th style={styles.th}>
+                House Commission Earned
+              </th>
             </tr>
           </thead>
 
@@ -1033,81 +2291,143 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
             {todayGames.length > 0 ? (
               <>
                 {todayGames
-                  .slice(0, visibleGameLogsCount)
-                  .map((game, index) => {
-                    const cartelasCount = Number(
-                      game.cards_sold ??
-                      game.cardsSold ??
-                      game.soldCartelas?.length ??
-                      0
-                    );
+                  .slice(
+                    0,
+                    visibleGameLogsCount
+                  )
+                  .map(
+                    (game, index) => {
+                      /*
+                       * SAME ORIGINAL CARTELA LOGIC
+                       */
+                      const cartelasCount =
+                        Number(
+                          game.cards_sold ??
+                          game.cardsSold ??
+                          game.soldCartelas?.length ??
+                          0
+                        );
 
-                    const betAmount = Number(game.bet) || 50;
+                      /*
+                       * SAME ORIGINAL BET LOGIC
+                       */
+                     
+const betAmount =
+                        Number(game.bet) ||
+                        50;
 
-                    const grossPool =
-                      betAmount * cartelasCount;
+                      const grossPool =
+                        betAmount *
+                        cartelasCount;
 
-                    const commissionRate =
-                      Number(game.commission) || 15;
+                      /*
+                       * SAME ORIGINAL COMMISSION LOGIC
+                       */
+                      const commissionRate =
+                        Number(
+                          game.commission
+                        ) || 15;
 
-                    const houseEarned = Number(
-                      game.house_commission ??
-                      game.commission_earned ??
-                      grossPool *
-                        (commissionRate / 100)
-                    );
+                      const houseEarned =
+                        Number(
+                          game.house_commission ??
+                          game.commission_earned ??
+                          game.commissionDeducted ??
+                          grossPool *
+                            (commissionRate /
+                              100)
+                        );
 
-                    const formattedDate = new Date(
-                      game.created_at ||
-                      game.finished_at ||
-                      game.started_at ||
-                      game.date
-                    ).toLocaleString();
+                      /*
+                       * KEEP YOUR DATE FIELD ORDER
+                       */
+                      const gameDate =
+                        game.created_at ||
+                        game.finished_at ||
+                        game.started_at ||
+                        game.date;
 
-                    return (
-                      <tr key={index}>
-                        <td style={styles.td}>
-                          {formattedDate}
-                        </td>
+                      /*
+                       * DISPLAY ETHIOPIA TIME
+                       */
+                      const formattedDate =
+                        gameDate
+                          ? new Date(
+                              gameDate
+                            ).toLocaleString(
+                              "en-US",
+                              {
+                                timeZone:
+                                  "Africa/Addis_Ababa",
+                              }
+                            )
+                          : "N/A";
 
-                        <td style={styles.td}>
-                          <strong>
-                            #
-                            {game.game_id ||
-                              game.id}
-                          </strong>
-                        </td>
-
-                        <td style={styles.td}>
-                          {game.cashier ||
-                            game.cashier_id ||
-                            "System"}
-                        </td>
-
-                        <td style={styles.td}>
-                          {cartelasCount} Cards
-                        </td>
-
-                        <td style={styles.td}>
-                          {grossPool} ETB
-                        </td>
-
-                        <td
-                          style={{
-                            ...styles.td,
-                            color:
-                              colors.accentCyan,
-                            fontWeight: "700",
-                          }}
+                      return (
+                        <tr
+                          key={
+                            game.game_id ||
+                            game.id ||
+                            index
+                          }
                         >
-                          {houseEarned.toFixed(
-                            2
-                          )}{" "}
-                          ETB
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          <td
+                            style={styles.td}
+                          >
+                            {formattedDate}
+                          </td>
+
+                          <td
+                            style={styles.td}
+                          >
+                            <strong>
+                              #
+                              {game.game_id ||
+                                game.id}
+                            </strong>
+                          </td>
+
+                          <td
+                            style={styles.td}
+                          >
+                            {game.cashier ||
+                              game.cashier_id ||
+                              "System"}
+                          </td>
+
+                          <td
+                            style={styles.td}
+                          >
+                            {cartelasCount}{" "}
+                            Cards
+                          </td>
+
+                          <td
+                            style={styles.td}
+                          >
+                            {grossPool} ETB
+                          </td>
+
+                          <td
+                            style={{
+                              ...styles.td,
+                              color:
+                                colors.accentCyan,
+                              fontWeight:
+                                "700",
+                            }}
+                          >
+                            {houseEarned.toFixed(
+                              2
+                            )}{" "}
+                            ETB
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+
+                {/* ================= NET ================= */}
 
                 <tr>
                   <td
@@ -1133,7 +2453,10 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
                         "2px solid #2dd4bf",
                     }}
                   >
-                    {todayNet.toFixed(2)} ETB
+                    {todayNet.toFixed(
+                      2
+                    )}{" "}
+                    ETB
                   </td>
                 </tr>
               </>
@@ -1170,42 +2493,59 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Date</th>
-              <th style={styles.th}>Net Profit</th>
+              <th style={styles.th}>
+                Date
+              </th>
+
+              <th style={styles.th}>
+                Net Profit
+              </th>
             </tr>
           </thead>
 
           <tbody>
             {previousDays.length > 0 ? (
-             previousDays
-  .slice(0, visibleSummaryDays)
-  .map((day) => (
-                <tr key={day.date}>
-                  <td style={styles.td}>
-                    {new Date(
-                      day.date
-                    ).toLocaleDateString()}
-                  </td>
-
-                  <td
-                    style={{
-                      ...styles.td,
-                      color:
-                        colors.accentCyan,
-                      fontWeight: "700",
-                    }}
+              previousDays
+                .slice(
+                  0,
+                  visibleSummaryDays
+                )
+                .map((day) => (
+                  <tr
+                    key={day.date}
                   >
-                    {day.net.toFixed(2)} ETB
-                  </td>
-                </tr>
-              ))
+                    <td
+                      style={styles.td}
+                    >
+                      {new Date(
+                        day.date
+                      ).toLocaleDateString()}
+                    </td>
+
+                    <td
+                      style={{
+                        ...styles.td,
+                        color:
+                          colors.accentCyan,
+                        fontWeight:
+                          "700",
+                      }}
+                    >
+                      {day.net.toFixed(
+                        2
+                      )}{" "}
+                      ETB
+                    </td>
+                  </tr>
+                ))
             ) : (
               <tr>
                 <td
                   colSpan="2"
                   style={{
                     ...styles.td,
-                    textAlign: "center",
+                    textAlign:
+                      "center",
                   }}
                 >
                   No previous day records.
@@ -1215,40 +2555,55 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
           </tbody>
         </table>
       </div>
-{previousDays.length > 0 && (
-  <button
-    style={styles.showMoreBtn}
-    onClick={() => {
-      if (
-        visibleSummaryDays >=
-        previousDays.length
-      ) {
-        setVisibleSummaryDays(1);
-      } else {
-        setVisibleSummaryDays(
+
+      {/* ================= PREVIOUS DAYS BUTTON ================= */}
+
+      {previousDays.length > 0 && (
+        <button
+          style={
+            styles.showMoreBtn
+          }
+          onClick={() => {
+            if (
+              visibleSummaryDays >=
+              previousDays.length
+            ) {
+              setVisibleSummaryDays(
+                1
+              );
+            } else {
+              setVisibleSummaryDays(
+                previousDays.length
+              );
+            }
+          }}
+        >
+          {visibleSummaryDays >=
           previousDays.length
-        );
-      }
-    }}
-  >
-    {visibleSummaryDays >=
-    previousDays.length
-      ? "Hide Previous Days"
-      : `Show All Previous Days (${previousDays.length})`}
-  </button>
-)}
+            ? "Hide Previous Days"
+            : `Show All Previous Days (${previousDays.length})`}
+        </button>
+      )}
+
+      {/* ================= TODAY LOG BUTTON ================= */}
+
       {todayGames.length > 5 && (
         <button
-          style={styles.showMoreBtn}
+          style={
+            styles.showMoreBtn
+          }
           onClick={() => {
             if (
               visibleGameLogsCount >=
               todayGames.length
             ) {
-              setVisibleGameLogsCount(5);
+              setVisibleGameLogsCount(
+                5
+              );
             } else {
               setVisibleGameLogsCount(
-                (prev) => prev + 10
+                (prev) =>
+                  prev + 10
               );
             }
           }}
@@ -1265,6 +2620,7 @@ const filteredHouseGames = sortedHouseGames.filter((game) => {
     </>
   );
 })()}
+
 
       {/* Cashier Passwords and Details Section */}
       <h2 style={{ ...styles.sectionTitle, marginTop: "45px", marginBottom: "15px" }}>Cashier Passwords & Roster</h2>

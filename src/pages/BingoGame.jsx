@@ -4,6 +4,11 @@ import { useLanguage } from "../context/LanguageContext";
 import { API_URL } from "../config";
 import "./BingoGame.css";
 import { io } from "socket.io-client";
+import {
+  saveCalledBallOffline,
+  saveGameOffline,
+} from "../offline/offlineService";
+import { offlineDB } from "../offline/db";
   // Add this if not already imported
 // --- Phonetic & Legend Data ---
 // ==========================================================
@@ -78,7 +83,17 @@ speechLang: "om-ET",
   const [winnerMessage, setWinnerMessage] = useState("");
   const [checkedCartela, setCheckedCartela] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(""); 
-
+// ============================================================
+// 🎵 NEXT BINGO AUDIO PRELOADER
+// Keeps the next ball's MP3 ready before it is displayed.
+// ============================================================
+// ============================================================
+// 🎵 NEXT BINGO BALL / AUDIO PRELOAD
+// ============================================================
+const nextBingoBallRef = useRef(null);
+const nextBingoAudioRef = useRef(null);
+const nextBingoAudioPathRef = useRef(null);
+const nextBingoAudioReadyRef = useRef(false);
 
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
  const [blinkingNumber, setBlinkingNumber] = useState(null);
@@ -194,6 +209,7 @@ const audioLoadingRef = useRef(false);
   const volumeRef = useRef(0.7);
  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
 const [audioDuration, setAudioDuration] = useState(0);
+const preloadedVoicesCacheRef = useRef({}); // Tracks { [path]: audioObject }
 
   const selectedWinningPattern =
   location.state?.winningPatternCount ??
@@ -596,8 +612,316 @@ useEffect(() => {
     const retryDelay = 150;
 
     try {
-      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // =====================================================
+      // OFFLINE MODE — LOAD GAME FROM INDEXEDDB
+      // =====================================================
+      if (!navigator.onLine) {
+        console.log(
+          "📴 OFFLINE MODE — LOADING GAME FROM INDEXEDDB:",
+          id
+        );
 
+        const localGame = await offlineDB.games.get(String(id));
+
+        if (!localGame) {
+          console.error(
+            "❌ OFFLINE GAME NOT FOUND IN INDEXEDDB:",
+            id
+          );
+          return;
+        }
+
+        console.log(
+          "💾 OFFLINE GAME LOADED:",
+          localGame
+        );
+
+        // ================================================
+        // RESTORE GAME
+        // ================================================
+        setGame(prev => {
+          const restoredVoiceMode =
+            localGame.voice_mode ||
+            localGame.voiceMode ||
+            prev.voiceMode ||
+            "recorded";
+
+          const restoredSpeechLang =
+            localGame.speech_lang ||
+            localGame.speechLang ||
+            prev.speechLang ||
+            "en-US";
+
+          const restoredVoiceSpeed =
+            localGame.voice_speed ||
+            localGame.voiceSpeed ||
+            prev.voiceSpeed ||
+            1;
+
+          return {
+            ...prev,
+
+            id:
+              localGame.game_id ||
+              localGame.id ||
+              id,
+
+            game_id:
+              localGame.game_id ||
+              localGame.id ||
+              id,
+
+            date:
+              localGame.date ||
+              localGame.created_at,
+
+            created_at:
+              localGame.created_at,
+
+            game_date:
+              localGame.game_date ||
+              localGame.created_at,
+
+            cashier:
+              localGame.cashier ||
+              localGame.cashier_id,
+
+            cashier_id:
+              localGame.cashier_id ||
+              localGame.cashier,
+
+            house:
+              localGame.house ||
+              localGame.house_id,
+
+            house_id:
+              localGame.house_id ||
+              localGame.house,
+
+            bet:
+              Number(localGame.bet) || 0,
+
+            grossIncome:
+              Number(localGame.grossIncome) || 0,
+
+            // ============================================
+            // NET INCOME
+            // ============================================
+            netIncome:
+              Number(
+                localGame.netIncome ??
+                localGame.prize ??
+                0
+              ),
+
+            prize:
+              Number(
+                localGame.prize ??
+                localGame.netIncome ??
+                0
+              ),
+
+            commission:
+              Number(localGame.commission) || 0,
+
+            commissionDeducted:
+              Number(
+                localGame.commissionDeducted ??
+                localGame.commission_deducted ??
+                0
+              ),
+
+            house_commission:
+              Number(
+                localGame.house_commission ??
+                localGame.commissionDeducted ??
+                0
+              ),
+
+            status:
+              localGame.status ||
+              "Active",
+
+            // ============================================
+            // SOLD CARTELAS
+            // ============================================
+            soldCartelas:
+              localGame.soldCartelas ||
+              prev.soldCartelas ||
+              passedGame?.soldCartelas ||
+              [],
+
+            cardsSold:
+              Number(
+                localGame.cardsSold ??
+                localGame.cards_sold ??
+                0
+              ),
+
+            cards_sold:
+              Number(
+                localGame.cards_sold ??
+                localGame.cardsSold ??
+                0
+              ),
+
+            // ============================================
+            // PATTERNS
+            // ============================================
+            selectedPatterns:
+              localGame.selectedPatterns ||
+              [],
+
+            winningPatternCount:
+              Number(
+                localGame.winningPatternCount || 0
+              ),
+
+            // ============================================
+            // VOICE
+            // ============================================
+            voiceMode:
+              restoredVoiceMode,
+
+            speechLang:
+              restoredSpeechLang,
+
+            voiceSpeed:
+              restoredVoiceSpeed,
+          };
+        });
+
+        // =================================================
+        // RESTORE CALLED BALLS FROM INDEXEDDB
+        // =================================================
+        const localBalls =
+          await offlineDB.calledBalls
+            .where("game_id")
+            .equals(String(id))
+            .sortBy("called_at");
+
+        /*
+         * Your generateNumber() stores the actual number
+         * in IndexedDB.
+         *
+         * Convert it back to the same format used by
+         * your existing online called-number state:
+         *
+         * B3, I24, N37, G52, O67
+         */
+        const restoredCalled = localBalls.map(ball => {
+          const number = Number(ball.number);
+
+          let letter = "";
+
+          if (number >= 1 && number <= 15) {
+            letter = "B";
+          } else if (number >= 16 && number <= 30) {
+            letter = "I";
+          } else if (number >= 31 && number <= 45) {
+            letter = "N";
+          } else if (number >= 46 && number <= 60) {
+            letter = "G";
+          } else if (number >= 61 && number <= 75) {
+            letter = "O";
+          }
+
+          return `${letter}${number}`;
+        });
+
+        console.log(
+          "💾 OFFLINE CALLED NUMBERS:",
+          restoredCalled
+        );
+
+        // ================================================
+        // RESTORE REACT STATE
+        // ================================================
+        setCalled(restoredCalled);
+
+        // ================================================
+        // RESTORE REF USED BY generateNumber()
+        // ================================================
+        calledRef.current = restoredCalled;
+
+        // ================================================
+        // RESTORE CURRENT BALL
+        // ================================================
+        if (restoredCalled.length > 0) {
+          setCurrent(
+            restoredCalled[
+              restoredCalled.length - 1
+            ]
+          );
+        } else {
+          setCurrent(null);
+        }
+
+        // ================================================
+        // REBUILD REMAINING NUMBERS
+        // ================================================
+        const calledNumberValues = new Set(
+          localBalls.map(ball =>
+            Number(ball.number)
+          )
+        );
+
+        const allNumbers = Array.from(
+          { length: 75 },
+          (_, index) => index + 1
+        );
+
+        const remainingNumbers =
+          allNumbers.filter(
+            number =>
+              !calledNumberValues.has(number)
+          );
+
+        remainingNumbersRef.current =
+          remainingNumbers;
+
+        // ================================================
+        // LOG OFFLINE RESTORE
+        // ================================================
+        console.log(
+          "📦 RESTORED CALLED COUNT:",
+          restoredCalled.length
+        );
+
+        console.log(
+          "📦 RESTORED LAST BALL:",
+          restoredCalled.length > 0
+            ? restoredCalled[
+                restoredCalled.length - 1
+              ]
+            : null
+        );
+
+        console.log(
+          "📦 REMAINING NUMBERS:",
+          remainingNumbers.length
+        );
+
+        console.log(
+          "✅ OFFLINE GAME RESTORE COMPLETE:",
+          id
+        );
+
+        // ================================================
+        // IMPORTANT:
+        // DO NOT CALL SERVER WHILE OFFLINE
+        // ================================================
+        return;
+      }
+
+      // =====================================================
+      // ONLINE MODE — KEEP YOUR EXISTING SERVER LOGIC
+      // =====================================================
+      for (
+        let attempt = 1;
+        attempt <= maxAttempts;
+        attempt++
+      ) {
         console.log(
           `🔥 FETCH ACTIVE GAME: ${id} (attempt ${attempt}/${maxAttempts})`
         );
@@ -606,11 +930,17 @@ useEffect(() => {
           `${API_URL}/games/active/${id}`
         );
 
-        // ✅ Game found
+        // ================================================
+        // GAME FOUND
+        // ================================================
         if (response.ok) {
           const data = await response.json();
 
-          console.log("✅ ACTIVE GAME FROM BACKEND:", data);
+          console.log(
+            "✅ ACTIVE GAME FROM BACKEND:",
+            data
+          );
+
           console.log(
             "🎱 CALLED NUMBERS FROM BACKEND:",
             data.calledNumbers
@@ -637,98 +967,162 @@ useEffect(() => {
 
             return {
               ...prev,
-              id: data.game_id,
-              date: data.date,
-              cashier: data.cashier,
-              house: data.house,
-              bet: data.bet,
-              prize: data.prize,
-              commission: data.commission,
-              commissionDeducted: data.commission_deducted,
-              status: data.status,
-               // ✅ KEEP SOLD CARTELAS
-  soldCartelas:
-  data.soldCartelas ??
-  data.sold_cartelas ??
-  prev.soldCartelas ??
-  passedGame?.soldCartelas ??
-  [],
-              voiceMode: restoredVoiceMode,
-              speechLang: restoredSpeechLang,
-              voiceSpeed: restoredVoiceSpeed,
+
+              id:
+                data.game_id,
+
+              game_id:
+                data.game_id,
+
+              date:
+                data.date,
+
+              cashier:
+                data.cashier,
+
+              house:
+                data.house,
+
+              bet:
+                data.bet,
+
+              prize:
+                data.prize,
+
+              // Keep Net available online too
+              netIncome:
+                data.netIncome ??
+                data.prize,
+
+              commission:
+                data.commission,
+
+              commissionDeducted:
+                data.commission_deducted,
+
+              status:
+                data.status,
+
+              // =========================================
+              // KEEP SOLD CARTELAS
+              // =========================================
+              soldCartelas:
+                data.soldCartelas ??
+                data.sold_cartelas ??
+                prev.soldCartelas ??
+                passedGame?.soldCartelas ??
+                [],
+
+              voiceMode:
+                restoredVoiceMode,
+
+              speechLang:
+                restoredSpeechLang,
+
+              voiceSpeed:
+                restoredVoiceSpeed,
             };
           });
 
           // ==========================================
-// RESTORE CALLED NUMBERS AFTER REFRESH
-// ==========================================
+          // RESTORE CALLED NUMBERS AFTER REFRESH
+          // ==========================================
 
-const restoredCalled = Array.isArray(data.calledNumbers)
-  ? data.calledNumbers
-  : [];
+          const restoredCalled =
+            Array.isArray(data.calledNumbers)
+              ? data.calledNumbers
+              : [];
 
-// Restore React state
-setCalled(restoredCalled);
+          // ==========================================
+          // RESTORE REACT STATE
+          // ==========================================
 
-// Restore refs used by generateNumber()
-calledRef.current = restoredCalled;
+          setCalled(restoredCalled);
 
-// Restore last called number
-if (restoredCalled.length > 0) {
-  setCurrent(
-    restoredCalled[restoredCalled.length - 1]
-  );
-} else {
-  setCurrent(null);
-}
+          // ==========================================
+          // RESTORE REF
+          // ==========================================
 
-// ==========================================
-// REBUILD REMAINING NUMBERS
-// ==========================================
+          calledRef.current =
+            restoredCalled;
 
-const calledNumberValues = new Set(
-  restoredCalled.map(ball => {
-    const parts = ball.trim().split(/\s+/);
-    return Number(parts[1]);
-  })
-);
+          // ==========================================
+          // RESTORE LAST CALLED NUMBER
+          // ==========================================
 
-const allNumbers = Array.from(
-  { length: 75 },
-  (_, index) => index + 1
-);
+          if (restoredCalled.length > 0) {
+            setCurrent(
+              restoredCalled[
+                restoredCalled.length - 1
+              ]
+            );
+          } else {
+            setCurrent(null);
+          }
 
-const remainingNumbers = allNumbers.filter(
-  number => !calledNumberValues.has(number)
-);
+          // ==========================================
+          // REBUILD REMAINING NUMBERS
+          // ==========================================
 
-remainingNumbersRef.current = remainingNumbers;
+          const calledNumberValues =
+            new Set(
+              restoredCalled.map(ball => {
+                const parts =
+                  ball.trim().split(/\s+/);
 
-// ==========================================
-// LOG RESTORE
-// ==========================================
+                return Number(parts[1]);
+              })
+            );
 
-console.log(
-  "📦 RESTORED CALLED COUNT:",
-  restoredCalled.length
-);
+          const allNumbers =
+            Array.from(
+              { length: 75 },
+              (_, index) => index + 1
+            );
 
-console.log(
-  "📦 RESTORED LAST BALL:",
-  restoredCalled.length > 0
-    ? restoredCalled[restoredCalled.length - 1]
-    : null
-);
+          const remainingNumbers =
+            allNumbers.filter(
+              number =>
+                !calledNumberValues.has(number)
+            );
 
-console.log(
-  "📦 REMAINING NUMBERS:",
-  remainingNumbers.length
-);
-          // ✅ SUCCESS — stop retrying
+          remainingNumbersRef.current =
+            remainingNumbers;
+
+          // ==========================================
+          // LOG RESTORE
+          // ==========================================
+
+          console.log(
+            "📦 RESTORED CALLED COUNT:",
+            restoredCalled.length
+          );
+
+          console.log(
+            "📦 RESTORED LAST BALL:",
+            restoredCalled.length > 0
+              ? restoredCalled[
+                  restoredCalled.length - 1
+                ]
+              : null
+          );
+
+          console.log(
+            "📦 REMAINING NUMBERS:",
+            remainingNumbers.length
+          );
+
+          // ==========================================
+          // SUCCESS
+          // ==========================================
+
           return;
         }
 
-        // ⏳ Game hasn't been saved yet
+        // ==============================================
+        // GAME NOT READY
+        // ==============================================
+
         if (response.status === 404) {
           console.log(
             `⏳ GAME NOT READY — retrying in ${retryDelay}ms...`
@@ -736,14 +1130,20 @@ console.log(
 
           if (attempt < maxAttempts) {
             await new Promise(resolve =>
-              setTimeout(resolve, retryDelay)
+              setTimeout(
+                resolve,
+                retryDelay
+              )
             );
           }
 
           continue;
         }
 
-        // ❌ Other server error
+        // ==============================================
+        // OTHER SERVER ERROR
+        // ==============================================
+
         console.error(
           "❌ ACTIVE GAME REQUEST FAILED:",
           response.status
@@ -1043,6 +1443,13 @@ socket.on("winning-pattern-selected", handleWinningPattern);
 }, []);
 
 // ============================================================
+// 🎵 PRELOAD NEXT BINGO VOICE
+// Loads the next Oromo MP3 in a SEPARATE audio object.
+// This never touches the currently playing audio.
+// ============================================================
+
+
+// ============================================================
 // 🛑 AUDIO CLEANUP
 // ============================================================
 
@@ -1316,42 +1723,177 @@ function applyVoiceDepth(audio) {
     return null;
   }
 }
+
+function resetNextBingoPreload() {
+
+  nextBingoBallRef.current = null;
+
+  nextBingoAudioReadyRef.current = false;
+  nextBingoAudioPathRef.current = null;
+
+  const audio = nextBingoAudioRef.current;
+
+  if (audio) {
+
+    try {
+      audio.pause();
+      audio.oncanplay = null;
+      audio.onloadstart = null;
+      audio.onerror = null;
+      audio.removeAttribute("src");
+      audio.load();
+    } catch (e) {}
+
+  }
+
+  nextBingoAudioRef.current = null;
+
+  console.log(
+    "🧹 NEXT BINGO PRELOAD RESET"
+  );
+}
+
+
+
+function preloadNextBingoVoice(letter, number) {
+  const letterName = String(letter).trim().toLowerCase();
+  const numberName = String(number).trim();
+  const path = `/oromo/${letterName}${numberName}.mp3`;
+
+  // Already loading/loaded this exact voice path in our cache map
+  if (preloadedVoicesCacheRef.current[path]) {
+    console.log("🎵 NEXT VOICE ALREADY PRELOADING/PRELOADED IN CACHE:", path);
+    return;
+  }
+
+  // Clean old cache entries to protect device memory limits (keep last 3 items max)
+  const cachedPaths = Object.keys(preloadedVoicesCacheRef.current);
+  if (cachedPaths.length > 3) {
+    const oldestPath = cachedPaths[0];
+    try {
+      preloadedVoicesCacheRef.current[oldestPath].pause();
+      preloadedVoicesCacheRef.current[oldestPath].removeAttribute("src");
+      preloadedVoicesCacheRef.current[oldestPath].load();
+    } catch (e) {}
+    delete preloadedVoicesCacheRef.current[oldestPath];
+  }
+
+  const audio = new Audio();
+  audio.preload = "auto";
+  audio.src = path;
+
+  const selectedVolume = Number(volumeRef.current);
+  audio.volume = Math.max(0, Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1));
+
+  const selectedSpeed = Number(voiceSpeedRef.current);
+  audio.playbackRate = Math.max(0.5, Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1));
+  audio.defaultPlaybackRate = audio.playbackRate;
+
+  // Store the active audio instance inside our cache dictionary instantly
+  preloadedVoicesCacheRef.current[path] = audio;
+
+  console.log("📦 PRELOADING EXACT NEXT VOICE TO CACHE MAP:", path, Date.now());
+
+  audio.onloadstart = () => {
+    console.log("📥 NEXT VOICE LOAD START:", path, Date.now());
+  };
+
+  audio.oncanplay = () => {
+    console.log("✅ NEXT VOICE READY IN CACHE MAP:", path, Date.now());
+  };
+
+  audio.onloadeddata = () => {
+    console.log("📥 NEXT VOICE DATA LOADED:", path, Date.now());
+  };
+
+  audio.onerror = (error) => {
+    console.error("❌ NEXT VOICE PRELOAD FAILED:", path, error);
+    delete preloadedVoicesCacheRef.current[path]; // Remove failed asset records completely
+  };
+
+  audio.load();
+}
+
 // ============================================================
 // 🎯 BINGO CALL PLAYBACK
 // ============================================================
 // ============================================================
 // 🎯 BINGO CALL PLAYBACK (RESTORED & ENHANCED)
 // ============================================================
-async function playRecordedBingoCall(letter, number, onComplete = () => {}, resumeTime = 0) {
+async function playRecordedBingoCall(
+  letter,
+  number,
+  onComplete = () => {},
+  resumeTime = 0,
+  preloadedAudioParam = null // Renamed local parameter to avoid shadow variable conflicts
+) {
   const generationId = ++audioGenerationRef.current;
-  const completeName = `${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}`;
 
-  console.log("🎯 NEW AUDIO GENERATION:", generationId, letter, number);
+  const completeName =
+    `${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}`;
 
-  // Instantly lock this ball into the active reference frame tracking structure
-  pendingBingoCallRef.current = { letter, number, result: `${letter} ${number}` };
+  console.log(
+    "📞 playRecordedBingoCall ENTER:",
+    completeName,
+    Date.now()
+  );
+
+  console.log(
+    "🎯 NEW AUDIO GENERATION:",
+    generationId,
+    letter,
+    number
+  );
+
+  // ============================================================
+  // LOCK CURRENT BALL
+  // ============================================================
+
+  pendingBingoCallRef.current = {
+    letter,
+    number,
+    result: `${letter} ${number}`,
+  };
+
+  // ============================================================
+  // PAUSE CHECK
+  // ============================================================
 
   if (stateRef.current.paused) {
-    console.log("⏸️ GAME PAUSED — ABORTING PLAYBACK LIFE CYCLE CONTEXT");
+    console.log(
+      "⏸️ GAME PAUSED — ABORTING PLAYBACK LIFE CYCLE CONTEXT"
+    );
+
     isDrawingBallRef.current = false;
     return;
   }
 
-  // Halt any running tracks cleanly
+  // ============================================================
+  // STOP OLD AUDIO
+  // ============================================================
+
   const oldAudio = activeAudioRef.current;
+
   if (oldAudio && !oldAudio.ended) {
     console.error(
       "🚨 AUDIO INTERRUPTED BEFORE FINISHING!",
-      "\n🎵 CUT PATH URL:", oldAudio.src,
-      "\n⏱️ TIME POSITION WHEN CUT:", oldAudio.currentTime.toFixed(2), "seconds"
+      "\n🎵 CUT PATH URL:",
+      oldAudio.src,
+      "\n⏱️ TIME POSITION WHEN CUT:",
+      oldAudio.currentTime.toFixed(2),
+      "seconds"
     );
 
     try {
       oldAudio.pause();
-      oldAudio.onended = null; 
+      oldAudio.onended = null;
       oldAudio.onerror = null;
     } catch (e) {}
   }
+
+  // ============================================================
+  // BUILD AUDIO PATH
+  // ============================================================
 
   const folder = "oromo";
   const letterName = String(letter).trim().toLowerCase();
@@ -1359,39 +1901,147 @@ async function playRecordedBingoCall(letter, number, onComplete = () => {}, resu
   const finalPath = `/${folder}/${letterName}${numberName}.mp3`;
 
   try {
-    // ✅ PASS THE RESUME TIME DIRECTLY INTO THE WRAPPER HOOK HERE
-    const result = await playCompleteRecording(finalPath, () => {
-      console.log("🔔 DIRECT AUDIO COMPLETION:", completeName);
-    }, resumeTime);
+
+    // ============================================================
+    // ♻️ CHECK FOR PRELOADED AUDIO FROM CACHE DICTIONARY MAP
+    // ============================================================
+
+    let preloadedAudio = null;
+    const cachedAudioInstance = preloadedVoicesCacheRef.current[finalPath];
+
+    console.log("🔎 DICTIONARY CACHE PRELOAD CHECK:", {
+      finalPath,
+      audioExistsInMap: !!cachedAudioInstance,
+      readyState: cachedAudioInstance?.readyState ?? null,
+    });
+
+    // Check if the file is loaded and ready inside the map cache
+    if (cachedAudioInstance && cachedAudioInstance.readyState === 4) {
+      
+      preloadedAudio = cachedAudioInstance;
+
+      console.log(
+        "♻️ USING PRELOADED BINGO VOICE FROM CACHE MAP:",
+        finalPath,
+        "readyState:",
+        preloadedAudio.readyState
+      );
+
+      // Clean the dictionary key immediately to release memory tracking
+      delete preloadedVoicesCacheRef.current[finalPath];
+
+    } else {
+
+      console.log(
+        "📦 NO MATCHING READY AUDIO IN CACHE MAP (FALLBACK TO SEQUENTIAL NETWORK FETCH):",
+        finalPath
+      );
+      
+      // If it exists but wasn't finished loading, clear it from cache so it can reload clean
+      if (cachedAudioInstance) {
+        delete preloadedVoicesCacheRef.current[finalPath];
+      }
+    }
+
+    // ============================================================
+    // SEND AUDIO TO PLAYBACK
+    // ============================================================
+
+    console.log(
+      "📦 SENDING TO playCompleteRecording:",
+      completeName,
+      "preloaded:",
+      !!preloadedAudio,
+      "readyState:",
+      preloadedAudio?.readyState ?? "none",
+      Date.now()
+    );
+
+    // ============================================================
+    // PLAY AUDIO
+    // ============================================================
+
+    const result = await playCompleteRecording(
+      finalPath,
+      () => {
+        console.log(
+          "🔔 DIRECT AUDIO COMPLETION:",
+          completeName
+        );
+      },
+      resumeTime,
+      preloadedAudio
+    );
+
+    // ============================================================
+    // GENERATION SAFETY
+    // ============================================================
 
     if (generationId !== audioGenerationRef.current) {
-      console.log("🛑 OBSELETE GENERATION TIMELINE BLOCKED:", generationId);
-      
+
+      console.log(
+        "🛑 OBSELETE GENERATION TIMELINE BLOCKED:",
+        generationId
+      );
+
       if (loopTimeoutRef.current === null) {
+
         setTimeout(() => {
+
           if (!stateRef.current.paused) {
-            console.log("🚀 AUTO-RECOVERY HOOK: FORCING ADVANCEMENT PAST STALE BLOCKED THREAD");
+
+            console.log(
+              "🚀 AUTO-RECOVERY HOOK: FORCING ADVANCEMENT PAST STALE BLOCKED THREAD"
+            );
+
             isDrawingBallRef.current = false;
+
             generateNumber();
           }
+
         }, 1000);
       }
+
       return;
     }
 
-    if (result?.paused || stateRef.current.paused) {
-      console.log("⏸️ CALL WAITING FOR RESUME SEPARATION:", completeName);
+    // ============================================================
+    // PAUSED RESULT
+    // ============================================================
+
+    if (
+      result?.paused ||
+      stateRef.current.paused
+    ) {
+
+      console.log(
+        "⏸️ CALL WAITING FOR RESUME SEPARATION:",
+        completeName
+      );
+
       isDrawingBallRef.current = false;
+
       return;
     }
+
+    // ============================================================
+    // AUDIO COMPLETED
+    // ============================================================
 
     if (result?.completed) {
       onComplete();
     }
+
   } catch (error) {
-    console.error("❌ CRITICAL ANNOUNCER ROUTING REJECTION EXCEPTION:", error);
+
+    console.error(
+      "❌ CRITICAL ANNOUNCER ROUTING REJECTION EXCEPTION:",
+      error
+    );
+
     isDrawingBallRef.current = false;
-    onComplete(); 
+
+    onComplete();
   }
 }
 
@@ -1400,15 +2050,24 @@ async function playRecordedBingoCall(letter, number, onComplete = () => {}, resu
 
 
 
-
-function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
+function playCompleteRecording(
+  path,
+  onFinished = () => {},
+  resumeTime = 0,
+  preloadedAudio = null
+) {
   return new Promise((resolve, reject) => {
+
     const completeName =
       typeof path === "string"
         ? path.split("/").pop()
         : "unknown-audio";
 
     const generationId = audioGenerationRef.current;
+
+    // ============================================================
+    // 1. INITIAL STATE CHECKS
+    // ============================================================
 
     if (stateRef.current.paused) {
       console.log("⏸️ GAME PAUSED BEFORE AUDIO CREATION:", completeName);
@@ -1422,108 +2081,46 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
       return;
     }
 
-    if (!globalAudioInstanceRef.current) {
-      globalAudioInstanceRef.current = new Audio();
-      globalAudioInstanceRef.current.preload = "auto";
-    }
-
-    const audio = globalAudioInstanceRef.current;
-
-    // Reset listeners
-    audio.onended = null;
-    audio.onerror = null;
-    audio.onpause = null;
-    audio.onwaiting = null;
-    audio.onstalled = null;
-    audio.oncanplay = null;
-    audio.onloadstart = null;
-    audio.ontimeupdate = null;
-    audio.ondurationchange = null;
-
-    audio.src = path;
-
-    // Initialize display states safely
-    setAudioCurrentTime(resumeTime);
-    setAudioDuration(0);
-
     // ============================================================
-    // LIVE UI TRACKING BINDINGS
+    // 2. SELECT AUDIO OBJECT
     // ============================================================
-    audio.ontimeupdate = () => {
-      setAudioCurrentTime(audio.currentTime);
-    };
+    let audio;
 
-    audio.ondurationchange = () => {
-      setAudioDuration(audio.duration || 0);
-    };
-
-    audio.load();
-
-    console.log("📦 AUDIO LOAD REQUEST:", completeName);
-
-    audio.onloadstart = () => {
-      console.log("📥 LOAD START:", completeName);
-    };
-
-    audio.oncanplay = () => {
-      console.log("✅ CAN PLAY:", completeName);
-    };
-
-    audio.onwaiting = () => {
-      console.warn("⏳ AUDIO WAITING:", completeName);
-    };
-
-    audio.onstalled = () => {
-      console.error("🚨 AUDIO STALLED:", completeName);
-    };
-
-    const selectedVolume = Number(volumeRef.current);
-
-    audio.volume = Math.max(
-      0,
-      Math.min(
-        1,
-        Number.isFinite(selectedVolume)
-          ? selectedVolume
-          : 1
-      )
-    );
-
-    const selectedSpeed = Number(voiceSpeedRef.current);
-
-    audio.playbackRate = Math.max(
-      0.5,
-      Math.min(
-        2.0,
-        Number.isFinite(selectedSpeed)
-          ? selectedSpeed
-          : 1
-      )
-    );
-
-    audio.defaultPlaybackRate = audio.playbackRate;
-
-    activeAudioRef.current = audio;
-
-    // 🎙️ ATTACH VOICE DEPTH ENGINE
-    try {
-      const nodes = applyVoiceDepth(audio);
-      console.log("🎙️ DEPTH ENGINE ATTACHED:", !!nodes);
-    } catch (error) {
-      console.error("❌ DEPTH ENGINE ATTACH FAILED:", error);
+    if (preloadedAudio) {
+      audio = preloadedAudio;
+      console.log(
+        "♻️ PRELOADED AUDIO OBJECT TRANSFERRED TO PLAYBACK:",
+        completeName,
+        "readyState:",
+        audio.readyState
+      );
+      globalAudioInstanceRef.current = audio;
+    } else {
+      if (!globalAudioInstanceRef.current) {
+        globalAudioInstanceRef.current = new Audio();
+        globalAudioInstanceRef.current.preload = "auto";
+      }
+      audio = globalAudioInstanceRef.current;
+      console.log("📦 NORMAL AUDIO OBJECT USED:", completeName);
     }
 
     let finished = false;
+    let started = false;
 
+    // ============================================================
+    // 3. CLEANUP
+    // ============================================================
     const cleanup = () => {
-      if (finished) return;
-
+      if (finished) {
+        return;
+      }
       finished = true;
 
       if (activeAudioRef.current === audio) {
         activeAudioRef.current = null;
       }
 
+      // Remove all handlers installed by this playback.
       audio.onended = null;
       audio.onerror = null;
       audio.onpause = null;
@@ -1533,42 +2130,150 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
       audio.onloadstart = null;
       audio.ontimeupdate = null;
       audio.ondurationchange = null;
-
-      // Clear layout states smoothly
-      setAudioCurrentTime(0);
-      setAudioDuration(0);
+      audio.onloadedmetadata = null;
 
       try {
         audio.pause();
-      } catch (error) {}
+      } catch (error) {
+        // Ignore pause errors safely.
+      }
+
+      // 🛡️ RE-RENDERING FRAME GUARD: Only clear state variables if another ball has not overtaken this thread loop
+      if (generationId === audioGenerationRef.current) {
+        setAudioCurrentTime(0);
+        setAudioDuration(0);
+      } else {
+        console.log("🛡️ BYPASSED WIPING STATE: Next ball has already claimed the UI countdown tracker!");
+      }
 
       console.log("🧹 AUDIO SOURCE WIPED CLEAN:", completeName);
     };
 
-    const onCanPlayThrough = () => {
-      audio.removeEventListener("canplaythrough", onCanPlayThrough);
+    // ============================================================
+    // 4. REMOVE OLD EVENT HANDLERS
+    // ============================================================
+    audio.onended = null;
+    audio.onerror = null;
+    audio.onpause = null;
+    audio.onwaiting = null;
+    audio.onstalled = null;
+    audio.oncanplay = null;
+    audio.onloadstart = null;
+    audio.ontimeupdate = null;
+    audio.ondurationchange = null;
+    audio.onloadedmetadata = null;
 
-      console.log("🎯 CANPLAYTHROUGH RECEIVED:", completeName);
+    // ============================================================
+    // 5. SOURCE SETUP
+    // ============================================================
+    if (!preloadedAudio) {
+      audio.src = path;
+      audio.preload = "auto";
+      console.log("📦 NORMAL AUDIO SOURCE LOADING:", completeName);
+    } else {
+      console.log(
+        "♻️ PRELOADED AUDIO SOURCE REUSED:",
+        completeName,
+        "readyState:",
+        audio.readyState
+      );
+    }
 
-      if (
-        stateRef.current.paused ||
-        generationId !== audioGenerationRef.current
-      ) {
-        cleanup();
+    // ============================================================
+    // 6. INITIAL UI AUDIO STATE
+    // ============================================================
+    setAudioCurrentTime(resumeTime);
+    
+    // ⚡ FIX 1: Instantly inject the duration from preloaded memory instead of clearing it to 0
+    if (audio.duration && Number.isFinite(audio.duration)) {
+      setAudioDuration(audio.duration);
+    } else {
+      setAudioDuration(0);
+    }
+
+    // ============================================================
+    // 7. LIVE AUDIO TIME UPDATES
+    // ============================================================
+    audio.ontimeupdate = () => {
+      setAudioCurrentTime(audio.currentTime || 0);
+    };
+
+    audio.ondurationchange = () => {
+      setAudioDuration(audio.duration || 0);
+    };
+
+    // ⚡ FIX 2: Safeguard loader to extract asset length variations asynchronously
+    audio.onloadedmetadata = () => {
+      if (audio.duration && Number.isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
+      }
+    };
+
+    // ============================================================
+    // 8. LOAD START DIAGNOSTIC
+    // ============================================================
+    audio.onloadstart = () => {
+      console.log("📥 LOAD START:", completeName, Date.now());
+    };
+
+    // ============================================================
+    // 9. VOLUME
+    // ============================================================
+    const selectedVolume = Number(volumeRef.current);
+    audio.volume = Math.max(0, Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1));
+
+    // ============================================================
+    // 10. PLAYBACK SPEED
+    // ============================================================
+    const selectedSpeed = Number(voiceSpeedRef.current);
+    audio.playbackRate = Math.max(0.5, Math.min(2, Number.isFinite(selectedSpeed) ? selectedSpeed : 1));
+    audio.defaultPlaybackRate = audio.playbackRate;
+
+    // ============================================================
+    // 11. MARK AS ACTIVE AUDIO
+    // ============================================================
+    activeAudioRef.current = audio;
+
+    // ============================================================
+    // 12. START PLAYBACK
+    // ============================================================
+    const startPlayback = () => {
+      if (finished || started) {
         return;
       }
+
+      if (stateRef.current.paused) {
+        cleanup();
+        resolve({ paused: true, completed: false });
+        return;
+      }
+
+      if (generationId !== audioGenerationRef.current) {
+        cleanup();
+        resolve({ cancelled: true, completed: false });
+        return;
+      }
+
+      started = true;
 
       if (resumeTime > 0) {
         try {
           audio.currentTime = Number(resumeTime);
-          console.log("🎯 REUSABLE SINGLETON PRE-SEEK SUCCESSFUL AT TIME POSITION:", resumeTime, "s");
-        } catch (e) {
-          console.warn("⚠️ Audio singleton pre-seek layout warning skipped safely:", e);
+          console.log("🎯 RESUME POSITION:", completeName, resumeTime, "seconds");
+        } catch (error) {
+          console.warn("⚠️ RESUME POSITION SET FAILED:", error);
         }
       }
 
-      let playPromise;
+      console.log(
+        "🚀 STARTING RECORDED VOICE:",
+        completeName,
+        "readyState:",
+        audio.readyState,
+        Date.now()
+      );
 
+      let playPromise;
       try {
         playPromise = audio.play();
       } catch (error) {
@@ -1581,40 +2286,80 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log("▶️ REUSABLE AUDIO LANE PLAYING SUCCESSFULLY:", completeName);
+            console.log("▶️ AUDIO ACTUALLY PLAYING:", completeName, Date.now());
+            // ⚡ FIX 3: Safety backup state refresh right as sound output begins
+            if (audio.duration && Number.isFinite(audio.duration)) {
+              setAudioDuration(audio.duration);
+            }
           })
           .catch((error) => {
-            if (error.name === "AbortError") {
-              console.log("⏸️ REUSABLE STREAM INTENTIONALLY ABORTED BY SYSTEM CONTROLS");
+            if (error && error.name === "AbortError") {
+              console.log("⏸️ AUDIO PLAYBACK ABORTED:", completeName);
               cleanup();
               resolve({ paused: true, completed: false });
-            } else {
-              console.error("❌ PLAY PROMISE ERROR:", error);
-              cleanup();
-              reject(error);
+              return;
             }
+            console.error("❌ AUDIO PLAY PROMISE ERROR:", error);
+            cleanup();
+            reject(error);
           });
       }
     };
 
-    audio.addEventListener("canplaythrough", onCanPlayThrough);
+    // ============================================================
+    // 13. CAN PLAY HANDLER
+    // ============================================================
+    audio.oncanplay = () => {
+      console.log(
+        "✅ CAN PLAY:",
+        completeName,
+        Date.now(),
+        "readyState:",
+        audio.readyState
+      );
+      startPlayback();
+    };
 
+    // ============================================================
+    // 14. WAITING
+    // ============================================================
+    audio.onwaiting = () => {
+      console.warn("⏳ AUDIO WAITING:", completeName, "time:", audio.currentTime.toFixed(3));
+    };
+
+    // ============================================================
+    // 15. STALLED
+    // ============================================================
+    audio.onstalled = () => {
+      console.warn("🚨 AUDIO STALLED:", completeName);
+    };
+
+    // ============================================================
+    // 16. AUDIO FINISHED
+    // ============================================================
     audio.onended = () => {
-      if (finished) return;
-      console.log("✅ VOICE FINISHED:", completeName);
+      if (finished) {
+        return;
+      }
+      console.log("✅ VOICE FINISHED:", completeName, Date.now());
       cleanup();
 
       try {
         onFinished();
       } catch (error) {
-        console.error("❌ BINGO COMPLETION CALLBACK ERROR:", error);
+        console.error("❌ COMPLETION CALLBACK ERROR:", error);
       }
 
       resolve({ completed: true });
     };
 
+       // ============================================================
+    // 17. AUDIO ERROR
+    // ============================================================
     audio.onerror = (error) => {
-      audio.removeEventListener("canplaythrough", onCanPlayThrough);
+      if (finished) {
+        return;
+      }
 
       if (stateRef.current.paused) {
         cleanup();
@@ -1632,11 +2377,36 @@ function playCompleteRecording(path, onFinished = () => {}, resumeTime = 0) {
       cleanup();
       reject(new Error(`Could not play ${path}`));
     };
+
+    // ============================================================
+    // 18. NORMAL AUDIO LOAD
+    // ============================================================
+    if (!preloadedAudio) {
+      audio.load();
+      console.log("📦 NORMAL AUDIO LOAD TRIGGERED:", completeName);
+    } else {
+      console.log(
+        "⚡ SKIPPING audio.load() — PRELOADED AUDIO:",
+        completeName,
+        "readyState:",
+        audio.readyState
+      );
+    }
+
+    // ============================================================
+    // 19. ALREADY READY?
+    // ============================================================
+    if (audio.readyState >= 3) {
+      console.log(
+        "⚡ AUDIO ALREADY READY — STARTING IMMEDIATELY:",
+        completeName,
+        "readyState:",
+        audio.readyState
+      );
+      startPlayback();
+    }
   });
 }
-
-
-
 
     // end of playCompleteRecording
 
@@ -2199,6 +2969,20 @@ useEffect(() => {
     window.removeEventListener("online", handleOnline);
   };
 }, []);
+
+
+// ============================================================
+// 🎵 PRELOAD THE EXACT RESERVED NEXT BINGO VOICE
+// ============================================================
+
+
+function getBingoLetter(number) {
+  if (number <= 15) return "B";
+  if (number <= 30) return "I";
+  if (number <= 45) return "N";
+  if (number <= 60) return "G";
+  return "O";
+}
 // ==========================================================
 // NETWORK RETRY HELPER (Runs silently on a background thread)
 // ==========================================================
@@ -2284,46 +3068,181 @@ async function generateNumber() {
     let number = 0;
     let isFirstBallOfGame = false;
 
+// ============================================================
+// 🎵 CAPTURE PRELOADED AUDIO FOR THE CURRENT BALL
+// ============================================================
+
+let preloadedAudioForCurrentBall = null;
+
+if (
+  nextBingoBallRef.current &&
+  nextBingoAudioRef.current &&
+  nextBingoAudioPathRef.current
+) {
+  const expectedPath =
+    `/oromo/${String(nextBingoBallRef.current.letter)
+      .trim()
+      .toLowerCase()}${String(nextBingoBallRef.current.number)
+      .trim()
+      .toLowerCase()}.mp3`;
+
+  if (
+    nextBingoAudioPathRef.current === expectedPath
+  ) {
+    preloadedAudioForCurrentBall =
+      nextBingoAudioRef.current;
+
+    console.log(
+      "♻️ CAPTURED PRELOADED AUDIO FOR CURRENT BALL:",
+      expectedPath,
+      "readyState:",
+      preloadedAudioForCurrentBall.readyState
+    );
+
+    // Detach the current-ball audio from the NEXT-ball slot.
+    nextBingoAudioRef.current = null;
+    nextBingoAudioPathRef.current = null;
+    nextBingoAudioReadyRef.current = false;
+  }
+}
     // Absolute Business Protection: Clear pending flags to force clean selections
     pendingBingoCallRef.current = null;
 
-    const currentRemaining = remainingNumbersRef.current;
+    // ============================================================
+// 🎯 GET CURRENT BALL
+// ============================================================
 
-    if (!currentRemaining || currentRemaining.length === 0) {
-      console.log("🛑 NO REMAINING NUMBERS");
-      isDrawingBallRef.current = false;
-      return;
-    }
+let selectedBall = nextBingoBallRef.current;
 
-    if (currentRemaining.length === 75) {
-      isFirstBallOfGame = true;
-    }
+// ------------------------------------------------------------
+// If a ball was already reserved/preloaded, consume it.
+// ------------------------------------------------------------
+if (selectedBall) {
 
-    const randomIndex = Math.floor(Math.random() * currentRemaining.length);
-    number = currentRemaining[randomIndex];
+  console.log(
+    "♻️ CONSUMING PRELOADED NEXT BALL:",
+    selectedBall.result
+  );
 
-    if (!generationStillValid()) {
-      isDrawingBallRef.current = false;
-      return;
-    }
+  number = selectedBall.number;
+  letter = selectedBall.letter;
+  result = selectedBall.result;
 
-    remainingNumbersRef.current = currentRemaining.filter(n => n !== number);
+  nextBingoBallRef.current = null;
 
-    letter = "B";
-    if (number >= 16) letter = "I";
-    if (number >= 31) letter = "N";
-    if (number >= 46) letter = "G";
-    if (number >= 61) letter = "O";
+}
+else
+   {
 
-    result = `${letter} ${number}`;
-    seenBallsRef.current.add(result);
+  // ----------------------------------------------------------
+  // No reserved ball yet — choose normally.
+  // ----------------------------------------------------------
 
+  const currentRemaining = remainingNumbersRef.current;
+
+  if (!currentRemaining || currentRemaining.length === 0) {
+    console.log("🎉 ALL BINGO NUMBERS HAVE BEEN CALLED");
+    return;
+  }
+
+  if (currentRemaining.length === 75) {
+    isFirstBallOfGame = true;
+  }
+
+  const randomIndex = Math.floor(
+    Math.random() * currentRemaining.length
+  );
+
+  number = currentRemaining[randomIndex];
+
+  if (!generationStillValid()) {
+    return;
+  }
+
+  remainingNumbersRef.current =
+    currentRemaining.filter(n => n !== number);
+
+  letter = getBingoLetter(number);
+
+  result = `${letter} ${number}`;
+
+  seenBallsRef.current.add(result);
+
+  console.log(
+    "🎲 FIRST/NORMAL BALL SELECTED:",
+    result
+  );
+}
+
+
+// ============================================================
+// 🚀 RESERVE THE NEXT BALL IMMEDIATELY
+// ============================================================
+//
+// IMPORTANT:
+// The reserved ball is removed from remainingNumbersRef NOW.
+// Therefore it cannot accidentally be selected twice.
+//
+// Its MP3 begins loading while the CURRENT voice is playing.
+// ============================================================
+
+// ============================================================
+// 🚀 RESERVE THE NEXT BALL
+// ============================================================
+
+if (
+  !nextBingoBallRef.current &&
+  remainingNumbersRef.current &&
+  remainingNumbersRef.current.length > 0
+) {
+
+  const remainingAfterCurrent =
+    remainingNumbersRef.current;
+
+  const nextIndex = Math.floor(
+    Math.random() * remainingAfterCurrent.length
+  );
+
+  const nextNumber =
+    remainingAfterCurrent[nextIndex];
+
+  const nextLetter =
+    getBingoLetter(nextNumber);
+
+  const nextResult =
+    `${nextLetter} ${nextNumber}`;
+
+  remainingNumbersRef.current =
+    remainingAfterCurrent.filter(
+      n => n !== nextNumber
+    );
+
+  nextBingoBallRef.current = {
+    number: nextNumber,
+    letter: nextLetter,
+    result: nextResult,
+  };
+
+  console.log(
+    "🎯 NEXT BALL RESERVED:",
+    nextResult
+  );
+
+  preloadNextBingoVoice(
+    nextLetter,
+    nextNumber
+  );
+}
     // Synchronize both arrays and Refs simultaneously
     const updatedCalled = [...calledRef.current, result];
     calledRef.current = updatedCalled;
     setCalled(updatedCalled);
     setCurrent(result);
-
+console.log(
+  "🎯 NUMBER DISPLAYED:",
+  result,
+  Date.now()
+);
     stateRef.current.called = updatedCalled;
     stateRef.current.current = result;
 
@@ -2332,256 +3251,139 @@ async function generateNumber() {
       if (!saved) console.error("❌ BACKEND TRANSACTION LOSS WARNING:", result);
       else console.log("✅ NUMBER SECURED ON SERVER CLOUD:", result);
     });
+// ==========================================================
+// 💾 OFFLINE COPY
+// Saves the same ball locally as a backup.
+// DOES NOT replace the existing server save.
+// ==========================================================
 
-    if (!generationStillValid() || !result) {
+saveCalledBallOffline(currentGameId, number)
+  .then(() => {
+    console.log(
+      "💾 OFFLINE COPY SAVED:",
+      currentGameId,
+      result
+    );
+  })
+  .catch((offlineError) => {
+    console.error(
+      "⚠️ OFFLINE BALL SAVE FAILED:",
+      offlineError
+    );
+  });
+            if (!generationStillValid() || !result) {
       isDrawingBallRef.current = false;
       return;
     }
 
     // Dynamic initial startup shuffle countdown parameter valve
-        // ✅ OPTIMIZED UPGRADE: Bypasses the old timeout delay valve entirely!
-    const startupDelayDuration = 0; 
-
-    
     if (isFirstBallOfGame) {
       console.log("⏳ HOLDING FIRST BALL ANNOUNCEMENT VOICE FOR SHUFFLE MUSIC TO FINISH: 5.5s");
+      
+      startupTimeoutRef.current = setTimeout(() => {
+        executeBingoVoicePlayback(letter, number, result, myGenerationId, generationStillValid);
+      }, 0);
+
+    } else {
+      // 🚀 SPEED MODE FIX: Fire synchronously immediately inside the same engine frame!
+      executeBingoVoicePlayback(letter, number, result, myGenerationId, generationStillValid);
     }
 
-   startupTimeoutRef.current = setTimeout(() => {
-      if (!generationStillValid()) {
-        isDrawingBallRef.current = false;
-        return;
-      }
+  } catch (err) {
+    console.error("❌ GENERATE NUMBER CRITICAL CONTAINER FAULT EXCEPTION:", err);
+    isDrawingBallRef.current = false;
+  }
+}
 
-      // Kill any loose pending failsafe timers before mounting a fresh clock instance anchor
-      if (audioFailsafeTimeoutRef.current !== null) {
-        clearTimeout(audioFailsafeTimeoutRef.current);
-        audioFailsafeTimeoutRef.current = null;
-      }
-
-      // =========================================================================
-      // 🛡️ HEARTBEAT TIMEOUT (8-SECOND ISOLATED TIMELINE PROTECTOR)
-      // =========================================================================
-            // =========================================================================
-      // 🛡️ RE-TUNED HEARTBEAT FAILSAFE (LIVE HEARTBEAT GUARD — ZERO CUT-OFFS)
-      // =========================================================================
- // ============================================================
-// 🛡️ AUDIO WATCHDOG
-// IMPORTANT:
-// The watchdog NEVER generates another ball directly.
-// It only reports a genuine failure to the same completion
-audioFailsafeTimeoutRef.current = setTimeout(() => {
-  const audio = activeAudioRef.current;
-
-  // Generation already cancelled
-  if (!generationStillValid()) {
-    console.log(
-      "🛑 WATCHDOG IGNORED — GENERATION NO LONGER VALID:",
-      result
-    );
-
-    audioFailsafeTimeoutRef.current = null;
+function executeBingoVoicePlayback(letter, number, result, myGenerationId, generationCheckFn) {
+  if (typeof generationCheckFn === 'function' && !generationCheckFn()) {
+    isDrawingBallRef.current = false;
     return;
   }
-
-  // Game paused
-  if (stateRef.current.paused) {
-    console.log(
-      "⏸️ WATCHDOG IGNORED — GAME IS PAUSED:",
-      result
-    );
-
-    audioFailsafeTimeoutRef.current = null;
-    return;
-  }
-
-  // Audio is still alive
-  if (
-    audio &&
-    !audio.paused &&
-    !audio.ended
-  ) {
-    console.log(
-      "🛡️ WATCHDOG CANCELLED — AUDIO STILL PLAYING:",
-      result,
-      "TIME:",
-      Number(audio.currentTime || 0).toFixed(2)
-    );
-
-    audioFailsafeTimeoutRef.current = null;
-    return;
-  }
-
-  // Real stall
-  console.error(
-    "🚨 REAL AUDIO STALL DETECTED:",
-    result,
-    "\n🎵 AUDIO:",
-    audio?.src || "NO ACTIVE AUDIO",
-    "\n⏱️ POSITION:",
-    audio?.currentTime ?? "N/A"
-  );
-
-  audioFailsafeTimeoutRef.current = null;
-
-  // Release lock ONLY
-  isDrawingBallRef.current = false;
-
-}, 8000);
-// ============================================================
-
-
-      // Fire voice playback engine directly
-      playRecordedBingoCall(letter, number, () => {
-
-  // ==========================================================
-  // NEVER ALLOW AN OLD AUDIO GENERATION TO CONTROL THE GAME
-  // ==========================================================
-
-  if (myGenerationId !== generationCancelRef.current) {
-    console.warn(
-      "🛑 COMPLETION IGNORED — STALE GAME GENERATION:",
-      result,
-      "CALL GENERATION:",
-      myGenerationId,
-      "CURRENT:",
-      generationCancelRef.current
-    );
-    return;
-  }
-
-  console.log(
-    "BaseGame Call Hook Completed -> ✅ CURRENT CALL FINISHED COMPLETELY:",
-    result
-  );
-
-  // ==========================================================
-  // CLEAR WATCHDOG
-  // ==========================================================
 
   if (audioFailsafeTimeoutRef.current !== null) {
     clearTimeout(audioFailsafeTimeoutRef.current);
     audioFailsafeTimeoutRef.current = null;
   }
 
-  // ==========================================================
-  // RELEASE CURRENT DRAW LOCK
-  // ==========================================================
+  audioFailsafeTimeoutRef.current = setTimeout(() => {
+    const audio = activeAudioRef.current;
+    if (typeof generationCheckFn === 'function' && !generationCheckFn()) return;
+    if (stateRef.current.paused) return;
+    if (audio && !audio.paused && !audio.ended) return;
+    isDrawingBallRef.current = false;
+  }, 8000);
 
-  isDrawingBallRef.current = false;
+  console.log("🎤 STARTING BINGO VOICE:", result, Date.now());
 
-  // ==========================================================
-  // PAUSE
-  // ==========================================================
+  // 🚀 HOOK INTO THE TIMELINE EVENT TRCKERS BEFORE PLAYBACK BEGINS
+  const targetPath = `/oromo/${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}.mp3`;
+  const cachedInstance = preloadedVoicesCacheRef.current[targetPath] || activeAudioRef.current;
 
-  if (stateRef.current.paused) {
-    console.log(
-      "⏸️ GAME WAS PAUSED MID-LOOP TRANSITION"
-    );
-    return;
-  }
+  if (cachedInstance) {
+    // 1. Sync the duration hook instantly when the asset opens
+    const updateDuration = () => {
+      if (Number.isFinite(cachedInstance.duration)) {
+        setAudioDuration(cachedInstance.duration);
+      }
+    };
 
-  // ==========================================================
-  // READ INTERVAL
-  // ==========================================================
+    // 2. Continually map the ticking elapsed seconds into your React state
+    const updateTimeTick = () => {
+      setAudioCurrentTime(cachedInstance.currentTime || 0);
+    };
 
-  const selectedSeconds = Number(callIntervalRef.current);
-
-  const safeSeconds = Number.isFinite(selectedSeconds)
-    ? selectedSeconds
-    : 0;
-
-  // ==========================================================
-  // NEVER CREATE TWO LOOP TIMERS
-  // ==========================================================
-
-  if (loopTimeoutRef.current !== null) {
-    console.log(
-      "⏳ LOOP ALREADY SCHEDULED — SKIPPING DUPLICATE:",
-      result
-    );
-    return;
-  }
-
-  // ==========================================================
-  // INSTANT MODE
-  // ==========================================================
-
-  if (safeSeconds === 0) {
-
-    console.log(
-      "🚀 SPEED IS 0s: DRAWING NEXT BALL ABSOLUTE INSTANTLY"
-    );
-
-    if (
-      !stateRef.current.paused &&
-      myGenerationId === generationCancelRef.current
-    ) {
-      generateNumber();
+    // Bind event hooks directly to the audio channel instance
+    cachedInstance.addEventListener("durationchange", updateDuration);
+    cachedInstance.addEventListener("loadedmetadata", updateDuration);
+    cachedInstance.addEventListener("timeupdate", updateTimeTick);
+    
+    // Run immediate safety snapshots in case it loaded early
+    if (cachedInstance.duration) {
+      setAudioDuration(cachedInstance.duration);
     }
-
-    return;
   }
 
-  // ==========================================================
-  // NEGATIVE / FAST MODE
-  // ==========================================================
+  playRecordedBingoCall(
+    letter,
+    number,
+    () => {
+      if (myGenerationId !== generationCancelRef.current) return;
 
-  if (safeSeconds < 0) {
+      if (audioFailsafeTimeoutRef.current !== null) {
+        clearTimeout(audioFailsafeTimeoutRef.current);
+        audioFailsafeTimeoutRef.current = null;
+      }
 
-    const overlapSeconds = Math.abs(safeSeconds);
+      isDrawingBallRef.current = false;
 
-    const fastDelayMs = Math.max(
-      0,
-      1000 - (overlapSeconds * 1000)
-    );
+      // 🧹 CLEANUP STATE TIMELINES ON FINISH
+      setAudioCurrentTime(0);
+      setAudioDuration(0);
 
-    loopTimeoutRef.current = setTimeout(() => {
+      if (stateRef.current.paused) return;
 
-      loopTimeoutRef.current = null;
+      const selectedSeconds = Number(callIntervalRef.current);
+      const safeSeconds = Number.isFinite(selectedSeconds) ? selectedSeconds : 0;
 
-      if (
-        stateRef.current.paused ||
-        myGenerationId !== generationCancelRef.current
-      ) {
+      if (loopTimeoutRef.current !== null) return;
+
+      if (safeSeconds === 0) {
+        console.log("🚀 SPEED IS 0s: DRAWING NEXT BALL ABSOLUTE INSTANTLY");
+        if (!stateRef.current.paused && myGenerationId === generationCancelRef.current) {
+          generateNumber();
+        }
         return;
       }
 
-      generateNumber();
-
-    }, fastDelayMs);
-
-    return;
-  }
-
-  // ==========================================================
-  // NORMAL MODE
-  // ==========================================================
-
-  const delayMs = safeSeconds * 1000;
-
-  loopTimeoutRef.current = setTimeout(() => {
-
-    loopTimeoutRef.current = null;
-
-    if (
-      stateRef.current.paused ||
-      myGenerationId !== generationCancelRef.current
-    ) {
-      return;
+      const delayMs = safeSeconds * 1000;
+      loopTimeoutRef.current = setTimeout(() => {
+        loopTimeoutRef.current = null;
+        if (stateRef.current.paused || myGenerationId !== generationCancelRef.current) return;
+        generateNumber();
+      }, delayMs);
     }
-
-    generateNumber();
-
-  }, delayMs);
-
-});
-    }, startupDelayDuration);
-
-  } catch (err) {
-    console.error("❌ GENERATE NUMBER CRITICAL CONTAINER FAULT EXCEPTION:", err);
-    isDrawingBallRef.current = false;
-  }
+  );
 }
 
 
@@ -2600,131 +3402,1268 @@ audioFailsafeTimeoutRef.current = setTimeout(() => {
 // ==========================================================
 
 
+const checkWinner = async () => {
+  if (!cartelaId.trim()) {
+    alert("Please enter a Cartela ID first.");
+    return;
+  }
 
+  setWinnerMessage(`Checking ${cartelaId}...`);
+  setVerificationStatus("CHECKING");
 
+  try {
+    const currentGame = stateRef.current.game;
 
-  const checkWinner = async () => {
-    if (!cartelaId.trim()) {
-      alert("Please enter a Cartela ID first.");
+    if (!currentGame) {
+      alert("Game not loaded.");
       return;
     }
 
-   setWinnerMessage(`Checking ${cartelaId}...`);
-setVerificationStatus("CHECKING");
+    const verifyGameId =
+      currentGame?.game_id ||
+      currentGame?.id;
 
+    console.log(
+      "🔥 VERIFY GAME OBJECT:",
+      currentGame
+    );
+
+    console.log(
+      "🔥 VERIFY GAME ID:",
+      verifyGameId
+    );
+
+    if (!verifyGameId) {
+      console.error(
+        "❌ MISSING game_id/id:",
+        currentGame
+      );
+
+      setWinnerMessage("Game ID missing");
+      return;
+    }
+
+
+   
+// =====================================================
+// OFFLINE VERIFICATION
+// =====================================================
+
+if (!navigator.onLine) {
+
+  console.log("📴 OFFLINE CARTELA VERIFICATION:", cartelaId);
+
+  const enteredCartelaId =
+    String(cartelaId).trim();
+
+  // ===================================================
+  // 1. GET LOCAL GAME
+  // ===================================================
+
+  const localGame =
+    await offlineDB.games.get(
+      String(verifyGameId)
+    );
+
+  console.log(
+    "💾 OFFLINE GAME:",
+    localGame
+  );
+
+  // Use the currently loaded game first,
+  // then local DB as fallback.
+  const gameForVerification =
+    localGame || currentGame;
+
+  if (!gameForVerification) {
+
+    console.error(
+      "❌ OFFLINE GAME NOT FOUND:",
+      verifyGameId
+    );
+
+    setWinnerMessage(
+      "Game not found offline"
+    );
+
+    setVerificationStatus(
+      "ERROR"
+    );
+
+    return;
+  }
+
+  // ===================================================
+  // 2. WINNING PATTERN REQUIREMENT
+  // SAME LOGIC AS BACKEND
+  // ===================================================
+
+  const rawWinningPatternCount =
+    gameForVerification
+      ?.winning_pattern_count ??
+    gameForVerification
+      ?.winningPatternCount;
+
+  const isFullHouseRequired =
+    String(
+      rawWinningPatternCount
+    ).toUpperCase() ===
+    "FULL_HOUSE";
+
+  const winningPatternCount =
+    isFullHouseRequired
+      ? null
+      : Math.max(
+          1,
+          Number(
+            rawWinningPatternCount
+          ) || 1
+        );
+
+  console.log(
+    "🔒 OFFLINE WINNING PATTERN REQUIREMENT:",
+    winningPatternCount
+  );
+
+  console.log(
+    "🔒 OFFLINE FULL HOUSE REQUIRED:",
+    isFullHouseRequired
+  );
+
+  // ===================================================
+  // 3. CHECK CARTELA WAS SOLD
+  // SAME PURPOSE AS BACKEND
+  // ===================================================
+
+  const soldCartelas =
+    gameForVerification?.soldCartelas ||
+    [];
+
+  console.log(
+    "💾 LOCAL SOLD CARTELAS:",
+    soldCartelas
+  );
+
+  const soldCartela =
+    soldCartelas.find(
+      (cartela) => {
+
+        const localId =
+          typeof cartela === "object"
+            ? (
+                cartela.cartelaId ??
+                cartela.cartela_id ??
+                cartela.id
+              )
+            : cartela;
+
+        return (
+          String(localId).trim() ===
+          enteredCartelaId
+        );
+      }
+    );
+
+  // ===================================================
+  // 4. NOT SOLD
+  // ===================================================
+
+  if (!soldCartela) {
+
+    console.log(
+      "❌ CARTELA WAS NOT SOLD IN THIS GAME"
+    );
+
+    setWinnerMessage(
+      `ID ${enteredCartelaId} NOT SOLD!`
+    );
+
+    setVerificationStatus(
+      "NOT_SOLD"
+    );
+
+    if (
+      currentGame.voiceMode === "recorded" ||
+      currentGame.voiceMode === "recorded-oromo"
+    ) {
+
+      const folder =
+        currentGame.voiceMode ===
+        "recorded-oromo"
+          ? "oromo"
+          : "amharic";
+
+      playRecordedBingoCall(
+        `/${folder}/notsold.mp3`
+      );
+
+    } else {
+
+      stopAllActiveAudio();
+
+      const speech =
+        new SpeechSynthesisUtterance(
+          `Cartela ${enteredCartelaId} not sold.`
+        );
+
+      speech.pitch = 0.65;
+      speech.rate = 1.15;
+
+      window.speechSynthesis.speak(
+        speech
+      );
+    }
+
+    return;
+  }
+
+  console.log(
+    "✅ CARTELA IS SOLD OFFLINE:",
+    soldCartela
+  );
+
+  // ===================================================
+  // 5. LOAD CARTELA MATRIX
+  // ===================================================
+
+  let matrix =
+    soldCartela.matrix;
+
+  // If matrix is stored under another field,
+  // support it without changing online behavior.
+  if (
+    typeof matrix === "string"
+  ) {
     try {
-      const currentGame = stateRef.current.game;
+      matrix =
+        JSON.parse(matrix);
+    } catch (e) {
+      console.error(
+        "❌ INVALID OFFLINE MATRIX:",
+        e
+      );
+      matrix = null;
+    }
+  }
 
-      if (!currentGame) {
-        alert("Game not loaded.");
-        return;
+  // ===================================================
+  // 6. FALLBACK: BUILD MATRIX FROM B/I/N/G/O
+  // ===================================================
+
+  if (
+    !matrix &&
+    soldCartela.numbers
+  ) {
+
+    let numbers =
+      soldCartela.numbers;
+
+    if (
+      typeof numbers === "string"
+    ) {
+      try {
+        numbers =
+          JSON.parse(numbers);
+      } catch (e) {
+        console.error(
+          "❌ INVALID OFFLINE NUMBERS:",
+          e
+        );
+        numbers = null;
+      }
+    }
+
+    if (
+      numbers &&
+      typeof numbers === "object"
+    ) {
+
+      const letters = [
+        "B",
+        "I",
+        "N",
+        "G",
+        "O",
+      ];
+
+      matrix = [];
+
+      for (
+        let row = 0;
+        row < 5;
+        row++
+      ) {
+
+        const boardRow = [];
+
+        for (
+          let col = 0;
+          col < 5;
+          col++
+        ) {
+
+          const letter =
+            letters[col];
+
+          const value =
+            numbers[letter]?.[row];
+
+          if (
+            row === 2 &&
+            col === 2
+          ) {
+
+            boardRow.push(
+              "FREE"
+            );
+
+          } else {
+
+            boardRow.push(
+              `${letter} ${value}`
+            );
+          }
+        }
+
+        matrix.push(
+          boardRow
+        );
+      }
+    }
+  }
+
+  if (!matrix) {
+
+    console.error(
+      "❌ OFFLINE CARTELA MATRIX NOT FOUND:",
+      soldCartela
+    );
+
+    setWinnerMessage(
+      "Cartela data error"
+    );
+
+    setVerificationStatus(
+      "ERROR"
+    );
+
+    return;
+  }
+
+  console.log(
+    "🎫 OFFLINE CARTELA MATRIX:",
+    matrix
+  );
+
+  // ===================================================
+  // 7. LOAD CALLED BALLS
+  // SAME LOGIC AS BACKEND
+  // ===================================================
+
+  const localBalls =
+    await offlineDB.calledBalls
+      .where("game_id")
+      .equals(
+        String(verifyGameId)
+      )
+      .sortBy("called_at");
+
+  console.log(
+    "🎱 OFFLINE CALLED BALLS:",
+    localBalls
+  );
+
+  // ===================================================
+  // 8. BUILD CALLED NUMBER SET
+  // ===================================================
+
+  const calledSet =
+    new Set();
+
+  for (
+    const ball of localBalls
+  ) {
+
+    const rawBall =
+      typeof ball === "object"
+        ? ball.number
+        : ball;
+
+    const number =
+      parseInt(
+        String(rawBall)
+          .trim()
+          .split(/\s+/)
+          .pop(),
+        10
+      );
+
+    if (
+      !Number.isNaN(number)
+    ) {
+      calledSet.add(number);
+    }
+  }
+
+  console.log(
+    "🎱 OFFLINE CALLED NUMBERS:",
+    Array.from(calledSet)
+  );
+
+  // ===================================================
+  // 9. SAME MARKED() FUNCTION AS BACKEND
+  // ===================================================
+
+  function marked(cell) {
+
+    if (
+      cell === "FREE"
+    ) {
+      return true;
+    }
+
+    const cellNumber =
+      parseInt(
+        String(cell)
+          .trim()
+          .split(/\s+/)
+          .pop(),
+        10
+      );
+
+    if (
+      Number.isNaN(cellNumber)
+    ) {
+      return false;
+    }
+
+    const result =
+      calledSet.has(
+        cellNumber
+      );
+
+    console.log(
+      `OFFLINE MARK CHECK | ${cell} | number=${cellNumber} | marked=${result}`
+    );
+
+    return result;
+  }
+
+  // ===================================================
+  // 10. CHECKED MATRIX FOR DISPLAY
+  // ===================================================
+
+  const checkedMatrix =
+    matrix.map(
+      (row) =>
+        row.map(
+          (cell) => {
+
+            const value =
+              typeof cell === "object"
+                ? cell.number
+                : cell;
+
+            const number =
+              Number(value);
+
+            return {
+              value: cell,
+              number,
+              marked:
+                cell === "FREE" ||
+                String(value)
+                  .toUpperCase() ===
+                  "FREE" ||
+                number === 0 ||
+                calledSet.has(
+                  number
+                ),
+            };
+          }
+        )
+    );
+
+  console.log(
+    "🎫 OFFLINE CHECKED MATRIX:",
+    checkedMatrix
+  );
+
+  // ===================================================
+  // 11. SHOW CARTELA
+  // SAME STRUCTURE AS ONLINE
+  // ===================================================
+
+  setCheckedCartela({
+
+    id:
+      soldCartela.cartelaId ??
+      soldCartela.cartela_id ??
+      soldCartela.id,
+
+    cartelaId:
+      soldCartela.cartelaId ??
+      soldCartela.cartela_id ??
+      soldCartela.id,
+
+    matrix:
+      matrix,
+  });
+
+  // ===================================================
+  // 12. WINNING PATTERNS
+  // SAME LOGIC AS BACKEND
+  // ===================================================
+
+  const winningPatterns = [];
+
+  // ===================================================
+  // HORIZONTAL LINES
+  // ===================================================
+
+  let horizontalCount = 0;
+
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
+
+    let complete = true;
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      if (
+        !marked(
+          matrix[row][col]
+        )
+      ) {
+
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+
+      horizontalCount++;
+
+      const patternCells = [];
+
+      for (
+        let col = 0;
+        col < 5;
+        col++
+      ) {
+
+        patternCells.push(
+          `${row}-${col}`
+        );
       }
 
-  const verifyGameId = currentGame?.game_id || currentGame?.id;
-
-console.log("🔥 VERIFY GAME OBJECT:", currentGame);
-console.log("🔥 VERIFY GAME ID:", verifyGameId);
-
-if (!verifyGameId) {
-  console.error("❌ MISSING game_id/id:", currentGame);
-  setWinnerMessage("Game ID missing");
-  return;
-}
-
-const response = await fetch(
-  `${API_URL}/games/${verifyGameId}/verify-cartela`,
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      cartelaId: cartelaId.trim(),
-    }),
+      winningPatterns.push(
+        patternCells
+      );
+    }
   }
-);
 
-const verificationData = await response.json();
+  const horizontalWinner =
+    horizontalCount > 0;
 
-if (!verificationData.sold) {
-  setWinnerMessage(`ID ${cartelaId} NOT SOLD!`);
-  setVerificationStatus("NOT_SOLD");
+  // ===================================================
+  // VERTICAL LINES
+  // ===================================================
+
+  let verticalCount = 0;
+
+  for (
+    let col = 0;
+    col < 5;
+    col++
+  ) {
+
+    let complete = true;
+
+    for (
+      let row = 0;
+      row < 5;
+      row++
+    ) {
+
+      if (
+        !marked(
+          matrix[row][col]
+        )
+      ) {
+
+        complete = false;
+        break;
+      }
+    }
+
+    if (complete) {
+
+      verticalCount++;
+
+      const patternCells = [];
+
+      for (
+        let row = 0;
+        row < 5;
+        row++
+      ) {
+
+        patternCells.push(
+          `${row}-${col}`
+        );
+      }
+
+      winningPatterns.push(
+        patternCells
+      );
+    }
+  }
+
+  const verticalWinner =
+    verticalCount > 0;
+
+  // ===================================================
+  // DIAGONALS
+  // ===================================================
+
+  let diag1Winner = true;
+
+  for (
+    let i = 0;
+    i < 5;
+    i++
+  ) {
+
+    if (
+      !marked(
+        matrix[i][i]
+      )
+    ) {
+
+      diag1Winner = false;
+      break;
+    }
+  }
+
+  let diag2Winner = true;
+
+  for (
+    let i = 0;
+    i < 5;
+    i++
+  ) {
+
+    if (
+      !marked(
+        matrix[i][4 - i]
+      )
+    ) {
+
+      diag2Winner = false;
+      break;
+    }
+  }
+
+  let diagonalCount = 0;
+
+  if (diag1Winner) {
+
+    diagonalCount++;
+
+    const patternCells = [];
+
+    for (
+      let i = 0;
+      i < 5;
+      i++
+    ) {
+
+      patternCells.push(
+        `${i}-${i}`
+      );
+    }
+
+    winningPatterns.push(
+      patternCells
+    );
+  }
+
+  if (diag2Winner) {
+
+    diagonalCount++;
+
+    const patternCells = [];
+
+    for (
+      let i = 0;
+      i < 5;
+      i++
+    ) {
+
+      patternCells.push(
+        `${i}-${4 - i}`
+      );
+    }
+
+    winningPatterns.push(
+      patternCells
+    );
+  }
+
+  const diagonalWinner =
+    diagonalCount > 0;
+
+  // ===================================================
+  // FOUR CORNERS
+  // ===================================================
+
+  const fourCornersWinner =
+    marked(matrix[0][0]) &&
+    marked(matrix[0][4]) &&
+    marked(matrix[4][0]) &&
+    marked(matrix[4][4]);
+
+  if (
+    fourCornersWinner
+  ) {
+
+    winningPatterns.push([
+      "0-0",
+      "0-4",
+      "4-0",
+      "4-4",
+    ]);
+  }
+
+  // ===================================================
+  // FOUR CORNERS NEAR STAR
+  // ===================================================
+
+  const fourCornersNearStarWinner =
+    marked(matrix[1][1]) &&
+    marked(matrix[1][3]) &&
+    marked(matrix[3][1]) &&
+    marked(matrix[3][3]);
+
+  if (
+    fourCornersNearStarWinner
+  ) {
+
+    winningPatterns.push([
+      "1-1",
+      "1-3",
+      "3-1",
+      "3-3",
+    ]);
+  }
+
+  // ===================================================
+  // FULL HOUSE
+  // ===================================================
+
+  let fullHouseWinner = true;
+
+  for (
+    let row = 0;
+    row < 5;
+    row++
+  ) {
+
+    for (
+      let col = 0;
+      col < 5;
+      col++
+    ) {
+
+      if (
+        !marked(
+          matrix[row][col]
+        )
+      ) {
+
+        fullHouseWinner = false;
+        break;
+      }
+    }
+
+    if (
+      !fullHouseWinner
+    ) {
+      break;
+    }
+  }
+
+  if (
+    fullHouseWinner
+  ) {
+
+    const patternCells = [];
+
+    for (
+      let row = 0;
+      row < 5;
+      row++
+    ) {
+
+      for (
+        let col = 0;
+        col < 5;
+        col++
+      ) {
+
+        patternCells.push(
+          `${row}-${col}`
+        );
+      }
+    }
+
+    winningPatterns.push(
+      patternCells
+    );
+  }
+
+  // ===================================================
+  // 13. COUNT COMPLETED PATTERNS
+  // ===================================================
+
+  const completedWinningPatterns =
+    winningPatterns.length;
+
+  // ===================================================
+  // 14. FINAL WINNER
+  // SAME LOGIC AS BACKEND
+  // ===================================================
+
+  const isWinner =
+    isFullHouseRequired
+      ? fullHouseWinner
+      : completedWinningPatterns >=
+        winningPatternCount;
+
+  // ===================================================
+  // 15. ONLY REQUIRED PATTERNS BECOME RED
+  // SAME LOGIC AS BACKEND
+  // ===================================================
+
+  const winningCells =
+    isFullHouseRequired
+      ? winningPatterns
+          .flat()
+      : winningPatterns
+          .slice(
+            0,
+            winningPatternCount
+          )
+          .flat();
+
+  console.log(
+    "================================="
+  );
+
+  console.log(
+    "📴 OFFLINE BINGO VERIFICATION RESULT"
+  );
+
+  console.log(
+    "Cartela:",
+    enteredCartelaId
+  );
+
+  console.log(
+    "Horizontal count:",
+    horizontalCount
+  );
+
+  console.log(
+    "Vertical count:",
+    verticalCount
+  );
+
+  console.log(
+    "Diagonal count:",
+    diagonalCount
+  );
+
+  console.log(
+    "Four Corners:",
+    fourCornersWinner
+  );
+
+  console.log(
+    "Four Corners Near Star:",
+    fourCornersNearStarWinner
+  );
+
+  console.log(
+    "Full House:",
+    fullHouseWinner
+  );
+
+  console.log(
+    "COMPLETED PATTERNS:",
+    completedWinningPatterns
+  );
+
+  console.log(
+    "REQUIRED PATTERNS:",
+    winningPatternCount
+  );
+
+  console.log(
+    "FINAL WINNER:",
+    isWinner
+  );
+
+  console.log(
+    "WINNING CELLS:",
+    winningCells
+  );
+
+  console.log(
+    "================================="
+  );
+
+  // ===================================================
+  // 16. SAVE WINNING CELLS
+  // ===================================================
+
+  setWinningCells(
+    winningCells
+  );
+
+  // ===================================================
+  // 17. OFFLINE WINNER
+  // SAME RESULT FLOW AS ONLINE
+  // ===================================================
+
+  if (isWinner) {
+
+    let patternName =
+      "🎉 LINE BINGO!";
+
+    if (
+      isFullHouseRequired ||
+      fullHouseWinner
+    ) {
+
+      patternName =
+        "🎉 FULL HOUSE!";
+
+    } else if (
+      fourCornersWinner
+    ) {
+
+      patternName =
+        "⭐ FOUR CORNERS!";
+
+    } else if (
+      fourCornersNearStarWinner
+    ) {
+
+      patternName =
+        "⭐ FOUR CORNERS NEAR STAR!";
+
+    }
+
+    setWinnerMessage(
+      patternName
+    );
+
+    setVerificationStatus(
+      "WINNER"
+    );
+
+    if (
+      currentGame.voiceMode === "recorded" ||
+      currentGame.voiceMode === "recorded-oromo"
+    ) {
+
+      const folder =
+        currentGame.voiceMode ===
+        "recorded-oromo"
+          ? "oromo"
+          : "amharic";
+
+      playRecordedBingoCall(
+        `/${folder}/winner.mp3`
+      );
+
+    } else {
+
+      stopAllActiveAudio();
+
+      const speech =
+        new SpeechSynthesisUtterance(
+          `Bingo! Cartela ${enteredCartelaId} is a winner!`
+        );
+
+      speech.pitch = 0.6;
+      speech.rate = 1.2;
+
+      window.speechSynthesis.speak(
+        speech
+      );
+    }
+
+    return;
+  }
+
+  // ===================================================
+  // 18. OFFLINE NOT WINNER
+  // ===================================================
+
+  setWinnerMessage(
+    "❌ No Bingo"
+  );
+
+  setVerificationStatus(
+    "NOT_WINNER"
+  );
 
   if (
     currentGame.voiceMode === "recorded" ||
     currentGame.voiceMode === "recorded-oromo"
   ) {
-    playRecordedAudio("notsold");
+
+    const folder =
+      currentGame.voiceMode ===
+      "recorded-oromo"
+        ? "oromo"
+        : "amharic";
+
+    playRecordedBingoCall(
+      `/${folder}/notwinner.mp3`
+    );
+
   } else {
+
     stopAllActiveAudio();
 
-    const speech = new SpeechSynthesisUtterance(
-      `Cartela ${cartelaId} not sold.`
-    );
+    const speech =
+      new SpeechSynthesisUtterance(
+        `Cartela ${enteredCartelaId} is not a winner yet.`
+      );
 
     speech.pitch = 0.65;
     speech.rate = 1.15;
 
-    window.speechSynthesis.speak(speech);
+    window.speechSynthesis.speak(
+      speech
+    );
   }
 
   return;
 }
 
-setCheckedCartela(verificationData.cartela);
-setWinningCells(
-  verificationData.winningCells || []
-);
+    // =====================================================
+    // ONLINE VERIFICATION
+    // =====================================================
 
-      if (verificationData.isWinner) {
-        let patternName = "🎉 LINE BINGO!";
-
-        if (verificationData.isFullHouse) {
-          patternName = "🎉 FULL HOUSE!";
-        } else if (verificationData.isFourCorners) {
-          patternName = "⭐ FOUR CORNERS!";
-        }
-
-        setWinnerMessage(patternName);
-        setVerificationStatus("WINNER");
-
-        if (currentGame.voiceMode === "recorded" ||
-  currentGame.voiceMode === "recorded-oromo") {
-          playRecordedAudio("winner");
-        } else {
-          stopAllActiveAudio();
-          const speech = new SpeechSynthesisUtterance(`Bingo! Cartela ${cartelaId} is a winner!`);
-          speech.pitch = 0.6;
-          speech.rate = 1.2; 
-          window.speechSynthesis.speak(speech);
-        }
-      } else {
-        setWinnerMessage("❌ No Bingo");
-        setVerificationStatus("NOT_WINNER");
-
-        if (currentGame.voiceMode === "recorded" ||
-  currentGame.voiceMode === "recorded-oromo") {
-          playRecordedAudio("notwinner");
-        } else {
-          stopAllActiveAudio();
-          const speech = new SpeechSynthesisUtterance(`Cartela ${cartelaId} is not a winner yet.`);
-          speech.pitch = 0.65;
-          speech.rate = 1.15;
-          window.speechSynthesis.speak(speech);
-        }
+    const response = await fetch(
+      `${API_URL}/games/${verifyGameId}/verify-cartela`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+        body: JSON.stringify({
+          cartelaId:
+            cartelaId.trim(),
+        }),
       }
-    } catch (err) {
-      console.error("Verification Error:", err);
-      setWinnerMessage("Verification error");
-    }
-  };
+    );
 
-  const closeVerificationBoard = () => {
-    setCheckedCartela(null);
-    setVerificationStatus("");
-    setWinnerMessage("");
-    setCartelaId("");
-  };
+    const verificationData =
+      await response.json();
+
+    // -----------------------------------------------------
+    // NOT SOLD
+    // -----------------------------------------------------
+
+    if (!verificationData.sold) {
+
+      setWinnerMessage(
+        `ID ${cartelaId} NOT SOLD!`
+      );
+
+      setVerificationStatus(
+        "NOT_SOLD"
+      );
+
+      if (
+        currentGame.voiceMode === "recorded" ||
+        currentGame.voiceMode === "recorded-oromo"
+      ) {
+
+        playRecordedAudio(
+          "notsold"
+        );
+
+      } else {
+
+        stopAllActiveAudio();
+
+        const speech =
+          new SpeechSynthesisUtterance(
+            `Cartela ${cartelaId} not sold.`
+          );
+
+        speech.pitch = 0.65;
+        speech.rate = 1.15;
+
+        window.speechSynthesis.speak(
+          speech
+        );
+      }
+
+      return;
+    }
+
+    // -----------------------------------------------------
+    // ONLINE SOLD CARTELA
+    // -----------------------------------------------------
+
+    setCheckedCartela(
+      verificationData.cartela
+    );
+
+    setWinningCells(
+      verificationData.winningCells ||
+        []
+    );
+
+    // -----------------------------------------------------
+    // ONLINE WINNER
+    // -----------------------------------------------------
+
+    if (verificationData.isWinner) {
+
+      let patternName =
+        "🎉 LINE BINGO!";
+
+      if (
+        verificationData.isFullHouse
+      ) {
+
+        patternName =
+          "🎉 FULL HOUSE!";
+
+      } else if (
+        verificationData.isFourCorners
+      ) {
+
+        patternName =
+          "⭐ FOUR CORNERS!";
+      }
+
+      setWinnerMessage(
+        patternName
+      );
+
+      setVerificationStatus(
+        "WINNER"
+      );
+
+      if (
+        currentGame.voiceMode === "recorded" ||
+        currentGame.voiceMode === "recorded-oromo"
+      ) {
+
+        playRecordedAudio(
+          "winner"
+        );
+
+      } else {
+
+        stopAllActiveAudio();
+
+        const speech =
+          new SpeechSynthesisUtterance(
+            `Bingo! Cartela ${cartelaId} is a winner!`
+          );
+
+        speech.pitch = 0.6;
+        speech.rate = 1.2;
+
+        window.speechSynthesis.speak(
+          speech
+        );
+      }
+
+    } else {
+
+      // ---------------------------------------------------
+      // ONLINE NOT WINNER
+      // ---------------------------------------------------
+
+      setWinnerMessage(
+        "❌ No Bingo"
+      );
+
+      setVerificationStatus(
+        "NOT_WINNER"
+      );
+
+      if (
+        currentGame.voiceMode === "recorded" ||
+        currentGame.voiceMode === "recorded-oromo"
+      ) {
+
+        playRecordedAudio(
+          "notwinner"
+        );
+
+      } else {
+
+        stopAllActiveAudio();
+
+        const speech =
+          new SpeechSynthesisUtterance(
+            `Cartela ${cartelaId} is not a winner yet.`
+          );
+
+        speech.pitch = 0.65;
+        speech.rate = 1.15;
+
+        window.speechSynthesis.speak(
+          speech
+        );
+      }
+    }
+
+  } catch (err) {
+
+    console.error(
+      "Verification Error:",
+      err
+    );
+
+    setWinnerMessage(
+      "Verification error"
+    );
+
+    setVerificationStatus(
+      "ERROR"
+    );
+  }
+};
+
+const closeVerificationBoard = () => {
+  setCheckedCartela(null);
+  setVerificationStatus("");
+  setWinnerMessage("");
+  setCartelaId("");
+};
 
   async function reset() {
     stopAllActiveAudio();
@@ -3717,7 +5656,6 @@ setWinningCells(
       </div>
     </div>
   </div>
-
   {/* =======================================================
         ITEM 3: High-Visibility Current Called Display
         ======================================================= */}

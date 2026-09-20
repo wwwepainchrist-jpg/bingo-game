@@ -4,7 +4,14 @@ import { QRCodeCanvas } from "qrcode.react";
 import "./CashierDashboard.css";
 import { useLanguage } from "../context/LanguageContext";
 import { API_URL } from "../config";
-
+import {
+  saveGameOffline,
+  saveSoldCartelaOffline,
+  saveLocalPackage,
+  getLocalPackage,
+  isOnline,
+   syncOfflineGames,
+} from "../offline/offlineService";
 function generateMockMatrixForId(id) {
   const seed = Number(id) || 1;
   const columns = { B: [], I: [], N: [], G: [], O: [] };
@@ -89,7 +96,7 @@ const startingGameRef = useRef(false);
   });
 
   const [loading, setLoading] = useState(true);
-
+const offlineSyncRunningRef = useRef(false);
   const location = useLocation();
   const [startClicked, setStartClicked] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
@@ -118,124 +125,724 @@ const startingGameRef = useRef(false);
   const [showWinningPattern, setShowWinningPattern] = useState(false);
   const passedGame = location.state?.game;
 
-  // Fetch initial cashier data
+// ============================================================
+// FETCH CASHIER DASHBOARD DATA
+// ============================================================
+
 useEffect(() => {
   async function fetchDashboardData() {
+
+    // ==========================================================
+    // OFFLINE MODE
+    // ==========================================================
+    if (!navigator.onLine) {
+      console.log("📴 CASHIER DASHBOARD: OFFLINE MODE");
+
+      try {
+        // ========================================================
+        // 1. LOAD SAVED BET
+        // ========================================================
+        const savedBet = localStorage.getItem(
+          `bet_amount_${id}`
+        );
+
+        if (savedBet !== null) {
+          const offlineBet = Number(savedBet);
+
+          if (Number.isFinite(offlineBet)) {
+            setBet(offlineBet);
+
+            console.log(
+              "📴 USING SAVED BET:",
+              offlineBet
+            );
+          }
+        }
+
+        // ========================================================
+        // 2. LOAD SAVED HOUSE ID
+        // ========================================================
+        const savedHouseId = localStorage.getItem(
+          `cashier_house_id_${id}`
+        );
+
+        if (!savedHouseId) {
+          console.error(
+            "❌ OFFLINE: NO SAVED HOUSE ID FOR CASHIER:",
+            id
+          );
+
+          return;
+        }
+
+        console.log(
+          "📴 USING SAVED HOUSE ID:",
+          savedHouseId
+        );
+
+        // ========================================================
+        // 3. LOAD LAST HOUSE COMMISSION
+        // ========================================================
+        const commissionStorageKey =
+          `house_commission_${savedHouseId}`;
+
+        const savedCommission =
+          localStorage.getItem(
+            commissionStorageKey
+          );
+
+        const offlineCommission =
+          Number(savedCommission);
+
+        if (
+          Number.isFinite(offlineCommission) &&
+          offlineCommission >= 0 &&
+          offlineCommission <= 100
+        ) {
+          setCommission(
+            offlineCommission
+          );
+
+          console.log(
+            "📴 USING SAVED HOUSE COMMISSION:",
+            `${offlineCommission}%`
+          );
+        } else {
+          console.error(
+            "❌ OFFLINE: INVALID SAVED COMMISSION:",
+            savedCommission
+          );
+        }
+
+        // ========================================================
+        // 4. LOAD LAST ONLINE PACKAGE
+        // ========================================================
+        const localPackage =
+          await getLocalPackage(
+            String(savedHouseId)
+          );
+
+        if (!localPackage) {
+          console.error(
+            "❌ OFFLINE: NO SAVED PACKAGE FOR HOUSE:",
+            savedHouseId
+          );
+        } else {
+
+          // ------------------------------------------------------
+          // TOTAL PACKAGE
+          // ------------------------------------------------------
+          const totalPackage =
+            Number(
+              localPackage.total_package ??
+              localPackage.totalAmount ??
+              localPackage.total ??
+              0
+            );
+
+          // ------------------------------------------------------
+          // REMAINING PACKAGE
+          // ------------------------------------------------------
+          const remainingPackage =
+            Number(
+              localPackage.remaining_package ??
+              localPackage.remainingAmount ??
+              localPackage.remainingBalance ??
+              localPackage.remaining ??
+              0
+            );
+
+          // ------------------------------------------------------
+          // NORMALIZE PACKAGE
+          // ------------------------------------------------------
+          const offlinePackage = {
+            ...localPackage,
+
+            house_id:
+              String(savedHouseId),
+
+            total_package:
+              totalPackage,
+
+            totalAmount:
+              totalPackage,
+
+            remaining_package:
+              remainingPackage,
+
+            remainingAmount:
+              remainingPackage,
+
+            remainingBalance:
+              remainingPackage,
+
+            remaining:
+              remainingPackage,
+
+            synced:
+              true,
+
+            offline_created:
+              false
+          };
+
+          // ------------------------------------------------------
+          // LOAD PACKAGE INTO SCREEN
+          // ------------------------------------------------------
+          setRawPackageInfo(
+            offlinePackage
+          );
+
+          console.log(
+            "📴 OFFLINE PACKAGE LOADED:",
+            {
+              houseId: savedHouseId,
+              total: totalPackage,
+              remaining: remainingPackage
+            }
+          );
+        }
+
+                // ========================================================
+        // 5. LOAD LOCAL SOLD CARTELAS
+        // ========================================================
+        let localSoldCartelas = [];
+
+        try {
+          // Check if the external function is imported/defined before calling it
+          if (typeof getLocalSoldCartelas === "function") {
+            localSoldCartelas = await getLocalSoldCartelas(String(savedHouseId));
+          } else {
+            // Fallback: Safely pull the local tickets straight from localStorage cache
+            const fallbackCartelas = localStorage.getItem(`offline_sold_cartelas_${savedHouseId}`);
+            if (fallbackCartelas) {
+              localSoldCartelas = JSON.parse(fallbackCartelas);
+            }
+          }
+        } catch (dbError) {
+          console.warn("⚠️ Local indexedDB check failed, falling back to empty list:", dbError);
+        }
+
+        if (Array.isArray(localSoldCartelas)) {
+          setSoldCartelas(localSoldCartelas);
+          console.log("📴 USING LOCAL SOLD CARTELAS:", localSoldCartelas.length);
+        } else {
+          setSoldCartelas([]);
+          console.log("📴 NO LOCAL SOLD CARTELAS FOUND (FALLBACK APPLIED)");
+        }
+
+      } catch (offlineError) {
+        console.error(
+          "❌ OFFLINE DASHBOARD LOAD FAILED:",
+          offlineError
+        );
+      } finally {
+        setLoading(false);
+      }
+
+      return;
+    }
+
+    // ==========================================================
+    // ONLINE MODE
+    // ==========================================================
     try {
       const res = await fetch(
         `https://bingo-backend-ccn6.onrender.com/api/cashier-dashboard/${id}`
       );
 
-      if (res.ok) {
-        const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          `Dashboard request failed: ${res.status}`
+        );
+      }
 
-    const savedBet = localStorage.getItem(
-  `bet_amount_${id}`
-);
+      const data = await res.json();
 
-if (savedBet !== null) {
+      console.log(
+        "🌐 CASHIER DASHBOARD DATA:",
+        data
+      );
 
-  console.log(
-    "💰 USING SAVED BET:",
-    savedBet
-  );
+      // ========================================================
+      // 1. BET
+      // ========================================================
+      const savedBet = localStorage.getItem(
+        `bet_amount_${id}`
+      );
 
-  setBet(Number(savedBet));
+      if (savedBet !== null) {
+        const onlineSavedBet =
+          Number(savedBet);
 
-} else if (data.bet !== undefined) {
-
-  console.log(
-    "💰 USING API BET:",
-    data.bet
-  );
-
-  setBet(data.bet);
-}
-        if (data.voiceMode) {
-          setVoiceMode(data.voiceMode);
-        }
-
-        if (data.soldCartelas) {
-          setSoldCartelas(data.soldCartelas);
-        }
-
-        if (data.cashier) {
-          setCurrentCashier(data.cashier);
-        }
-
-        if (data.packageInfo) {
-          setRawPackageInfo(data.packageInfo);
-        }
-
-        // Fetch commission for this cashier's house
-        const houseId =
-          Number(data.cashier?.house_id) || Number(id);
-
-        try {
-          const settingsRes = await fetch(
-            `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${houseId}`
+        if (
+          Number.isFinite(
+            onlineSavedBet
+          )
+        ) {
+          setBet(
+            onlineSavedBet
           );
 
-          if (settingsRes.ok) {
-            const settingsData = await settingsRes.json();
+          console.log(
+            "💰 USING SAVED BET:",
+            onlineSavedBet
+          );
+        }
 
-            console.log(
-              "🏠 CASHIER DATABASE COMMISSION:",
-              settingsData.value
-            );
+      } else if (
+        data.bet !== undefined
+      ) {
+        const apiBet =
+          Number(data.bet);
 
-            if (settingsData.value !== undefined) {
-              setCommission(Number(settingsData.value));
-            }
-          } else {
-            console.log(
-              "⚠️ Commission request failed:",
-              settingsRes.status
-            );
-          }
-        } catch (err) {
-          console.error(
-            "Error fetching house commission:",
-            err
+        if (
+          Number.isFinite(apiBet)
+        ) {
+          setBet(apiBet);
+
+          console.log(
+            "💰 USING API BET:",
+            apiBet
           );
         }
       }
+
+      // ========================================================
+      // 2. VOICE
+      // ========================================================
+      if (data.voiceMode) {
+        setVoiceMode(
+          data.voiceMode
+        );
+      }
+
+      // ========================================================
+      // 3. SOLD CARTELAS
+      // ========================================================
+      if (
+        Array.isArray(
+          data.soldCartelas
+        )
+      ) {
+        setSoldCartelas(
+          data.soldCartelas
+        );
+      }
+
+      // ========================================================
+      // 4. CASHIER
+      // ========================================================
+      if (data.cashier) {
+        setCurrentCashier(
+          data.cashier
+        );
+      }
+
+      // ========================================================
+      // 5. REAL HOUSE ID
+      // ========================================================
+      const houseId =
+        data.cashier?.house_id;
+
+      if (
+        houseId === undefined ||
+        houseId === null ||
+        String(houseId).trim() === ""
+      ) {
+        console.error(
+          "❌ REAL HOUSE ID IS MISSING:",
+          data.cashier
+        );
+
+        return;
+      }
+
+      const houseIdString =
+        String(houseId);
+
+      console.log(
+        "🏠 REAL HOUSE ID:",
+        houseIdString
+      );
+
+      // ========================================================
+      // 6. SAVE CASHIER → HOUSE
+      // ========================================================
+      localStorage.setItem(
+        `cashier_house_id_${id}`,
+        houseIdString
+      );
+
+      // ========================================================
+      // 7. ONLINE PACKAGE → SAVE EXACT COPY FOR OFFLINE
+      // ========================================================
+      if (data.packageInfo) {
+        try {
+          const packageInfo =
+            data.packageInfo;
+
+          // ----------------------------------------------------
+          // TOTAL PACKAGE
+          // ----------------------------------------------------
+          const totalPackage =
+            Number(
+              packageInfo.total_package ??
+              packageInfo.totalAmount ??
+              packageInfo.total ??
+              0
+            );
+
+          // ----------------------------------------------------
+          // REMAINING PACKAGE
+          // ----------------------------------------------------
+          const remainingPackage =
+            Number(
+              packageInfo.remaining_package ??
+              packageInfo.remainingAmount ??
+              packageInfo.remainingBalance ??
+              packageInfo.remaining ??
+              0
+            );
+
+          // ----------------------------------------------------
+          // EXACT PACKAGE COPY
+          // ----------------------------------------------------
+          const packageToSave = {
+            ...packageInfo,
+
+            house_id:
+              houseIdString,
+
+            total_package:
+              totalPackage,
+
+            totalAmount:
+              totalPackage,
+
+            remaining_package:
+              remainingPackage,
+
+            remainingAmount:
+              remainingPackage,
+
+            remainingBalance:
+              remainingPackage,
+
+            remaining:
+              remainingPackage,
+
+            synced:
+              true,
+
+            offline_created:
+              false,
+
+            updated_at:
+              new Date().toISOString()
+          };
+
+          // ----------------------------------------------------
+          // UPDATE SCREEN
+          // ----------------------------------------------------
+          setRawPackageInfo(
+            packageToSave
+          );
+
+          // ----------------------------------------------------
+          // IMPORTANT:
+          // REPLACE LOCAL PACKAGE WITH
+          // THE CURRENT ONLINE SERVER PACKAGE
+          // ----------------------------------------------------
+          await saveLocalPackage(
+            houseIdString,
+            packageToSave
+          );
+
+          console.log(
+            "🌐 ONLINE PACKAGE:",
+            {
+              houseId:
+                houseIdString,
+              total:
+                totalPackage,
+              remaining:
+                remainingPackage
+            }
+          );
+
+          console.log(
+            "💾 OFFLINE PACKAGE UPDATED FROM ONLINE:",
+            {
+              houseId:
+                houseIdString,
+              total:
+                totalPackage,
+              remaining:
+                remainingPackage
+            }
+          );
+
+        } catch (packageError) {
+          console.error(
+            "❌ PACKAGE SAVE ERROR:",
+            packageError
+          );
+        }
+      } else {
+        console.warn(
+          "⚠️ ONLINE RESPONSE HAS NO packageInfo"
+        );
+      }
+
+      // ========================================================
+      // 8. HOUSE COMMISSION
+      // ========================================================
+      const commissionStorageKey =
+        `house_commission_${houseIdString}`;
+
+      try {
+        const settingsRes =
+          await fetch(
+            `https://bingo-backend-ccn6.onrender.com/api/settings/house_commission_${houseIdString}`
+          );
+
+        if (settingsRes.ok) {
+
+          const settingsData =
+            await settingsRes.json();
+
+          const houseCommission =
+            Number(
+              settingsData.value
+            );
+
+          console.log(
+            "🏠 HOUSE COMMISSION FROM DATABASE:",
+            houseCommission
+          );
+
+          if (
+            Number.isFinite(
+              houseCommission
+            ) &&
+            houseCommission >= 0 &&
+            houseCommission <= 100
+          ) {
+
+            // --------------------------------------------------
+            // UPDATE REACT STATE
+            // --------------------------------------------------
+            setCommission(
+              houseCommission
+            );
+
+            // --------------------------------------------------
+            // SAVE FOR OFFLINE
+            // --------------------------------------------------
+            localStorage.setItem(
+              commissionStorageKey,
+              String(
+                houseCommission
+              )
+            );
+
+            console.log(
+              "💰 CASHIER COMMISSION UPDATED:",
+              `${houseCommission}%`
+            );
+
+            console.log(
+              "💾 COMMISSION SAVED FOR OFFLINE:",
+              `${houseCommission}%`
+            );
+
+          } else {
+            console.error(
+              "❌ INVALID HOUSE COMMISSION:",
+              houseCommission
+            );
+          }
+
+        } else {
+
+          // --------------------------------------------------
+          // SERVER DID NOT RETURN COMMISSION
+          // USE LAST SAVED COMMISSION
+          // --------------------------------------------------
+          const savedCommission =
+            Number(
+              localStorage.getItem(
+                commissionStorageKey
+              )
+            );
+
+          if (
+            Number.isFinite(
+              savedCommission
+            ) &&
+            savedCommission >= 0 &&
+            savedCommission <= 100
+          ) {
+
+            setCommission(
+              savedCommission
+            );
+
+            console.log(
+              "📴 USING LAST SAVED HOUSE COMMISSION:",
+              `${savedCommission}%`
+            );
+          }
+        }
+
+      } catch (commissionError) {
+
+        console.error(
+          "⚠️ COMMISSION FETCH FAILED:",
+          commissionError
+        );
+
+        // ------------------------------------------------------
+        // FALL BACK TO LAST SAVED COMMISSION
+        // ------------------------------------------------------
+        const savedCommission =
+          Number(
+            localStorage.getItem(
+              commissionStorageKey
+            )
+          );
+
+        if (
+          Number.isFinite(
+            savedCommission
+          ) &&
+          savedCommission >= 0 &&
+          savedCommission <= 100
+        ) {
+
+          setCommission(
+            savedCommission
+          );
+
+          console.log(
+            "📴 USING LAST SAVED HOUSE COMMISSION:",
+            `${savedCommission}%`
+          );
+        }
+      }
+
     } catch (err) {
+
       console.error(
-        "Error fetching dashboard data from server:",
+        "❌ ERROR FETCHING DASHBOARD:",
         err
       );
+
     } finally {
       setLoading(false);
     }
   }
 
   fetchDashboardData();
-}, [id]);
-  const grossIncome = bet * soldCartelas.length;
-  const commissionAmount = grossIncome * (Number(commission) / 100);
-  const netIncome = grossIncome - commissionAmount;
-  const houseId = Number(currentCashier.house_id) || Number(id);
 
-  const realRemainingPackageAmount = Number(
-    rawPackageInfo.remaining_package ??
-    rawPackageInfo.remainingAmount ??
-    rawPackageInfo.remainingBalance ??
-    rawPackageInfo.remaining ??
+}, [id]);
+
+
+// ============================================================
+// COMMISSION / PACKAGE CALCULATIONS
+// ============================================================
+
+const activeCommission =
+  Number.isFinite(Number(commission))
+    ? Number(commission)
+    : 0;
+
+const grossIncome =
+  Number(bet) *
+  (Array.isArray(soldCartelas)
+    ? soldCartelas.length
+    : 0);
+
+const commissionAmount =
+  grossIncome *
+  (activeCommission / 100);
+
+const netIncome =
+  grossIncome -
+  commissionAmount;
+
+
+// ============================================================
+// HOUSE ID
+// ============================================================
+
+const houseId =
+  currentCashier?.house_id ||
+  localStorage.getItem(
+    `cashier_house_id_${id}`
+  );
+
+
+// ============================================================
+// PACKAGE BALANCE
+// ============================================================
+
+const realRemainingPackageAmount =
+  Number(
+    rawPackageInfo?.remaining_package ??
+    rawPackageInfo?.remainingAmount ??
+    rawPackageInfo?.remainingBalance ??
+    rawPackageInfo?.remaining ??
     0
   );
 
-  const totalAmount = Number(
-    rawPackageInfo.total_package ??
-    rawPackageInfo.totalAmount ??
+const totalAmount =
+  Number(
+    rawPackageInfo?.total_package ??
+    rawPackageInfo?.totalAmount ??
     1
   );
-  
-  const upcomingGameCommission = Number(grossIncome) * (Number(commission) / 100);
-  const isInsufficientPackage = realRemainingPackageAmount < upcomingGameCommission || realRemainingPackageAmount <= 0;
-  
-  const packagePercent = Math.min(100, Math.max(0, Math.round((realRemainingPackageAmount / totalAmount) * 100)));
 
+
+// ============================================================
+// COMMISSION REQUIRED FOR NEXT GAME
+// ============================================================
+
+const upcomingGameCommission =
+  grossIncome *
+  (activeCommission / 100);
+
+
+// ============================================================
+// CHECK PACKAGE
+// ============================================================
+
+const isInsufficientPackage =
+  realRemainingPackageAmount <= 0 ||
+  realRemainingPackageAmount <
+    upcomingGameCommission;
+
+
+// ============================================================
+// PACKAGE PERCENT
+// ============================================================
+
+const packagePercent =
+  totalAmount > 0
+    ? Math.min(
+        100,
+        Math.max(
+          0,
+          Math.round(
+            (realRemainingPackageAmount /
+              totalAmount) *
+              100
+          )
+        )
+      )
+    : 0;
+    
 const handleIncreaseBet = async () => {
   const nextBet = bet + 5;
 
@@ -344,7 +951,7 @@ async function startGame() {
   // PREVENT MULTIPLE START CLICKS
   // =====================================================
   if (startingGameRef.current) {
-    console.log("🛑 START GAME ALREADY IN PROGRESS - IGNORING CLICK");
+    console.log("🛑 START GAME ALREADY IN PROGRESS");
     return;
   }
 
@@ -354,136 +961,1164 @@ async function startGame() {
 
   const startGameStart = performance.now();
 
-  if (soldCartelas.length === 0) {
-    startingGameRef.current = false;
-    return alert("Sell a cartela first!");
-  }
-
-  const commissionAmount =
-    Number(grossIncome) * (Number(commission) / 100);
-
-  const remaining_package = realRemainingPackageAmount;
-
-  if (remaining_package < commissionAmount) {
-    startingGameRef.current = false;
-    return alert("insufficient balance");
-  }
-
-  const newRemaining = Math.max(
-    0,
-    remaining_package - commissionAmount
-  );
-
-  const updatedPackage = {
-    ...rawPackageInfo,
-    remainingAmount: newRemaining,
-    remainingBalance: newRemaining,
-    remaining: newRemaining,
-  };
-
-  setRawPackageInfo(updatedPackage);
-
-  const structuralSoldCartelas = soldCartelas.map((num) => ({
-    id: String(num),
-    matrix: generateMockMatrixForId(num),
-  }));
-
-  localStorage.setItem(
-    "logged_in_cashier",
-    String(id)
-  );
-
-  const game = {
-    id: `G-${Date.now()}`,
-    date: new Date().toISOString(),
-    cashier: id,
-    house: houseId,
-    bet: Number(bet),
-    prize: Number(netIncome.toFixed(0)),
-    commission: Number(commission),
-    commissionDeducted: commissionAmount,
-    soldCartelas: structuralSoldCartelas,
-    cardsSold: structuralSoldCartelas.length,
-    selectedPatterns,
-    winningPatternCount,
-    voiceMode,
-  };
-
   try {
-    console.log("💾 SAVING GAME:", game.id);
+    // =====================================================
+    // CHECK CARTELAS
+    // =====================================================
+    if (!soldCartelas || soldCartelas.length === 0) {
+      alert("Sell a cartela first!");
+      return;
+    }
 
-    const response = await fetch(`${API_URL}/games`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        game,
-        cashierId: id,
-        soldCartelas,
-      }),
-    });
+    // =====================================================
+    // CALCULATE MONEY
+    // =====================================================
+    const gross = Number(grossIncome) || 0;
 
-    if (!response.ok) {
-      const errorText = await response.text();
+    const commissionPercent =
+      Number(commission) || 0;
 
+    // HOUSE COMMISSION EARNED
+    const commissionAmount =
+      gross *
+      (commissionPercent / 100);
+
+    // CURRENT PACKAGE
+    const currentPackage =
+      Number(realRemainingPackageAmount) || 0;
+
+    // CASHIER NET INCOME
+    const gameNetIncome =
+      Number(netIncome) || 0;
+
+    console.log(
+      "💰 START GAME MONEY:",
+      {
+        gross,
+        commissionPercent,
+        commissionEarned:
+          commissionAmount,
+        cashierNetIncome:
+          gameNetIncome,
+        currentPackage,
+      }
+    );
+
+    // =====================================================
+    // CHECK PACKAGE
+    //
+    // PACKAGE IS REDUCED BY HOUSE COMMISSION EARNED
+    // =====================================================
+    if (
+      currentPackage <
+      commissionAmount
+    ) {
+      alert("Insufficient balance");
+      return;
+    }
+
+    // =====================================================
+    // HOUSE ID
+    // =====================================================
+    const actualHouseId =
+      currentCashier?.house_id ||
+      localStorage.getItem(
+        `cashier_house_id_${id}`
+      );
+
+    if (!actualHouseId) {
       throw new Error(
-        `Backend error ${response.status}: ${errorText}`
+        "House ID is missing."
       );
     }
 
-   const result = await response.json();
-const savedGame = {
-  ...result.game,
-  soldCartelas: soldCartelas,
-};
+    // =====================================================
+    // CREATE GAME ID ONCE
+    //
+    // SAME ID IS USED ONLINE + OFFLINE
+    // =====================================================
+    const gameId =
+      `G-${Date.now()}`;
 
-console.log(
-  "✅ GAME CREATED:",
-  savedGame.game_id
-);
+    const createdAt =
+      new Date().toISOString();
 
-console.log(
-  "🚨 SOLD CARTELAS FOR BINGO:",
-  savedGame.soldCartelas
-);
+    // =====================================================
+    // CARTELA STRUCTURE
+    // =====================================================
+    const structuralSoldCartelas =
+      soldCartelas.map((num) => ({
+        id: String(num),
 
-    setGameStarted(true);
-    setStartClicked(true);
-    setSoldCartelas([]);
+        cartela_id:
+          String(num),
+
+        matrix:
+          generateMockMatrixForId(num),
+      }));
+
+    // =====================================================
+    // CREATE COMMON GAME OBJECT
+    // ONLINE + OFFLINE
+    // =====================================================
+    const localGame = {
+      id:
+        String(gameId),
+
+      game_id:
+        String(gameId),
+
+      date:
+        createdAt,
+
+      created_at:
+        createdAt,
+
+      game_date:
+        createdAt,
+
+      cashier:
+        id,
+
+      cashier_id:
+        String(id),
+
+      house:
+        String(actualHouseId),
+
+      house_id:
+        String(actualHouseId),
+
+      bet:
+        Number(bet) || 0,
+
+      grossIncome:
+        gross,
+
+      // Cashier's game income
+      netIncome:
+        gameNetIncome,
+
+      prize:
+        gameNetIncome,
+
+      // COMMISSION PERCENTAGE
+      commission:
+        commissionPercent,
+
+      // ACTUAL HOUSE COMMISSION EARNED
+      commissionDeducted:
+        commissionAmount,
+
+      // ACTUAL HOUSE COMMISSION EARNED
+      house_commission:
+        commissionAmount,
+
+      soldCartelas:
+        structuralSoldCartelas,
+
+      cardsSold:
+        structuralSoldCartelas.length,
+
+      cards_sold:
+        structuralSoldCartelas.length,
+
+      selectedPatterns,
+
+      winningPatternCount,
+
+      voiceMode,
+
+      status:
+        "Active",
+    };
 
     console.log(
-      "⏱️ START GAME TOTAL:",
-      performance.now() - startGameStart,
-      "ms"
+      "🎮 GAME PREPARED:",
+      localGame
     );
-console.log("🚨 SOLD CARTELAS BEFORE NAVIGATE:", soldCartelas);
-console.log("🚨 SAVED GAME:", savedGame);
-console.log("🚨 SAVED GAME SOLD CARTELAS:", savedGame?.soldCartelas);
-    navigate(`/bingo-game/${savedGame.game_id}`, {
-  state: {
-    game: savedGame,
-    saving: false,
-    winningPatternCount: winningPatternCount,
-  },
-});
+
+    // =====================================================
+    // CHECK INTERNET
+    // =====================================================
+    const online =
+      navigator.onLine;
+
+    console.log(
+      online
+        ? "🌐 ONLINE START"
+        : "📴 OFFLINE START"
+    );
+
+    // =====================================================
+    // ONLINE GAME CREATION
+    // =====================================================
+    if (online) {
+      try {
+        console.log(
+          "☁️ CREATING GAME ON SERVER:",
+          gameId
+        );
+
+        const controller =
+          new AbortController();
+
+        let response;
+
+        try {
+          response =
+            await fetch(
+              `${API_URL}/games`,
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    game:
+                      localGame,
+
+                    cashierId:
+                      id,
+
+                    soldCartelas:
+                      soldCartelas,
+                  }),
+
+                signal:
+                  controller.signal,
+              }
+            );
+        } catch (fetchError) {
+          console.error(
+            "❌ GAME FETCH ERROR:",
+            fetchError
+          );
+
+          throw fetchError;
+        }
+
+        console.log(
+          "☁️ SERVER RESPONSE:",
+          response.status,
+          response.statusText
+        );
+
+        if (!response.ok) {
+          const errorText =
+            await response.text();
+
+          throw new Error(
+            `Backend error ${response.status}: ${errorText}`
+          );
+        }
+
+        const result =
+          await response.json();
+
+        if (
+          !result ||
+          !result.game
+        ) {
+          throw new Error(
+            "Server did not return a game"
+          );
+        }
+
+        // =================================================
+        // SERVER GAME
+        // =================================================
+        const savedGame = {
+          ...result.game,
+
+          id:
+            String(
+              result.game.game_id ||
+              gameId
+            ),
+
+          game_id:
+            String(
+              result.game.game_id ||
+              gameId
+            ),
+
+          house_id:
+            String(
+              result.game.house_id ||
+              actualHouseId
+            ),
+
+          cashier_id:
+            String(
+              result.game.cashier_id ||
+              id
+            ),
+
+          soldCartelas:
+            soldCartelas,
+
+          cards_sold:
+            Number(
+              result.game.cards_sold ??
+              result.game.cardsSold ??
+              soldCartelas.length
+            ),
+
+          cardsSold:
+            Number(
+              result.game.cards_sold ??
+              result.game.cardsSold ??
+              soldCartelas.length
+            ),
+
+          bet:
+            Number(
+              result.game.bet ??
+              bet ??
+              0
+            ),
+
+          grossIncome:
+            Number(
+              result.game.grossIncome ??
+              result.game.gross_income ??
+              gross
+            ),
+
+          // COMMISSION PERCENTAGE
+          commission:
+            Number(
+              result.game.commission ??
+              result.game.commission_percent ??
+              commissionPercent
+            ),
+
+          // ACTUAL COMMISSION EARNED
+          commissionDeducted:
+            Number(
+              result.game.commissionDeducted ??
+              result.game.house_commission ??
+              commissionAmount
+            ),
+
+          // ACTUAL COMMISSION EARNED
+          house_commission:
+            Number(
+              result.game.house_commission ??
+              result.game.commissionDeducted ??
+              commissionAmount
+            ),
+
+          prize:
+            Number(
+              result.game.prize ??
+              gameNetIncome ??
+              0
+            ),
+
+          netIncome:
+            Number(
+              result.game.netIncome ??
+              result.game.prize ??
+              gameNetIncome ??
+              0
+            ),
+
+          selectedPatterns,
+
+          winningPatternCount,
+
+          voiceMode,
+
+          status:
+            result.game.status ||
+            "Active",
+
+          created_at:
+            result.game.created_at ||
+            result.game.date ||
+            createdAt,
+
+          game_date:
+            result.game.game_date ||
+            result.game.created_at ||
+            createdAt,
+
+          synced:
+            true,
+
+          offline_created:
+            false,
+
+          updated_at:
+            new Date().toISOString(),
+        };
+
+        console.log(
+          "✅ SERVER GAME CREATED:",
+          savedGame
+        );
+
+        // =================================================
+        // SAVE ONLINE GAME LOCALLY
+        //
+        // THIS MAKES ONLINE GAME AVAILABLE OFFLINE
+        // =================================================
+        await saveGameOffline(
+          savedGame
+        );
+
+        console.log(
+          "💾 ONLINE GAME SAVED LOCALLY:",
+          savedGame.game_id
+        );
+
+        // =================================================
+        // SAVE SOLD CARTELAS LOCALLY
+        // =================================================
+        for (
+          const cartelaId
+          of soldCartelas
+        ) {
+          await saveSoldCartelaOffline({
+            game_id:
+              String(
+                savedGame.game_id
+              ),
+
+            cartela_id:
+              String(cartelaId),
+
+            house_id:
+              String(actualHouseId),
+
+            sold_at:
+              savedGame.created_at ||
+              createdAt,
+
+            synced:
+              true,
+
+            offline_created:
+              false,
+
+            updated_at:
+              new Date().toISOString(),
+          });
+        }
+
+        console.log(
+          "💾 ONLINE SOLD CARTELAS SAVED LOCALLY"
+        );
+
+        // =================================================
+        // IMPORTANT
+        //
+        // DO NOT DO THIS:
+        //
+        // currentPackage - commissionAmount
+        //
+        // The SERVER has already processed the online game.
+        //
+        // Instead, download the CURRENT server package
+        // and save that exact balance locally.
+        // =================================================
+
+        try {
+          console.log(
+            "☁️ REFRESHING HOUSE PACKAGE FROM SERVER:",
+            actualHouseId
+          );
+
+          const packageResponse =
+            await fetch(
+              `${API_URL}/houses/${actualHouseId}/package`,
+              {
+                method:
+                  "GET",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+              }
+            );
+
+          if (
+            packageResponse.ok
+          ) {
+            const serverPackage =
+              await packageResponse.json();
+
+            console.log(
+              "☁️ SERVER PACKAGE:",
+              serverPackage
+            );
+
+            // -------------------------------------------------
+            // SAVE SERVER PACKAGE LOCALLY
+            // -------------------------------------------------
+
+            const serverPackageData =
+              serverPackage?.package ||
+              serverPackage;
+
+            if (
+              serverPackageData
+            ) {
+              const normalizedPackage = {
+                ...serverPackageData,
+
+                house_id:
+                  String(actualHouseId),
+
+                synced:
+                  true,
+
+                offline_created:
+                  false,
+
+                updated_at:
+                  new Date().toISOString(),
+              };
+
+              await saveLocalPackage(
+                String(actualHouseId),
+                normalizedPackage
+              );
+
+              setRawPackageInfo(
+                normalizedPackage
+              );
+
+              console.log(
+                "💾 SERVER PACKAGE SAVED LOCALLY:",
+                normalizedPackage
+              );
+            }
+
+          } else {
+            console.warn(
+              "⚠️ COULD NOT REFRESH SERVER PACKAGE:",
+              packageResponse.status
+            );
+          }
+
+        } catch (
+          packageError
+        ) {
+          console.warn(
+            "⚠️ SERVER PACKAGE REFRESH FAILED:",
+            packageError
+          );
+        }
+
+        // =================================================
+        // START ONLINE GAME UI
+        // =================================================
+        setGameStarted(
+          true
+        );
+
+        setStartClicked(
+          true
+        );
+
+        setSoldCartelas(
+          []
+        );
+
+        localStorage.setItem(
+          "logged_in_cashier",
+          String(id)
+        );
+
+        console.log(
+          "🚀 ONLINE GAME STARTED:",
+          savedGame.game_id
+        );
+
+        navigate(
+          `/bingo-game/${savedGame.game_id}`,
+          {
+            state: {
+              game:
+                savedGame,
+
+              saving:
+                false,
+
+              winningPatternCount:
+                winningPatternCount,
+
+              offline:
+                false,
+            },
+          }
+        );
+
+        return;
+
+      } catch (
+        onlineError
+      ) {
+
+        console.warn(
+          "⚠️ ONLINE GAME CREATION FAILED:",
+          onlineError
+        );
+
+        console.warn(
+          "📴 USING OFFLINE GAME:",
+          gameId
+        );
+
+        // Continue into OFFLINE creation.
+      }
+    }
+
+
+    // =====================================================
+    // OFFLINE GAME CREATION
+    // =====================================================
+
+    console.log(
+      "📴 CREATING GAME LOCALLY:",
+      gameId
+    );
+
+    // =====================================================
+    // SAVE OFFLINE GAME
+    // =====================================================
+    await saveGameOffline({
+      ...localGame,
+
+      id:
+        String(gameId),
+
+      game_id:
+        String(gameId),
+
+      house_id:
+        String(actualHouseId),
+
+      cashier_id:
+        String(id),
+
+      bet:
+        Number(bet) || 0,
+
+      grossIncome:
+        gross,
+
+      netIncome:
+        gameNetIncome,
+
+      prize:
+        gameNetIncome,
+
+      // COMMISSION PERCENTAGE
+      commission:
+        commissionPercent,
+
+      // ACTUAL HOUSE COMMISSION EARNED
+      commissionDeducted:
+        commissionAmount,
+
+      // ACTUAL HOUSE COMMISSION EARNED
+      house_commission:
+        commissionAmount,
+
+      soldCartelas:
+        structuralSoldCartelas,
+
+      cardsSold:
+        structuralSoldCartelas.length,
+
+      cards_sold:
+        structuralSoldCartelas.length,
+
+      selectedPatterns,
+
+      winningPatternCount,
+
+      voiceMode,
+
+      date:
+        createdAt,
+
+      created_at:
+        createdAt,
+
+      game_date:
+        createdAt,
+
+      status:
+        "Active",
+
+      synced:
+        false,
+
+      offline_created:
+        true,
+
+      updated_at:
+        new Date().toISOString(),
+    });
+
+    console.log(
+      "💾 OFFLINE GAME SAVED:",
+      gameId,
+      {
+        gross:
+          gross,
+
+        commissionPercent:
+          commissionPercent,
+
+        commissionEarned:
+          commissionAmount,
+
+        cardsSold:
+          structuralSoldCartelas.length,
+      }
+    );
+
+
+    // =====================================================
+    // SAVE OFFLINE SOLD CARTELAS
+    // =====================================================
+    for (
+      const cartela
+      of structuralSoldCartelas
+    ) {
+
+      await saveSoldCartelaOffline({
+        game_id:
+          String(gameId),
+
+        cartela_id:
+          String(cartela.id),
+
+        house_id:
+          String(actualHouseId),
+
+        sold_at:
+          createdAt,
+
+        synced:
+          false,
+
+        offline_created:
+          true,
+
+        updated_at:
+          new Date().toISOString(),
+      });
+
+      console.log(
+        "💾 OFFLINE CARTELA SAVED:",
+        cartela.id
+      );
+    }
+
+
+    // =====================================================
+    // UPDATE OFFLINE PACKAGE
+    //
+    // OFFLINE GAME HAS NOT BEEN PROCESSED BY SERVER.
+    // THEREFORE DEDUCT COMMISSION LOCALLY ONCE.
+    // =====================================================
+
+    const packageBeforeGame =
+      Number(
+        rawPackageInfo?.remaining_package ??
+        rawPackageInfo?.remainingAmount ??
+        rawPackageInfo?.remainingBalance ??
+        rawPackageInfo?.remaining ??
+        0
+      );
+
+    const packageAfterGame =
+      Math.max(
+        0,
+        packageBeforeGame -
+          commissionAmount
+      );
+
+    const originalTotalPackage =
+      Number(
+        rawPackageInfo?.total_package ??
+        rawPackageInfo?.totalAmount ??
+        rawPackageInfo?.total ??
+        0
+      );
+
+    const updatedOfflinePackage = {
+      ...(rawPackageInfo || {}),
+
+      house_id:
+        String(actualHouseId),
+
+      total_package:
+        originalTotalPackage,
+
+      totalAmount:
+        originalTotalPackage,
+
+      remaining_package:
+        packageAfterGame,
+
+      remainingAmount:
+        packageAfterGame,
+
+      remainingBalance:
+        packageAfterGame,
+
+      remaining:
+        packageAfterGame,
+
+      synced:
+        false,
+
+      offline_created:
+        true,
+
+      updated_at:
+        new Date().toISOString(),
+    };
+
+    await saveLocalPackage(
+      String(actualHouseId),
+      updatedOfflinePackage
+    );
+
+    setRawPackageInfo(
+      updatedOfflinePackage
+    );
+
+    console.log(
+      "📴 OFFLINE PACKAGE UPDATED:",
+      {
+        houseId:
+          String(actualHouseId),
+
+        totalPackage:
+          originalTotalPackage,
+
+        previous:
+          packageBeforeGame,
+
+        commissionEarned:
+          commissionAmount,
+
+        remaining:
+          packageAfterGame,
+      }
+    );
+
+
+    // =====================================================
+    // START OFFLINE GAME
+    // =====================================================
+    setGameStarted(
+      true
+    );
+
+    setStartClicked(
+      true
+    );
+
+    setSoldCartelas(
+      []
+    );
+
+    localStorage.setItem(
+      "logged_in_cashier",
+      String(id)
+    );
+
+    console.log(
+      "🚀 OFFLINE GAME STARTED:",
+      gameId
+    );
+
+
+    // =====================================================
+    // GO TO BINGO GAME
+    // =====================================================
+    navigate(
+      `/bingo-game/${gameId}`,
+      {
+        state: {
+          game: {
+            ...localGame,
+
+            id:
+              String(gameId),
+
+            game_id:
+              String(gameId),
+
+            house_id:
+              String(actualHouseId),
+
+            cashier_id:
+              String(id),
+
+            soldCartelas:
+              structuralSoldCartelas,
+
+            cardsSold:
+              structuralSoldCartelas.length,
+
+            cards_sold:
+              structuralSoldCartelas.length,
+
+            netIncome:
+              gameNetIncome,
+
+            prize:
+              gameNetIncome,
+
+            commission:
+              commissionPercent,
+
+            commissionDeducted:
+              commissionAmount,
+
+            house_commission:
+              commissionAmount,
+
+            selectedPatterns,
+
+            winningPatternCount,
+
+            voiceMode,
+
+            status:
+              "Active",
+
+            date:
+              createdAt,
+
+            created_at:
+              createdAt,
+
+            game_date:
+              createdAt,
+          },
+
+          saving:
+            false,
+
+          winningPatternCount:
+            winningPatternCount,
+
+          offline:
+            true,
+        },
+      }
+    );
 
   } catch (err) {
+
     console.error(
-      "❌ ERROR STARTING GAME:",
+      "❌ START GAME FAILED:",
       err
     );
 
-    // Only unlock if game creation failed
-    startingGameRef.current = false;
-    setStartClicked(false);
+    setStartClicked(
+      false
+    );
 
     alert(
       `Could not start game:\n${err.message}`
     );
+
+  } finally {
+
+    startingGameRef.current =
+      false;
+
+    console.log(
+      "🔓 START GAME UNLOCKED"
+    );
+
+    console.log(
+      "⏱️ START GAME TOTAL:",
+      (
+        performance.now() -
+        startGameStart
+      ).toFixed(0),
+      "ms"
+    );
   }
 }
 
+useEffect(() => {
+  const syncWhenOnline = async () => {
+    // Prevent duplicate syncs
+    if (offlineSyncRunningRef.current) {
+      console.log(
+        "⏳ OFFLINE SYNC ALREADY RUNNING - SKIPPING DUPLICATE"
+      );
+      return;
+    }
+
+    // Must be online before syncing
+    if (!navigator.onLine) {
+      console.log("📴 OFFLINE - WAITING FOR CONNECTION");
+      return;
+    }
+
+    offlineSyncRunningRef.current = true;
+
+    console.log("🌐 INTERNET CONNECTION RESTORED");
+    console.log("🔄 STARTING OFFLINE SYNC:", {
+      cashierId: id,
+      houseId: currentCashier?.house_id,
+    });
+
+    try {
+      const SYNC_API_URL =
+        "https://bingo-backend-ccn6.onrender.com/api";
+
+      // ==============================
+      // 1. SYNC OFFLINE GAMES
+      // ==============================
+      const result = await syncOfflineGames({
+  apiUrl: SYNC_API_URL,
+  cashierId: id,
+});
+
+      console.log(
+        "✅ OFFLINE SYNC RESULT:",
+        result
+      );
+
+      // ==============================
+      // 2. REFRESH PACKAGE AFTER SYNC
+      // ==============================
+      if (
+        result?.success &&
+        currentHouseId
+      ) {
+        try {
+          const packageResponse = await fetch(
+            `${SYNC_API_URL}/houses/${currentHouseId}/package`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (packageResponse.ok) {
+            const packageResult =
+              await packageResponse.json();
+
+            const serverPackage =
+              packageResult?.package ||
+              packageResult;
+
+            if (serverPackage) {
+              const normalizedPackage = {
+                ...serverPackage,
+                house_id: String(currentHouseId),
+                synced: true,
+                offline_created: false,
+                updated_at:
+                  new Date().toISOString(),
+              };
+
+              // Save fresh server package locally
+              await saveLocalPackage(
+                String(currentHouseId),
+                normalizedPackage
+              );
+
+              // Update React state
+              setRawPackageInfo(
+                normalizedPackage
+              );
+
+              console.log(
+                "💰 PACKAGE REFRESHED AFTER SYNC:",
+                normalizedPackage
+              );
+            } else {
+              console.warn(
+                "⚠️ PACKAGE RESPONSE DID NOT CONTAIN PACKAGE"
+              );
+            }
+          } else {
+            console.warn(
+              "⚠️ PACKAGE FETCH FAILED:",
+              packageResponse.status,
+              packageResponse.statusText
+            );
+          }
+        } catch (packageError) {
+          console.warn(
+            "⚠️ PACKAGE REFRESH AFTER SYNC FAILED:",
+            packageError
+          );
+        }
+      }
+
+      console.log(
+        "🏁 OFFLINE SYNC PROCESS COMPLETED"
+      );
+    } catch (syncError) {
+      console.error(
+        "❌ OFFLINE SYNC ERROR:",
+        syncError
+      );
+    } finally {
+      // IMPORTANT:
+      // Always release the lock so future
+      // online events can trigger another sync.
+      offlineSyncRunningRef.current = false;
+
+      console.log(
+        "🔓 OFFLINE SYNC LOCK RELEASED"
+      );
+    }
+  };
+
+  // ==========================================
+  // SYNC IMMEDIATELY IF ALREADY ONLINE
+  // ==========================================
+  if (navigator.onLine) {
+    syncWhenOnline();
+  }
+
+  // ==========================================
+  // SYNC WHEN INTERNET COMES BACK
+  // ==========================================
+  window.addEventListener(
+    "online",
+    syncWhenOnline
+  );
+
+  // ==========================================
+  // CLEANUP
+  // ==========================================
+  return () => {
+    window.removeEventListener(
+      "online",
+      syncWhenOnline
+    );
+  };
+}, [id, currentCashier?.house_id]);
   const playerQrUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/select-cartela`

@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
 import { useLanguage } from "../context/LanguageContext";
-
+import {
+  saveOfflineLogin,
+  verifyOfflineLogin,
+} from "../offline/offlineService";
 export default function Login() {
   const navigate = useNavigate();
 
@@ -42,10 +45,11 @@ const API_URL = "https://bingo-backend-ccn6.onrender.com/api";
  
    
 async function login() {
-console.log("🖱️ LOGIN FUNCTION CALLED", {
-  time: Date.now(),
-  lock: loginLockRef.current,
-});
+  console.log("🖱️ LOGIN FUNCTION CALLED", {
+    time: Date.now(),
+    lock: loginLockRef.current,
+  });
+
   // 🔒 HARD LOGIN LOCK
   if (loginLockRef.current) {
     console.log("⛔ LOGIN ALREADY IN PROGRESS");
@@ -62,7 +66,6 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
   setLoggingIn(true);
 
   try {
-
     console.log("⚡ LOGIN START");
 
     const startTime = performance.now();
@@ -87,8 +90,10 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
     );
 
     if (!response.ok || !data.success) {
-
-      alert(data.message || "Wrong username or password.");
+      alert(
+        data.message ||
+          "Wrong username or password."
+      );
 
       return;
     }
@@ -98,21 +103,46 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
     console.log("✅ LOGIN SUCCESS:", user);
     console.log("👤 ROLE:", user.role);
 
-    // 💾 SAVE LOGIN
+    // ========================================================
+    // 💾 SAVE ONLINE LOGIN FOR FUTURE OFFLINE LOGIN
+    // ========================================================
+
+    try {
+      await saveOfflineLogin(
+        username.trim(),
+        password,
+        user
+      );
+
+      console.log(
+        "💾 LOGIN CREDENTIALS SAVED FOR OFFLINE USE"
+      );
+    } catch (offlineLoginSaveError) {
+      console.error(
+        "⚠️ FAILED TO SAVE OFFLINE LOGIN:",
+        offlineLoginSaveError
+      );
+
+      // IMPORTANT:
+      // Online login still continues normally.
+    }
+
+    // 💾 SAVE CURRENT USER
     localStorage.setItem(
       "currentUser",
       JSON.stringify(user)
     );
 
-    // 🚀 NAVIGATE
-    if (user.role === "Super Admin") {
+    // ========================================================
+    // 🚀 NAVIGATION
+    // ========================================================
 
+    if (user.role === "Super Admin") {
       navigate("/super-admin", {
         replace: true,
       });
 
     } else if (user.role === "House Admin") {
-
       navigate(
         `/house-dashboard/${user.house_id}`,
         {
@@ -121,7 +151,6 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
       );
 
     } else if (user.role === "Agent") {
-
       navigate(
         `/agent-dashboard/${user.username}`,
         {
@@ -130,7 +159,6 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
       );
 
     } else if (user.role === "Cashier") {
-
       navigate(
         `/cashier-dashboard/${user.username}`,
         {
@@ -139,20 +167,128 @@ console.log("🖱️ LOGIN FUNCTION CALLED", {
       );
 
     } else {
-
-      alert("Unknown role: " + user.role);
-
+      alert(
+        "Unknown role: " + user.role
+      );
     }
 
   } catch (err) {
 
-    console.error("❌ LOGIN ERROR:", err);
+    // ========================================================
+    // 📴 SERVER UNAVAILABLE
+    // ========================================================
 
-    alert("Cannot connect to server.");
+    console.warn(
+      "📴 SERVER LOGIN FAILED - TRYING OFFLINE LOGIN:",
+      err
+    );
+
+    try {
+      const offlineUser =
+        await verifyOfflineLogin(
+          username.trim(),
+          password
+        );
+
+      if (!offlineUser) {
+        alert(
+          "Cannot connect to server and no valid offline login was found."
+        );
+
+        return;
+      }
+
+      console.log(
+        "✅ OFFLINE LOGIN SUCCESS:",
+        offlineUser
+      );
+
+      // 💾 Restore current user
+      localStorage.setItem(
+        "currentUser",
+        JSON.stringify(offlineUser)
+      );
+
+      console.log(
+        "📴 USING SAVED OFFLINE USER:",
+        offlineUser.username
+      );
+
+      // ======================================================
+      // 🚀 SAME ROLE NAVIGATION AS ONLINE LOGIN
+      // ======================================================
+
+      if (
+        offlineUser.role ===
+        "Super Admin"
+      ) {
+
+        navigate("/super-admin", {
+          replace: true,
+        });
+
+      } else if (
+        offlineUser.role ===
+        "House Admin"
+      ) {
+
+        navigate(
+          `/house-dashboard/${offlineUser.house_id}`,
+          {
+            replace: true,
+          }
+        );
+
+      } else if (
+        offlineUser.role ===
+        "Agent"
+      ) {
+
+        navigate(
+          `/agent-dashboard/${offlineUser.username}`,
+          {
+            replace: true,
+          }
+        );
+
+      } else if (
+        offlineUser.role ===
+        "Cashier"
+      ) {
+
+        navigate(
+          `/cashier-dashboard/${offlineUser.username}`,
+          {
+            replace: true,
+          }
+        );
+
+      } else {
+
+        alert(
+          "Unknown role: " +
+          offlineUser.role
+        );
+      }
+
+    } catch (offlineLoginError) {
+
+      console.error(
+        "❌ OFFLINE LOGIN FAILED:",
+        offlineLoginError
+      );
+
+      alert(
+        "Offline login failed."
+      );
+    }
 
   } finally {
-  loginLockRef.current = false;
-}
+
+    loginLockRef.current = false;
+
+    setLoggingIn(false);
+  }
 }
 
   async function handlePasswordChange() {
