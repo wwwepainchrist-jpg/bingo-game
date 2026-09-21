@@ -1758,7 +1758,7 @@ function resetNextBingoPreload() {
 function preloadNextBingoVoice(letter, number) {
   const letterName = String(letter).trim().toLowerCase();
   const numberName = String(number).trim();
-  const path = `/oromo/${letterName}${numberName}.mp3`;
+  const path = `/oromo/${letterName}${numberName}.wav`;
 
   // Already loading/loaded this exact voice path in our cache map
   if (preloadedVoicesCacheRef.current[path]) {
@@ -1898,7 +1898,7 @@ async function playRecordedBingoCall(
   const folder = "oromo";
   const letterName = String(letter).trim().toLowerCase();
   const numberName = String(number).trim().toLowerCase();
-  const finalPath = `/${folder}/${letterName}${numberName}.mp3`;
+  const finalPath = `/${folder}/${letterName}${numberName}.wav`;
 
   try {
 
@@ -2419,7 +2419,7 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
       ? "oromo"
       : "amharic";
 
-  const audioPath = `/${folder}/${fileName}.mp3`;
+  const audioPath = `/${folder}/${fileName}.wav`;
 
   console.log(
     "🎵 VERIFICATION AUDIO SYSTEM TRIGGERED:",
@@ -2507,7 +2507,7 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
 function playShuffleSound(onFinished = () => {}) {
   console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO CHANNEL RESOURCE");
   
-  const audio = new Audio("/oromo/shuffle.mp3");
+  const audio = new Audio("/oromo/shuffle.wav");
   audio.preload = "auto";
   
   // Bind the channel to our global component reference so togglePlayPause can control it
@@ -3084,7 +3084,7 @@ if (
       .trim()
       .toLowerCase()}${String(nextBingoBallRef.current.number)
       .trim()
-      .toLowerCase()}.mp3`;
+      .toLowerCase()}.wav`;
 
   if (
     nextBingoAudioPathRef.current === expectedPath
@@ -3317,7 +3317,7 @@ function executeBingoVoicePlayback(letter, number, result, myGenerationId, gener
   console.log("🎤 STARTING BINGO VOICE:", result, Date.now());
 
   // 🚀 HOOK INTO THE TIMELINE EVENT TRCKERS BEFORE PLAYBACK BEGINS
-  const targetPath = `/oromo/${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}.mp3`;
+  const targetPath = `/oromo/${String(letter).trim().toLowerCase()}${String(number).trim().toLowerCase()}.wav`;
   const cachedInstance = preloadedVoicesCacheRef.current[targetPath] || activeAudioRef.current;
 
   if (cachedInstance) {
@@ -3594,7 +3594,7 @@ if (!navigator.onLine) {
           : "amharic";
 
       playRecordedBingoCall(
-        `/${folder}/notsold.mp3`
+        `/${folder}/notsold.wav`
       );
 
     } else {
@@ -4394,7 +4394,7 @@ if (!navigator.onLine) {
           : "amharic";
 
       playRecordedBingoCall(
-        `/${folder}/winner.mp3`
+        `/${folder}/winner.wav`
       );
 
     } else {
@@ -4441,7 +4441,7 @@ if (!navigator.onLine) {
         : "amharic";
 
     playRecordedBingoCall(
-      `/${folder}/notwinner.mp3`
+      `/${folder}/notwinner.wav`
     );
 
   } else {

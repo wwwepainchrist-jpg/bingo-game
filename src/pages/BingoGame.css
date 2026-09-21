@@ -483,8 +483,8 @@ input {
     flex-shrink: 0 !important;
     background: radial-gradient(
         circle at 35% 35%,
-        #2D3A4F 0%,
-        #151E2E 55%,
+        #070B14 0%,
+        #070B14 55%,
         #070B14 100%
     ) !important;
     border: 6px solid #1E82D4 !important;
