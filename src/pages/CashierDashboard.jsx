@@ -2224,19 +2224,7 @@ useEffect(() => {
           {/* STATS */}
           <div className="header-stats" style={{ margin: "3px 0", fontSize: "40px", display: "flex", gap: "10px", alignItems: "center" }}>
             <div>{t?.cashier || "Cashier"}: <b className="stat-cashier">{id}</b></div>
-            <div>{t?.sold || "Sold Cartelas"}: <b className="stat-sold">{soldCartelas.length}</b></div>
-            
-            <div style={{ 
-              background: "rgba(15, 23, 42, 0.8)", 
-              padding: "6px 14px", 
-              borderRadius: "8px", 
-              border: "2px solid #2954d6",
-              fontSize: "70px",
-              fontWeight: "800",
-              boxShadow: "0 0 10px rgba(56, 189, 248, 0.25)"
-            }}>
-             {<span style={{ fontSize: "70px", fontWeight: "900" }}>{"Gahataa : ደራሽ "}</span>}: <b className="stat-income" style={{ fontSize: "80px", fontWeight: "900", color: "#ffffff", marginLeft: "10px" }}>{netIncome.toFixed(2)} ETB </b>
-            </div>     
+           
           </div>
 
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
