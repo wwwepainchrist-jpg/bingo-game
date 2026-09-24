@@ -5658,7 +5658,7 @@ const closeVerificationBoard = () => {
         flexDirection: "column",
         gap: "6px",
         borderTop: "1px solid rgba(255,255,255,0.05)", /* Subtle top line separating from Item 1 */
-        width: "70%",
+        width: "95%",
         justifyContent: "center",
         position: "relative",
         zIndex: 1,
@@ -5816,39 +5816,40 @@ const closeVerificationBoard = () => {
     🎙️ ITEM 4: RECTANGULAR EDITABLE COUNTDOWN DISPLAY
     ======================================================= */}
 {(() => {
-  // 🎨 EDITABLE STYLE CONFIGURATION VARIABLES (Change these values to adjust size/fonts)
-  const BOX_WIDTH = "50%";       // Width of the rectangle box container
-  const BOX_HEIGHT = "100px";      // Height of the rectangle box container
-  const BOX_BG = "#09090a";       // Background color of the rectangle box
- const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)"; // Border color and style
-const BOX_RADIUS = "8px"; // Box corner roundness
-  
-  const FONT_SIZE = "90px";       // General editable font size for the countdown texts
-  const FONT_WEIGHT = "3000";      // Editable font weight boldness
-  
+  // 🎨 EDITABLE STYLE CONFIGURATION VARIABLES
+  const BOX_WIDTH = "50%";        // Width of the rectangle box container
+  const BOX_HEIGHT = "100px";     // Height of the rectangle box container
+  const BOX_BG = "#09090a";       // Background color
+  const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)";
+  const BOX_RADIUS = "8px";       // Box corner roundness
+
+  const FONT_SIZE = "90px";       // Countdown font size
+  const FONT_WEIGHT = "3000";     // Countdown font weight
+
   // Editable individual state text colors
-  const COLOR_PAUSED = "#ffffffff"; 
-  const COLOR_VOICE = "#ffffffff";  
-  const COLOR_DELAY = "#fffffffffff";  
-  const COLOR_DEFAULT = "#ffffffff"; 
+  const COLOR_PAUSED = "#ffffffff";
+  const COLOR_VOICE = "#ffffffff";
+  const COLOR_DELAY = "#fffffffffff";
+  const COLOR_DEFAULT = "#ffffffff";
 
   return (
-    <div 
-      style={{ 
+    <div
+      style={{
         width: "100%",
-        borderTop: "1px solid rgba(255,255,255,0.05)", /* Divider separating from Item 3 */
+        borderTop: "1px solid rgba(255,255,255,0.05)",
         paddingTop: "12px",
         marginTop: "4px",
         display: "flex",
-        justifyContent: "center"
+        justifyContent: "center",
       }}
     >
-      <div 
+      <div
         className="countdown-rectangular-box"
-        style={{ 
-          fontStyle: "normal", 
-          display: "flex", 
-          alignItems: "center", 
+        style={{
+          fontStyle: "normal",
+          display: "flex",
+          alignItems: "center",
+          flexDirection: "column",
           justifyContent: "center",
           flexShrink: 0,
           width: BOX_WIDTH,
@@ -5857,34 +5858,124 @@ const BOX_RADIUS = "8px"; // Box corner roundness
           border: BOX_BORDER,
           borderRadius: BOX_RADIUS,
           boxSizing: "border-box",
-          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.9)"
+          boxShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
         }}
       >
+
+        {/* NEXT CALL */}
+        <div
+          style={{
+            color: "#ffffff",
+            fontSize: "24px",
+            fontWeight: "900",
+            lineHeight: "1",
+            marginBottom: "6px",
+          }}
+        >
+          NEXT CALL
+        </div>
+
+        {/* COUNTDOWN */}
         {paused ? (
-          <span style={{ color: COLOR_PAUSED, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
-           
-          </span>
+
+          /* Paused - show nothing */
+          null
+
         ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? (
-          /* Voice playback countdown - strictly whole seconds */
-           <span style={{ color: COLOR_VOICE, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
-             {Math.ceil(Math.max(0, audioDuration - audioCurrentTime))}s
+
+          /* Voice playback countdown */
+          <span
+            style={{
+              color: COLOR_VOICE,
+              fontSize: FONT_SIZE,
+              fontWeight: FONT_WEIGHT,
+              display: "inline-flex",
+              alignItems: "baseline",
+              lineHeight: "1",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {/* Seconds number */}
+            <span
+              style={{
+                display: "inline-block",
+                minWidth: "1.2ch",
+                textAlign: "right",
+              }}
+            >
+              {Math.ceil(
+                Math.max(0, audioDuration - audioCurrentTime)
+              )}
+            </span>
+
+            {/* s stays beside the number */}
+            <span
+              style={{
+                display: "inline-block",
+                marginLeft: "4px",
+              }}
+            >
+              s
+            </span>
           </span>
+
         ) : current && callIntervalTimeLeft > 0 ? (
-          /* Delay pacing interval countdown - strictly whole seconds */
-          <span style={{ color: COLOR_DELAY, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
-            ⏳ {Math.ceil(callIntervalTimeLeft)}s
+
+          /* Delay pacing interval countdown */
+          <span
+            style={{
+              color: COLOR_DELAY,
+              fontSize: FONT_SIZE,
+              fontWeight: FONT_WEIGHT,
+              display: "inline-flex",
+              alignItems: "baseline",
+              lineHeight: "1",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {/* Hourglass */}
+            <span
+              style={{
+                display: "inline-block",
+                marginRight: "8px",
+              }}
+            >
+              ⏳
+            </span>
+
+            {/* Seconds number */}
+            <span
+              style={{
+                display: "inline-block",
+                minWidth: "1.2ch",
+                textAlign: "right",
+              }}
+            >
+              {Math.ceil(callIntervalTimeLeft)}
+            </span>
+
+            {/* s */}
+            <span
+              style={{
+                display: "inline-block",
+                marginLeft: "4px",
+              }}
+            >
+              s
+            </span>
           </span>
+
         ) : (
-          /* Default state (Also handles drawing fallback automatically) */
-          <span style={{ color: COLOR_DEFAULT, fontSize: FONT_SIZE, fontWeight: FONT_WEIGHT }}>
-           
-          </span>
+
+          /* Call finished - hide countdown completely */
+          null
+
         )}
+
       </div>
     </div>
   );
 })()}
-
   </div> {/* Closes vertical column wrapper */}
 </div> {/* Closes horizontal side-by-side board wrapper */}
   
