@@ -60,15 +60,91 @@ export default function BingoGame() {
 
   const passedGame = location.state?.game;
 
-  const [game, setGame] = useState({
+  // ============================================================
+// 🎙️ GET PERMANENT CASHIER VOICE
+// ============================================================
+
+function getSavedCashierVoice() {
+  try {
+    const currentUserRaw =
+      localStorage.getItem("currentUser");
+
+    if (!currentUserRaw) {
+      return "recorded-oromo";
+    }
+
+    const currentUser =
+      JSON.parse(currentUserRaw);
+
+    const cashierId = currentUser?.username;
+
+    if (!cashierId) {
+      return "recorded-oromo";
+    }
+
+    const voiceKey =
+      `cashier_voice_selection_${cashierId}`;
+
+    const savedVoice =
+      localStorage.getItem(voiceKey);
+
+    const validVoices = [
+      "recorded-oromo",
+      "voice2",
+      "voice3",
+      "voice4",
+      "voice5",
+      "voice6",
+    ];
+
+    if (validVoices.includes(savedVoice)) {
+      console.log(
+        "🎙️ INITIAL CASHIER VOICE:",
+        savedVoice
+      );
+
+      return savedVoice;
+    }
+
+    return "recorded-oromo";
+
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD CASHIER VOICE:",
+      error
+    );
+
+    return "recorded-oromo";
+  }
+}
+
+  const [game, setGame] = useState(() => {
+  const initialVoice = getSavedCashierVoice();
+
+  return {
     prize: "00 Birr",
     id: id || "101",
     soldCartelas: passedGame?.soldCartelas || [],
-   voiceMode: "recorded-oromo",
-speechLang: "om-ET",
-    language: "en"
-  });
-  
+    voiceMode: initialVoice,
+    speechLang:
+      initialVoice === "recorded-oromo"
+        ? "om-ET"
+        : "en-US",
+    language: "en",
+  };
+});
+
+  // ============================================================
+// 🎙️ PERMANENT VOICE FOR THIS CASHIER
+// ============================================================
+
+
+
+  // ============================================================
+// 🎙️ LOAD SAVED VOICE FOR THIS CASHIER
+// ============================================================
+
+
   const [loading, setLoading] = useState(true);
 
   const { t } = useLanguage();
@@ -576,7 +652,88 @@ useEffect(() => {
 }, [callInterval, cashierId]);
 
 
+// ============================================================
+// 🎙️ LOAD PERMANENT VOICE FOR THIS CASHIER
+// ============================================================
 
+useEffect(() => {
+  const currentUserRaw =
+    localStorage.getItem("currentUser");
+
+  if (!currentUserRaw) {
+    console.log(
+      "🎙️ NO CURRENT USER — DEFAULTING TO OROMO"
+    );
+    return;
+  }
+
+  let currentUser;
+
+  try {
+    currentUser = JSON.parse(currentUserRaw);
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO READ CURRENT USER:",
+      error
+    );
+    return;
+  }
+
+  // Only use the cashier username
+  const cashierId = currentUser?.username;
+
+  if (!cashierId) {
+    console.log(
+      "🎙️ NO CASHIER USERNAME — DEFAULTING TO OROMO"
+    );
+    return;
+  }
+
+  const voiceKey =
+    `cashier_voice_selection_${cashierId}`;
+
+  const savedVoice =
+    localStorage.getItem(voiceKey);
+
+  console.log(
+    "🎙️ PERMANENT CASHIER VOICE CHECK:",
+    {
+      cashier: cashierId,
+      voiceKey,
+      savedVoice,
+    }
+  );
+
+  if (
+    savedVoice &&
+    [
+      "recorded-oromo",
+      "voice2",
+      "voice3",
+      "voice4",
+      "voice5",
+      "voice6",
+    ].includes(savedVoice)
+  ) {
+    setGame((prev) => ({
+      ...prev,
+      voiceMode: savedVoice,
+      speechLang:
+        savedVoice === "recorded-oromo"
+          ? "om-ET"
+          : "en-US",
+    }));
+
+    console.log(
+      "✅ PERMANENT VOICE RESTORED:",
+      savedVoice
+    );
+  } else {
+    console.log(
+      "🎙️ NO SAVED VOICE — OROMO REMAINS DEFAULT"
+    );
+  }
+}, []);
 
 
 
@@ -947,18 +1104,13 @@ useEffect(() => {
           );
 
           setGame(prev => {
-            const restoredVoiceMode =
-              data.voice_mode ||
-              data.voiceMode ||
-              prev.voiceMode ||
-              "recorded";
+  // 🎙️ CASHIER VOICE IS LOCAL — NEVER TAKE IT FROM GAME/BACKEND
+  const savedVoice = getSavedCashierVoice();
 
-            const restoredSpeechLang =
-              data.speech_lang ||
-              data.speechLang ||
-              prev.speechLang ||
-              "en-US";
-
+  const restoredSpeechLang =
+    savedVoice === "recorded-oromo"
+      ? "om-ET"
+      : "en-US";
             const restoredVoiceSpeed =
               data.voice_speed ||
               data.voiceSpeed ||
@@ -1014,10 +1166,10 @@ useEffect(() => {
                 [],
 
               voiceMode:
-                restoredVoiceMode,
+  savedVoice,
 
-              speechLang:
-                restoredSpeechLang,
+speechLang:
+  restoredSpeechLang,
 
               voiceSpeed:
                 restoredVoiceSpeed,
@@ -1895,10 +2047,37 @@ async function playRecordedBingoCall(
   // BUILD AUDIO PATH
   // ============================================================
 
-  const folder = "oromo";
-  const letterName = String(letter).trim().toLowerCase();
-  const numberName = String(number).trim().toLowerCase();
-  const finalPath = `/${folder}/${letterName}${numberName}.wav`;
+  // ============================================================
+// 🎙️ SELECT VOICE FOLDER
+// ============================================================
+
+const voiceFolderMap = {
+  "recorded-oromo": "oromo",
+  "voice2": "voice2",
+  "voice3": "voice3",
+  "voice4": "voice4",
+  "voice5": "voice5",
+  "voice6": "voice6",
+};
+
+// Get the voice selected for this cashier/game
+const selectedVoice = game?.voiceMode || "recorded-oromo";
+
+const folder =
+  voiceFolderMap[selectedVoice] || "oromo";
+
+const letterName = String(letter).trim().toLowerCase();
+const numberName = String(number).trim().toLowerCase();
+
+const finalPath =
+  `/${folder}/${letterName}${numberName}.wav`;
+
+console.log("🎙️ SELECTED BINGO VOICE:", {
+  selectedVoice,
+  folder,
+  file: `${letterName}${numberName}.wav`,
+  finalPath,
+});
 
   try {
 
@@ -2254,7 +2433,7 @@ function playCompleteRecording(
         return;
       }
 
-      started = true;
+  started = true;
 
       if (resumeTime > 0) {
         try {
@@ -4500,31 +4679,8 @@ if (!navigator.onLine) {
         "NOT_SOLD"
       );
 
-      if (
-        currentGame.voiceMode === "recorded" ||
-        currentGame.voiceMode === "recorded-oromo"
-      ) {
-
-        playRecordedAudio(
-          "notsold"
-        );
-
-      } else {
-
-        stopAllActiveAudio();
-
-        const speech =
-          new SpeechSynthesisUtterance(
-            `Cartela ${cartelaId} not sold.`
-          );
-
-        speech.pitch = 0.65;
-        speech.rate = 1.15;
-
-        window.speechSynthesis.speak(
-          speech
-        );
-      }
+     // 🎙️ PLAY THE CASHIER'S SELECTED VOICE
+playRecordedAudio("notsold");
 
       return;
     }
@@ -4574,31 +4730,8 @@ if (!navigator.onLine) {
         "WINNER"
       );
 
-      if (
-        currentGame.voiceMode === "recorded" ||
-        currentGame.voiceMode === "recorded-oromo"
-      ) {
-
-        playRecordedAudio(
-          "winner"
-        );
-
-      } else {
-
-        stopAllActiveAudio();
-
-        const speech =
-          new SpeechSynthesisUtterance(
-            `Bingo! Cartela ${cartelaId} is a winner!`
-          );
-
-        speech.pitch = 0.6;
-        speech.rate = 1.2;
-
-        window.speechSynthesis.speak(
-          speech
-        );
-      }
+    // 🎙️ PLAY THE CASHIER'S SELECTED VOICE
+playRecordedAudio("winner");
 
     } else {
 
@@ -4614,31 +4747,8 @@ if (!navigator.onLine) {
         "NOT_WINNER"
       );
 
-      if (
-        currentGame.voiceMode === "recorded" ||
-        currentGame.voiceMode === "recorded-oromo"
-      ) {
-
-        playRecordedAudio(
-          "notwinner"
-        );
-
-      } else {
-
-        stopAllActiveAudio();
-
-        const speech =
-          new SpeechSynthesisUtterance(
-            `Cartela ${cartelaId} is not a winner yet.`
-          );
-
-        speech.pitch = 0.65;
-        speech.rate = 1.15;
-
-        window.speechSynthesis.speak(
-          speech
-        );
-      }
+     // 🎙️ PLAY THE CASHIER'S SELECTED VOICE
+playRecordedAudio("notwinner");
     }
 
   } catch (err) {
@@ -6590,31 +6700,94 @@ const BOX_RADIUS = "8px"; // Box corner roundness
           🎙️ VOICE
         </span>
 
-        <select
-          value="recorded-oromo"
-          onChange={() => {
-            setGame((prev) => ({
-              ...prev,
-              voiceMode: "recorded-oromo",
-              speechLang: "oromo",
-            }));
-          }}
-          style={{
-            background: "#0c162d",
-            border: "1px solid #00c8ff",
-            color: "#fff",
-            borderRadius: "6px",
-            padding: "6px 8px",
-            fontSize: "13px",
-            fontWeight: "bold",
-            cursor: "pointer",
-            outline: "none",
-          }}
-        >
-          <option value="recorded-oromo">
-            🟢 Voice
-          </option>
-        </select>
+       <select
+  value={game?.voiceMode || "recorded-oromo"}
+  onChange={(e) => {
+    const selectedVoice = e.target.value;
+
+    setGame((prev) => ({
+      ...prev,
+      voiceMode: selectedVoice,
+      speechLang:
+        selectedVoice === "recorded-oromo"
+          ? "om-ET"
+          : "en-US",
+    }));
+
+    const currentUserRaw =
+      localStorage.getItem("currentUser");
+
+    if (!currentUserRaw) {
+      console.warn(
+        "⚠️ CURRENT USER NOT FOUND — VOICE NOT SAVED"
+      );
+      return;
+    }
+
+    try {
+      const currentUser =
+        JSON.parse(currentUserRaw);
+
+      const cashierId =
+        currentUser?.username;
+
+      if (!cashierId) {
+        console.warn(
+          "⚠️ CASHIER USERNAME NOT FOUND"
+        );
+        return;
+      }
+
+      const voiceKey =
+        `cashier_voice_selection_${cashierId}`;
+
+      // 💾 Permanent until cashier changes it
+      localStorage.setItem(
+        voiceKey,
+        selectedVoice
+      );
+
+      console.log(
+        "💾 PERMANENT VOICE SAVED:",
+        {
+          cashier: cashierId,
+          voice: selectedVoice,
+          key: voiceKey,
+        }
+      );
+
+    } catch (error) {
+      console.error(
+        "❌ FAILED TO SAVE CASHIER VOICE:",
+        error
+      );
+    }
+  }}
+>
+  <option value="recorded-oromo">
+    🟢 arada1
+  </option>
+
+  <option value="voice2">
+    🎙️ arada bass
+  </option>
+
+  <option value="voice3">
+    🎙️ arada bass1
+  </option>
+
+  <option value="voice4">
+    🎙️ Voice 4
+  </option>
+
+  <option value="voice5">
+    🎙️ Voice 5
+  </option>
+
+  <option value="voice6">
+    🎙️ Voice 6
+  </option>
+</select>
 
       </div>
 
