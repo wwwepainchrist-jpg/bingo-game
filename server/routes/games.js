@@ -1162,6 +1162,108 @@ router.post("/:id/reset", async (req, res) => {
   }
 });
 
+// ============================================================
+// GET ALL SOLD CARTELAS + AUTHENTIC DATABASE LAYOUT FOR A GAME
+// ============================================================
+router.get("/:gameId/sold-cartelas", async (req, res) => {
+  try {
+    const { gameId } = req.params;
+
+    console.log("🔍 SOLD CARTELAS REQUEST FOR GAME:", gameId);
+
+    const result = await pool.query(
+      `
+      SELECT
+        c.id,
+        c.serial,
+        c.numbers
+      FROM sold_cartelas sc
+      INNER JOIN cartelas c
+        ON c.id::text = sc.cartela_id::text
+      WHERE sc.game_id::text = $1
+      ORDER BY c.id ASC
+      `,
+      [String(gameId)]
+    );
+
+    const soldCartelas = result.rows.map((cartela) => {
+      const numbers =
+        typeof cartela.numbers === "string"
+          ? JSON.parse(cartela.numbers)
+          : cartela.numbers;
+
+      return {
+        id: String(cartela.id),
+        cartela_id: String(cartela.id),
+        serial: cartela.serial,
+        numbers,
+
+        // Optional: provide the same 5x5 structure
+        // your frontend currently expects.
+        matrix: [
+          [
+            numbers.B?.[0],
+            numbers.I?.[0],
+            numbers.N?.[0],
+            numbers.G?.[0],
+            numbers.O?.[0],
+          ],
+          [
+            numbers.B?.[1],
+            numbers.I?.[1],
+            numbers.N?.[1],
+            numbers.G?.[1],
+            numbers.O?.[1],
+          ],
+          [
+            numbers.B?.[2],
+            numbers.I?.[2],
+            "FREE",
+            numbers.G?.[2],
+            numbers.O?.[2],
+          ],
+          [
+            numbers.B?.[3],
+            numbers.I?.[3],
+            numbers.N?.[3],
+            numbers.G?.[3],
+            numbers.O?.[3],
+          ],
+          [
+            numbers.B?.[4],
+            numbers.I?.[4],
+            numbers.N?.[4],
+            numbers.G?.[4],
+            numbers.O?.[4],
+          ],
+        ],
+      };
+    });
+
+    console.log(
+      `✅ AUTHENTIC SOLD CARTELAS LOADED: ${soldCartelas.length}`
+    );
+
+    res.json({
+      success: true,
+      gameId,
+      count: soldCartelas.length,
+      soldCartelas,
+    });
+
+  } catch (error) {
+    console.error(
+      "❌ ERROR LOADING SOLD CARTELAS:",
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // ==========================================================================
 // MANUAL DELETE ROUTE FOR HOUSE PERIOD RECORDS (Daily, Weekly, Monthly, Yearly)
 // ==========================================================================

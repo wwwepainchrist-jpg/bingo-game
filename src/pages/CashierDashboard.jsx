@@ -1056,7 +1056,31 @@ async function startGame() {
         matrix:
           generateMockMatrixForId(num),
       }));
+// =====================================================
+// 🔍 DEBUG EARLY WINNER CARTELAS
+// =====================================================
+console.log(
+  "🎫 EARLY WINNER CARTELAS SENT TO GAME:",
+  structuralSoldCartelas
+);
 
+console.log(
+  "🎯 CARTELA COUNT:",
+  structuralSoldCartelas.length
+);
+
+console.log(
+  "🎯 CARTELA MATRICES:",
+  structuralSoldCartelas.map(c => ({
+    id: c.id,
+    matrix: c.matrix
+  }))
+);
+
+console.log(
+  "🏆 WINNING PATTERN COUNT:",
+  winningPatternCount
+);
     // =====================================================
     // CREATE COMMON GAME OBJECT
     // ONLINE + OFFLINE
@@ -1260,8 +1284,8 @@ async function startGame() {
               id
             ),
 
-          soldCartelas:
-            soldCartelas,
+soldCartelas:
+  structuralSoldCartelas,
 
           cards_sold:
             Number(
@@ -2166,9 +2190,7 @@ useEffect(() => {
               >
                 ←
               </button>
-              <h1 className="header-title" style={{ fontSize: "13px", margin: 0, whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
-                {t?.dashboard || "CASHIER DASHBOARD"}
-              </h1>
+             
             </div>
 
             {/* CONTROLS */}
@@ -2223,7 +2245,7 @@ useEffect(() => {
           
           {/* STATS */}
           <div className="header-stats" style={{ margin: "3px 0", fontSize: "40px", display: "flex", gap: "10px", alignItems: "center" }}>
-            <div>{t?.cashier || "Cashier"}: <b className="stat-cashier">{id}</b></div>
+            <div></div>
            
           </div>
 
@@ -2260,7 +2282,7 @@ useEffect(() => {
             </button>
             
             <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", background: "#2278e1", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
-              {t?.finance || "FINANCE"}
+              
             </button>
 
             <button 
@@ -2268,7 +2290,7 @@ useEffect(() => {
               className="btn btn-neutral"
               style={{ background: "#2278e1", color: "#ffffff", fontWeight: "bold", padding: "3px 8px", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}
             >
-              📱 {t?.qr || "PLAYER QR CODE"}
+             
             </button>
           </div> 
 
@@ -2294,7 +2316,7 @@ useEffect(() => {
             {/* GRID HEADER WITH INPUT FORM */}
             <div className="grid-header" style={{ marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
               <h2 style={{ margin: 0, fontSize: "45px", whiteSpace: "nowrap", lineHeight: 1.3, textTransform: "none" }}>
-                {"CARTELA (Filadhaa : ይምረጡ)"}
+              
               </h2>
 
               {/* INPUT FORM */}
@@ -2307,13 +2329,14 @@ useEffect(() => {
                   style={{
                     ...localeFontStyle,
                     width: "100%",
+                       height: "60px",
                     padding: "6px 12px",
                     background: "#0f172a",
                     border: "1px solid #38bdf8",
                     borderRadius: "4px",
                     color: "#ffffff",
                     fontWeight: "bold",
-                    fontSize: "20px",
+                    fontSize: "50px",
                     outline: "none"
                   }}
                 />

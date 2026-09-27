@@ -57,7 +57,7 @@ body,
   grid-template-rows: repeat(10, 1fr);
   gap: 8px;
   width: 90%;
-  height: 100%;
+  height: 200%;
   max-height: calc(100vh - 110px);
   box-sizing: border-box;
 }
@@ -67,9 +67,9 @@ body,
    ============================================================ */
 
 button.grid-cell-btn {
-  width: 100% !important;
-  height: 70px !important;
-  font-size: 55px !important;
+  width: 95% !important;
+  height: 100px !important;
+  font-size: 82px !important;
   font-weight: 900 !important;
   line-height: 1 !important;
   text-align: center !important;

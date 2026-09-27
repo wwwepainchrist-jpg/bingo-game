@@ -179,9 +179,9 @@ body {
 
 .bingo-board {
     width: 90%;
-     width: 2100px;    
+     width: 3200px;    
     min-width: 1400px;
-    height: 720px; /* Scaled up height */
+    height: 1000px; /* Scaled up height */
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -259,7 +259,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 72px; /* High-contrast large numbers */
+    font-size: 100px; /* High-contrast large numbers */
     line-height: 1;
     font-weight: 900;
     border-radius: 8px;
@@ -469,8 +469,8 @@ input {
 /* CURRENT BALL — SCALED UP TO 240x240 FOR MAXIMUM VISIBILITY */
 
 .current-ball-display {
-    width: 240px !important;
-    height: 240px !important;
+    width: 500px !important;
+    height: 500px !important;
     min-width: 240px !important;
     min-height: 240px !important;
     max-width: 240px !important;
@@ -675,9 +675,9 @@ input {
   z-index: 20;
 
   color: #FFFFFF !important;
-  font-weight: 900 !important;
+  font-weight: 1200 !important;
 
-  animation: whiteBingoBlink 0.55s ease-in-out;
+  animation: whiteBingoBlink 0.5s ease-in-out;
 
   transform-origin: center;
 

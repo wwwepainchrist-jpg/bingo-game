@@ -9,6 +9,8 @@ import {
   saveGameOffline,
 } from "../offline/offlineService";
 import { offlineDB } from "../offline/db";
+
+
   // Add this if not already imported
 // --- Phonetic & Legend Data ---
 // ==========================================================
@@ -49,6 +51,573 @@ const INITIAL_BALLS = [
   { id: 8, letter: "I", num: 19, color: "#ffd400", x: 45, y: 20, dx: -1.6, dy: -1.1 },
   { id: 9, letter: "O", num: 63, color: "#ff5252", x: 80, y: 40, dx: 1.2, dy: 1.8 }
 ];
+
+
+// =========================================================================
+// 🎲 TRUE MASTER JSON TRANSLATOR PACING ENGINE (WIN GUARANTEED WITHIN 25-35)
+// Dynamically reads, maps, and structures authentic 5x5 grids for ALL cards!
+// =========================================================================
+let frontendAuthSequence = [];
+
+function initializeFrontendPacedSequence(
+  stateRef,
+  authenticSoldCartelas = null
+) {
+  frontendAuthSequence = [];
+
+  // ============================================================
+  // 🔐 STRICT BACKEND SOURCE OF TRUTH
+  // ============================================================
+  if (
+    !Array.isArray(authenticSoldCartelas) ||
+    authenticSoldCartelas.length === 0
+  ) {
+    console.error(
+      "%c❌ PACING ABORTED: NO AUTHENTIC BACKEND SOLD CARTELAS WERE PROVIDED",
+      "background:#440000;color:#ff4444;font-weight:bold;padding:6px;"
+    );
+    return [];
+  }
+
+  const soldCards = authenticSoldCartelas;
+
+  console.log(
+    `%c🔐 PACING SYSTEM USING ONLY BACKEND-AUTHENTICATED CARTELAS: ${soldCards.length}`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:6px;"
+  );
+
+  // ============================================================
+  // 1. SELECT RANDOM SOLD CARTELA
+  // ============================================================
+  const randomIndex = Math.floor(Math.random() * soldCards.length);
+  const luckyCard = soldCards[randomIndex];
+
+  if (!luckyCard) {
+    console.error(
+      "❌ PACING ABORTED: RANDOM CARTELA OBJECT IS EMPTY."
+    );
+    return [];
+  }
+
+  // ============================================================
+  // 2. IDENTIFY CARTELA ID
+  // ============================================================
+  const chosenCardId = String(
+    luckyCard?.id ??
+    luckyCard?.cartela_id ??
+    luckyCard?.cartelaId ??
+    ""
+  ).trim();
+
+  console.log(
+    `%c🎲 PACING SYSTEM TARGET LOCK INJECTED ON CARD ID: #${chosenCardId}`,
+    "background:#003311;color:#00ff66;font-weight:bold;padding:5px;"
+  );
+
+  // ============================================================
+  // 3. GET AUTHENTIC DATABASE NUMBERS
+  // ============================================================
+  let authenticNumbers = luckyCard?.numbers;
+
+  if (typeof authenticNumbers === "string") {
+    try {
+      authenticNumbers = JSON.parse(authenticNumbers);
+    } catch (error) {
+      console.error(
+        `%c❌ CARTELA #${chosenCardId} NUMBERS JSON PARSE FAILED`,
+        "background:#440000;color:#ff4444;font-weight:bold;",
+        error
+      );
+      return [];
+    }
+  }
+
+  const hasValidNumbers =
+    authenticNumbers &&
+    Array.isArray(authenticNumbers.B) &&
+    Array.isArray(authenticNumbers.I) &&
+    Array.isArray(authenticNumbers.N) &&
+    Array.isArray(authenticNumbers.G) &&
+    Array.isArray(authenticNumbers.O) &&
+    authenticNumbers.B.length === 5 &&
+    authenticNumbers.I.length === 5 &&
+    authenticNumbers.N.length === 5 &&
+    authenticNumbers.G.length === 5 &&
+    authenticNumbers.O.length === 5;
+
+  if (!hasValidNumbers) {
+    console.error(
+      `%c❌ PACING ABORTED: CARTELA #${chosenCardId} DOES NOT CONTAIN AUTHENTIC DATABASE NUMBERS`,
+      "background:#440000;color:#ff4444;font-weight:bold;padding:7px;"
+    );
+    return [];
+  }
+
+  // ============================================================
+  // 4. CONVERT B/I/N/G/O COLUMNS INTO 5x5 MATRIX
+  // ============================================================
+  const letters = ["B", "I", "N", "G", "O"];
+  const matrixGrid = [];
+
+  for (let r = 0; r < 5; r++) {
+    const horizontalRow = [];
+
+    for (let c = 0; c < 5; c++) {
+      const letter = letters[c];
+      const rawCellVal = authenticNumbers[letter][r];
+
+      if (
+        rawCellVal === "★" ||
+        rawCellVal === "FREE" ||
+        (r === 2 && c === 2)
+      ) {
+        horizontalRow.push("FREE");
+        continue;
+      }
+
+      const numericValue = Number(rawCellVal);
+
+      if (
+        !Number.isFinite(numericValue) ||
+        numericValue < 1 ||
+        numericValue > 75
+      ) {
+        console.error(
+          `%c❌ INVALID NUMBER IN CARTELA #${chosenCardId}`,
+          "background:#440000;color:#ff4444;font-weight:bold;",
+          {
+            row: r,
+            column: letter,
+            value: rawCellVal,
+          }
+        );
+        return [];
+      }
+
+      horizontalRow.push(numericValue);
+    }
+
+    matrixGrid.push(horizontalRow);
+  }
+
+  // ============================================================
+  // 5. VERIFY MATRIX & PRINT VISUAL CONSOLE GRID
+  // ============================================================
+  if (
+    matrixGrid.length !== 5 ||
+    matrixGrid.some(
+      (row) =>
+        !Array.isArray(row) ||
+        row.length !== 5
+    )
+  ) {
+    console.error(
+      `❌ CRITICAL: CARTELA #${chosenCardId} FAILED 5x5 MATRIX VALIDATION.`,
+      matrixGrid
+    );
+    return [];
+  }
+
+  let visualConsoleGrid = "";
+
+  matrixGrid.forEach((row, rIdx) => {
+    let rowString = `Row ${rIdx}: [ `;
+
+    row.forEach((cell) => {
+      rowString += `${String(cell).padStart(6)} `;
+    });
+
+    rowString += " ]\n";
+    visualConsoleGrid += rowString;
+  });
+
+  console.log(
+    `%c📊 AUTHENTIC CHOSEN CARD 5x5 BLUEPRINT:\n${visualConsoleGrid}`,
+    "color:#ffffff;font-family:monospace;background:#111111;padding:8px;"
+  );
+
+  // ============================================================
+  // 6. RANDOM STRATEGIC ROW SELECTION
+  // ============================================================
+  // There are 5 rows:
+  //
+  // Row 0
+  // Row 1
+  // Row 2
+  // Row 3
+  // Row 4
+  //
+  // Possible combinations:
+  //
+  // 0 + 1
+  // 0 + 2
+  // 0 + 3
+  // 0 + 4
+  // 1 + 2
+  // 1 + 3
+  // 1 + 4
+  // 2 + 3
+  // 2 + 4
+  // 3 + 4
+  //
+  // TOTAL = 10 possible combinations.
+  // Each NEW GAME randomly chooses one combination.
+  // ============================================================
+
+  const possibleRowPairs = [
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [0, 4],
+    [1, 2],
+    [1, 3],
+    [1, 4],
+    [2, 3],
+    [2, 4],
+    [3, 4],
+  ];
+
+  const randomRowPair =
+    possibleRowPairs[
+      Math.floor(
+        Math.random() * possibleRowPairs.length
+      )
+    ];
+
+  const targetRow1 = randomRowPair[0];
+  const targetRow2 = randomRowPair[1];
+
+  console.log(
+    `%c🎲 RANDOM STRATEGIC ROWS SELECTED: Row Index ${targetRow1} and Row Index ${targetRow2}`,
+    "background:#332200;color:#ffcc00;font-weight:bold;padding:7px;"
+  );
+
+  console.log(
+    `%c🎯 RANDOM ROW COMBINATION: [${targetRow1}, ${targetRow2}]`,
+    "background:#003311;color:#00ff66;font-weight:bold;padding:5px;"
+  );
+
+  // ============================================================
+  // 7. BUILD AUTHENTIC CARD NUMBER POOLS
+  // ============================================================
+  const winningLineNumbers = new Set();
+  const remainingCardNumbers = new Set();
+  const allLuckyCardNumbers = new Set();
+
+  matrixGrid.forEach((row, rIdx) => {
+    row.forEach((cell) => {
+      if (
+        cell !== "FREE" &&
+        String(cell).toUpperCase() !== "FREE"
+      ) {
+        allLuckyCardNumbers.add(cell);
+
+        // ONLY THE RANDOMLY SELECTED TWO ROWS
+        // ARE THE STRATEGIC TARGET ROWS.
+        if (
+          rIdx === targetRow1 ||
+          rIdx === targetRow2
+        ) {
+          winningLineNumbers.add(cell);
+        } else {
+          remainingCardNumbers.add(cell);
+        }
+      }
+    });
+  });
+
+  const winningLineArray =
+    Array.from(winningLineNumbers);
+
+  const remainingCardArray =
+    Array.from(remainingCardNumbers);
+
+  // ============================================================
+  // 8. BUILD OUTSIDE POOL
+  // ============================================================
+  const outsidePool = [];
+
+  for (let i = 1; i <= 75; i++) {
+    if (!allLuckyCardNumbers.has(i)) {
+      outsidePool.push(i);
+    }
+  }
+
+  // =========================================================================
+  // 🧠 ENFORCED TIMELINE PHASES
+  //
+  // Phase 1: Calls 1-24
+  // Phase 2: Calls 25-35
+  // Phase 3: Calls 36-75
+  //
+  // IMPORTANT:
+  // The selected strategic rows are now RANDOM for every NEW GAME.
+  // =========================================================================
+
+  const shuffledWinning =
+    [...winningLineArray].sort(
+      () => Math.random() - 0.5
+    );
+
+  const shuffledRemainingCard =
+    [...remainingCardArray].sort(
+      () => Math.random() - 0.5
+    );
+
+  const shuffledOutside =
+    [...outsidePool].sort(
+      () => Math.random() - 0.5
+    );
+
+  // ============================================================
+  // 9. SPLIT STRATEGIC NUMBERS
+  // ============================================================
+
+  const earlyWinningNums =
+    shuffledWinning.slice(2);
+
+  const finalTriggerNums =
+    shuffledWinning.slice(0, 2);
+
+  // ============================================================
+  // 10. PHASE 1 — CALLS 1 TO 24
+  // ============================================================
+
+  const phase1CardNums =
+    shuffledRemainingCard.slice(0, 5);
+
+  const phase1OutsideCount =
+    24 -
+    earlyWinningNums.length -
+    phase1CardNums.length;
+
+  const phase1OutsideNums =
+    shuffledOutside.slice(
+      0,
+      phase1OutsideCount
+    );
+
+  const phase1Pool = [
+    ...earlyWinningNums,
+    ...phase1CardNums,
+    ...phase1OutsideNums,
+  ].sort(() => Math.random() - 0.5);
+
+  // ============================================================
+  // 11. PHASE 2 — CALLS 25 TO 35
+  // ============================================================
+
+  const phase2CardNums =
+    shuffledRemainingCard.slice(5, 8);
+
+  const phase2OutsideCount =
+    11 -
+    finalTriggerNums.length -
+    phase2CardNums.length;
+
+  const phase2OutsideNums =
+    shuffledOutside.slice(
+      phase1OutsideCount,
+      phase1OutsideCount + phase2OutsideCount
+    );
+
+  const phase2Pool = [
+    ...finalTriggerNums,
+    ...phase2CardNums,
+    ...phase2OutsideNums,
+  ].sort(() => Math.random() - 0.5);
+
+  // ============================================================
+  // 12. PHASE 3 — CALLS 36 TO 75
+  // ============================================================
+
+  const phase3Pool = [
+    ...shuffledRemainingCard.slice(8),
+    ...shuffledOutside.slice(
+      phase1OutsideCount +
+        phase2OutsideCount
+    ),
+  ].sort(() => Math.random() - 0.5);
+
+  // ============================================================
+  // 13. FINAL 75-BALL SEQUENCE
+  // ============================================================
+
+  const ordered75Balls = [
+    ...phase1Pool,
+    ...phase2Pool,
+    ...phase3Pool,
+  ];
+
+  // ============================================================
+  // 14. FINAL VALIDATION
+  // ============================================================
+
+  if (ordered75Balls.length !== 75) {
+    console.error(
+      "❌ PACING ABORTED: GENERATED SEQUENCE IS NOT 75 BALLS.",
+      {
+        length: ordered75Balls.length,
+        targetRows: [targetRow1, targetRow2],
+        chosenCardId,
+      }
+    );
+
+    return [];
+  }
+
+  const uniqueBalls = new Set(ordered75Balls);
+
+  if (uniqueBalls.size !== 75) {
+    console.error(
+      "❌ PACING ABORTED: DUPLICATE BALLS DETECTED.",
+      {
+        unique: uniqueBalls.size,
+        total: ordered75Balls.length,
+        targetRows: [targetRow1, targetRow2],
+      }
+    );
+
+    return [];
+  }
+
+  // ============================================================
+  // 15. CONVERT TO B/I/N/G/O FORMAT
+  // ============================================================
+
+  const finalSequence = ordered75Balls.map(
+    (num) => {
+      let letter = "B";
+
+      if (num >= 16 && num <= 30) {
+        letter = "I";
+      } else if (num >= 31 && num <= 45) {
+        letter = "N";
+      } else if (num >= 46 && num <= 60) {
+        letter = "G";
+      } else if (num >= 61 && num <= 75) {
+        letter = "O";
+      }
+
+      return `${letter} ${num}`;
+    }
+  );
+
+  // ============================================================
+  // 16. FINAL LOG
+  // ============================================================
+
+  console.log(
+    `%c🎯 FINAL RANDOMIZED PACING READY`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
+  );
+
+  console.log(
+    `🎲 SELECTED CARTELA: #${chosenCardId}`
+  );
+
+  console.log(
+    `🎲 SELECTED ROWS: ${targetRow1} + ${targetRow2}`
+  );
+
+  console.log(
+    `🎯 STRATEGIC NUMBERS: ${winningLineArray.length}`
+  );
+
+  console.log(
+    `🚀 AUTHENTIC FRONTEND 75-BALL SEQUENCE:`,
+    finalSequence
+  );
+
+  return finalSequence;
+}
+
+// ============================================================
+// 🔐 PERSIST AUTHENTIC PACING SEQUENCE PER GAME
+// ============================================================
+
+function getPacingSequenceStorageKey(gameId) {
+  return `bingo_auth_pacing_sequence_${String(gameId)}`;
+}
+
+function saveAuthenticPacingSequence(gameId, sequence) {
+  try {
+    if (
+      !gameId ||
+      !Array.isArray(sequence) ||
+      sequence.length !== 75
+    ) {
+      return false;
+    }
+
+    localStorage.setItem(
+      getPacingSequenceStorageKey(gameId),
+      JSON.stringify(sequence)
+    );
+
+    console.log(
+      `💾 AUTHENTIC PACING SEQUENCE SAVED FOR GAME ${gameId}`
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO SAVE AUTHENTIC PACING SEQUENCE:",
+      error
+    );
+
+    return false;
+  }
+}
+
+function loadSavedAuthenticPacingSequence(gameId) {
+  try {
+    if (!gameId) {
+      return [];
+    }
+
+    const saved = localStorage.getItem(
+      getPacingSequenceStorageKey(gameId)
+    );
+
+    if (!saved) {
+      return [];
+    }
+
+    const sequence = JSON.parse(saved);
+
+    if (
+      !Array.isArray(sequence) ||
+      sequence.length !== 75
+    ) {
+      console.warn(
+        `⚠️ INVALID SAVED PACING SEQUENCE FOR GAME ${gameId}`
+      );
+
+      localStorage.removeItem(
+        getPacingSequenceStorageKey(gameId)
+      );
+
+      return [];
+    }
+
+    console.log(
+      `🔐 RESTORED AUTHENTIC PACING SEQUENCE FOR GAME ${gameId}`
+    );
+
+    return sequence;
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO RESTORE AUTHENTIC PACING SEQUENCE:",
+      error
+    );
+
+    return [];
+  }
+}
+
+
+
 
 export default function BingoGame() {
 
@@ -177,7 +746,7 @@ const nextBingoAudioReadyRef = useRef(false);
 const firstGamePlayRef = useRef(true);
 const bingoBlinkIntervalRef = useRef(null);
 const bingoBlinkTimeoutRef = useRef(null);
-
+const winningCallTargetRef = useRef(null);
 // ==========================================================
 // 🎰 FIRST GAME ROLLING EFFECT
 // Runs ONLY once at the beginning of each new game
@@ -239,9 +808,9 @@ const startRandomBingoBlink = () => {
 
       setBlinkingNumber(randomNumber);
 
-    }, 180);
+    }, 50);
 
-  }, 2000);
+  }, 100);
 };
 
 
@@ -3196,49 +3765,155 @@ async function saveBallWithRetry(gameId, ball, retries = 3) {
 // 🎱 2. AUTHORITATIVE GENERATOR ENGINE (Blazing 0s Instant Mode)
 // ==========================================================
 // Declare this variable outside the function or right above it in your file to track times
+// ==========================================================
+// 🔐 LOAD AUTHENTIC SOLD CARTELAS FROM DATABASE
+// ==========================================================
+async function loadAuthenticSoldCartelas(gameId) {
+  try {
+    if (!gameId) {
+      console.error(
+        "❌ CANNOT LOAD AUTHENTIC SOLD CARTELAS: MISSING GAME ID"
+      );
+      return [];
+    }
+
+    console.log(
+      `%c🔐 LOADING AUTHENTIC SOLD CARTELAS FOR GAME ${gameId}`,
+      "background:#002b36;color:#00ffff;font-weight:bold;padding:6px;"
+    );
+
+    const response = await fetch(
+      `${API_URL}/games/${encodeURIComponent(gameId)}/sold-cartelas`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data?.success) {
+      throw new Error(
+        data?.error || "Backend did not return success"
+      );
+    }
+
+    const soldCartelas = Array.isArray(data.soldCartelas)
+      ? data.soldCartelas
+      : [];
+
+    console.log(
+      `%c✅ AUTHENTIC SOLD CARTELAS LOADED: ${soldCartelas.length}`,
+      "background:#003300;color:#00ff66;font-weight:bold;padding:6px;"
+    );
+
+    if (soldCartelas.length === 0) {
+      console.error(
+        `%c❌ DATABASE RETURNED ZERO SOLD CARTELAS FOR GAME ${gameId}`,
+        "background:#440000;color:#ff4444;font-weight:bold;padding:6px;"
+      );
+
+      return [];
+    }
+
+    console.table(
+      soldCartelas.map((card) => ({
+        id: card?.id,
+        cartela_id: card?.cartela_id,
+        serial: card?.serial,
+        hasNumbers: !!card?.numbers,
+        B: card?.numbers?.B?.join(",") || "",
+        I: card?.numbers?.I?.join(",") || "",
+        N: card?.numbers?.N?.join(",") || "",
+        G: card?.numbers?.G?.join(",") || "",
+        O: card?.numbers?.O?.join(",") || "",
+      }))
+    );
+
+    return soldCartelas;
+
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD AUTHENTIC SOLD CARTELAS:",
+      error
+    );
+
+    return [];
+  }
+}
 
 
 async function generateNumber() {
   const generationStart = Date.now();
   const myGenerationId = generationCancelRef.current;
-  const currentGameId = stateRef.current.game?.game_id || stateRef.current.game?.id || id;
 
-  console.log("🔥 GENERATE ENTERED", generationStart, "LOCK:", isDrawingBallRef.current, "CANCEL ID:", myGenerationId, "GAME:", currentGameId);
+  const currentGameId =
+    stateRef.current.game?.game_id ||
+    stateRef.current.game?.id ||
+    id;
 
-  // ✅ CRITICAL TIMESTAMP PROTECTION: Bypasses duplicate double-click triggers instantly
-  if (generationStart - lastGenerationTimeRef.current < 800) {
-    console.warn("🚫 DOUBLE-FIRE PREVENTED: DROPPING DUPLICATE REQUEST MARKS INTERCEPTED");
+  console.log(
+    "🔥 GENERATE ENTERED",
+    generationStart,
+    "LOCK:",
+    isDrawingBallRef.current,
+    "CANCEL ID:",
+    myGenerationId,
+    "GAME:",
+    currentGameId
+  );
+
+  // ============================================================
+  // 1. DOUBLE-FIRE SPAM GUARD
+  // ============================================================
+
+  if (
+    generationStart -
+      lastGenerationTimeRef.current <
+    800
+  ) {
+    console.warn(
+      "🚫 DOUBLE-FIRE PREVENTED"
+    );
     return;
   }
-  lastGenerationTimeRef.current = generationStart;
 
-  // Core safety guardrails
-  if (stateRef.current.paused) {
-    console.log(">>> GENERATE BLOCKED - PAUSED");
-    return;
-  }
+  lastGenerationTimeRef.current =
+    generationStart;
 
-  if (isDrawingBallRef.current) {
-    console.log("⏳ CALL GENERATION STILL IN PROGRESS");
-    return;
-  }
+  // ============================================================
+  // 2. TIMELINE SAFETY GUARDS
+  // ============================================================
 
-  if (loopTimeoutRef.current) {
-    console.log(">>> GENERATE BLOCKED - LOOP ALREADY EXISTS");
+  if (
+    stateRef.current.paused ||
+    isDrawingBallRef.current ||
+    loopTimeoutRef.current
+  ) {
     return;
   }
 
   if (!currentGameId) {
-    console.error("❌ NO GAME ID AVAILABLE — CANNOT GENERATE NUMBER");
+    console.error(
+      "❌ NO GAME ID AVAILABLE"
+    );
+
     isDrawingBallRef.current = false;
     return;
   }
 
-  // Claim the drawing loop lock atomically
   isDrawingBallRef.current = true;
 
+  // ============================================================
+  // 3. GENERATION VALIDITY
+  // ============================================================
+
   const generationStillValid = () => {
-    return myGenerationId === generationCancelRef.current && !stateRef.current.paused;
+    return (
+      myGenerationId ===
+        generationCancelRef.current &&
+      !stateRef.current.paused
+    );
   };
 
   try {
@@ -3247,232 +3922,456 @@ async function generateNumber() {
     let number = 0;
     let isFirstBallOfGame = false;
 
-// ============================================================
-// 🎵 CAPTURE PRELOADED AUDIO FOR THE CURRENT BALL
-// ============================================================
+    // ============================================================
+    // 4. CLEAN PRELOADED AUDIO CACHE
+    // ============================================================
 
-let preloadedAudioForCurrentBall = null;
+    if (
+      nextBingoBallRef.current &&
+      nextBingoAudioRef.current &&
+      nextBingoAudioPathRef.current
+    ) {
+      const expectedPath =
+        `/oromo/${String(
+          nextBingoBallRef.current.letter
+        )
+          .trim()
+          .toLowerCase()}${String(
+          nextBingoBallRef.current.number
+        )
+          .trim()
+          .toLowerCase()}.wav`;
 
-if (
-  nextBingoBallRef.current &&
-  nextBingoAudioRef.current &&
-  nextBingoAudioPathRef.current
-) {
-  const expectedPath =
-    `/oromo/${String(nextBingoBallRef.current.letter)
-      .trim()
-      .toLowerCase()}${String(nextBingoBallRef.current.number)
-      .trim()
-      .toLowerCase()}.wav`;
+      if (
+        nextBingoAudioPathRef.current ===
+        expectedPath
+      ) {
+        nextBingoAudioRef.current =
+          null;
 
-  if (
-    nextBingoAudioPathRef.current === expectedPath
-  ) {
-    preloadedAudioForCurrentBall =
-      nextBingoAudioRef.current;
+        nextBingoAudioPathRef.current =
+          null;
 
-    console.log(
-      "♻️ CAPTURED PRELOADED AUDIO FOR CURRENT BALL:",
-      expectedPath,
-      "readyState:",
-      preloadedAudioForCurrentBall.readyState
-    );
+        nextBingoAudioReadyRef.current =
+          false;
+      }
+    }
 
-    // Detach the current-ball audio from the NEXT-ball slot.
-    nextBingoAudioRef.current = null;
-    nextBingoAudioPathRef.current = null;
-    nextBingoAudioReadyRef.current = false;
-  }
-}
-    // Absolute Business Protection: Clear pending flags to force clean selections
-    pendingBingoCallRef.current = null;
+    pendingBingoCallRef.current =
+      null;
+
+    const calledCount =
+      calledRef.current.length;
 
     // ============================================================
-// 🎯 GET CURRENT BALL
-// ============================================================
+    // 🔐 5. FIRST BALL — LOAD DATABASE CARTELAS
+    // ============================================================
 
-let selectedBall = nextBingoBallRef.current;
+    if (calledCount === 0) {
+      isFirstBallOfGame = true;
 
-// ------------------------------------------------------------
-// If a ball was already reserved/preloaded, consume it.
-// ------------------------------------------------------------
-if (selectedBall) {
+      console.log(
+        `%c🔐 FIRST BALL — LOADING AUTHENTIC SOLD CARTELAS FOR GAME ${currentGameId}`,
+        "background:#002b36;color:#00ffff;font-weight:bold;padding:7px;"
+      );
 
-  console.log(
-    "♻️ CONSUMING PRELOADED NEXT BALL:",
-    selectedBall.result
-  );
+      // ----------------------------------------------------------
+      // IMPORTANT:
+      // Do NOT call initializeFrontendPacedSequence()
+      // until the backend cartelas have arrived.
+      // ----------------------------------------------------------
 
-  number = selectedBall.number;
-  letter = selectedBall.letter;
-  result = selectedBall.result;
+      const authenticSoldCartelas =
+        await loadAuthenticSoldCartelas(
+          currentGameId
+        );
 
-  nextBingoBallRef.current = null;
+      // ----------------------------------------------------------
+      // GENERATION MAY HAVE BEEN CANCELLED DURING FETCH
+      // ----------------------------------------------------------
 
-}
-else
-   {
+      if (
+        !generationStillValid()
+      ) {
+        console.warn(
+          "🛑 GENERATION CANCELLED WHILE LOADING AUTHENTIC CARTELAS"
+        );
 
-  // ----------------------------------------------------------
-  // No reserved ball yet — choose normally.
-  // ----------------------------------------------------------
+        isDrawingBallRef.current =
+          false;
 
-  const currentRemaining = remainingNumbersRef.current;
+        return;
+      }
 
-  if (!currentRemaining || currentRemaining.length === 0) {
-    console.log("🎉 ALL BINGO NUMBERS HAVE BEEN CALLED");
-    return;
-  }
+      // ----------------------------------------------------------
+      // DATABASE CARTELAS ARE REQUIRED
+      // ----------------------------------------------------------
 
-  if (currentRemaining.length === 75) {
-    isFirstBallOfGame = true;
-  }
+      if (
+        !Array.isArray(
+          authenticSoldCartelas
+        ) ||
+        authenticSoldCartelas.length === 0
+      ) {
+        console.error(
+          `%c❌ NO AUTHENTIC SOLD CARTELAS RETURNED FOR GAME ${currentGameId}`,
+          "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
+        );
 
-  const randomIndex = Math.floor(
-    Math.random() * currentRemaining.length
-  );
+        console.error(
+          "❌ DRAW ABORTED.",
+          "PostgreSQL cartelas are required."
+        );
 
-  number = currentRemaining[randomIndex];
+        frontendAuthSequence = [];
 
-  if (!generationStillValid()) {
-    return;
-  }
+        isDrawingBallRef.current =
+          false;
 
-  remainingNumbersRef.current =
-    currentRemaining.filter(n => n !== number);
+        return;
+      }
 
-  letter = getBingoLetter(number);
+      console.log(
+        `%c🔐 DATABASE CARTELAS LOADED: ${authenticSoldCartelas.length}`,
+        "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
+      );
 
-  result = `${letter} ${number}`;
+      // ==========================================================
+      // 🎯 6. BUILD AUTHENTIC 75-BALL SEQUENCE
+      // ==========================================================
 
-  seenBallsRef.current.add(result);
+      frontendAuthSequence = [];
 
-  console.log(
-    "🎲 FIRST/NORMAL BALL SELECTED:",
-    result
-  );
-}
+      frontendAuthSequence =
+        initializeFrontendPacedSequence(
+          stateRef,
+          authenticSoldCartelas
+        );
 
+      console.log(
+        "🚀 AUTHENTIC FRONTEND 75-BALL SEQUENCE:",
+        frontendAuthSequence.slice(
+          0,
+          40
+        )
+      );
 
-// ============================================================
-// 🚀 RESERVE THE NEXT BALL IMMEDIATELY
-// ============================================================
-//
-// IMPORTANT:
-// The reserved ball is removed from remainingNumbersRef NOW.
-// Therefore it cannot accidentally be selected twice.
-//
-// Its MP3 begins loading while the CURRENT voice is playing.
-// ============================================================
+      // ==========================================================
+      // 🛑 STRICT VALIDATION
+      // ==========================================================
 
-// ============================================================
-// 🚀 RESERVE THE NEXT BALL
-// ============================================================
+      if (
+        !Array.isArray(
+          frontendAuthSequence
+        ) ||
+        frontendAuthSequence.length !==
+          75
+      ) {
+        console.error(
+          `%c❌ AUTHENTIC PACING SEQUENCE FAILED FOR GAME ${currentGameId}`,
+          "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
+        );
 
-if (
-  !nextBingoBallRef.current &&
-  remainingNumbersRef.current &&
-  remainingNumbersRef.current.length > 0
-) {
+        console.error(
+          "❌ RANDOM FALLBACK IS DISABLED."
+        );
 
-  const remainingAfterCurrent =
-    remainingNumbersRef.current;
+        frontendAuthSequence = [];
 
-  const nextIndex = Math.floor(
-    Math.random() * remainingAfterCurrent.length
-  );
+        isDrawingBallRef.current =
+          false;
 
-  const nextNumber =
-    remainingAfterCurrent[nextIndex];
+        return;
+      }
 
-  const nextLetter =
-    getBingoLetter(nextNumber);
+      console.log(
+        `%c🔒 AUTHENTIC DATABASE PACING LOCKED FOR GAME ${currentGameId}`,
+        "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
+      );
+    }
 
-  const nextResult =
-    `${nextLetter} ${nextNumber}`;
+    // ============================================================
+    // 🎯 7. DRAW ONLY FROM AUTHENTIC PACED SEQUENCE
+    // ============================================================
 
-  remainingNumbersRef.current =
-    remainingAfterCurrent.filter(
-      n => n !== nextNumber
-    );
+    if (
+      !Array.isArray(
+        frontendAuthSequence
+      ) ||
+      frontendAuthSequence.length !==
+        75
+    ) {
+      console.error(
+        "❌ AUTHENTIC PACING SEQUENCE IS NOT AVAILABLE."
+      );
 
-  nextBingoBallRef.current = {
-    number: nextNumber,
-    letter: nextLetter,
-    result: nextResult,
-  };
+      console.error(
+        "❌ RANDOM DRAW FALLBACK DISABLED."
+      );
 
-  console.log(
-    "🎯 NEXT BALL RESERVED:",
-    nextResult
-  );
+      isDrawingBallRef.current =
+        false;
 
-  preloadNextBingoVoice(
-    nextLetter,
-    nextNumber
-  );
-}
-    // Synchronize both arrays and Refs simultaneously
-    const updatedCalled = [...calledRef.current, result];
-    calledRef.current = updatedCalled;
-    setCalled(updatedCalled);
-    setCurrent(result);
-console.log(
-  "🎯 NUMBER DISPLAYED:",
-  result,
-  Date.now()
-);
-    stateRef.current.called = updatedCalled;
-    stateRef.current.current = result;
-
-    // Unblocked background persistence network write
-    saveBallWithRetry(currentGameId, result, 3).then((saved) => {
-      if (!saved) console.error("❌ BACKEND TRANSACTION LOSS WARNING:", result);
-      else console.log("✅ NUMBER SECURED ON SERVER CLOUD:", result);
-    });
-// ==========================================================
-// 💾 OFFLINE COPY
-// Saves the same ball locally as a backup.
-// DOES NOT replace the existing server save.
-// ==========================================================
-
-saveCalledBallOffline(currentGameId, number)
-  .then(() => {
-    console.log(
-      "💾 OFFLINE COPY SAVED:",
-      currentGameId,
-      result
-    );
-  })
-  .catch((offlineError) => {
-    console.error(
-      "⚠️ OFFLINE BALL SAVE FAILED:",
-      offlineError
-    );
-  });
-            if (!generationStillValid() || !result) {
-      isDrawingBallRef.current = false;
       return;
     }
 
-    // Dynamic initial startup shuffle countdown parameter valve
-    if (isFirstBallOfGame) {
-      console.log("⏳ HOLDING FIRST BALL ANNOUNCEMENT VOICE FOR SHUFFLE MUSIC TO FINISH: 5.5s");
-      
-      startupTimeoutRef.current = setTimeout(() => {
-        executeBingoVoicePlayback(letter, number, result, myGenerationId, generationStillValid);
-      }, 0);
+    // ============================================================
+    // 8. ALL 75 BALLS COMPLETED
+    // ============================================================
 
+    if (
+      calledCount >= 75
+    ) {
+      console.log(
+        "🎉 ALL BINGO NUMBERS CALLED"
+      );
+
+      isDrawingBallRef.current =
+        false;
+
+      return;
+    }
+
+    // ============================================================
+    // 9. GET CURRENT AUTHENTIC PACED BALL
+    // ============================================================
+
+    result = String(
+      frontendAuthSequence[
+        calledCount
+      ]
+    ).trim();
+
+    const parts =
+      result.split(/\s+/);
+
+    letter =
+      String(
+        parts[0]
+      ).trim();
+
+    number =
+      Number(parts[1]);
+
+    if (
+      !letter ||
+      !Number.isFinite(number) ||
+      number < 1 ||
+      number > 75
+    ) {
+      console.error(
+        "❌ INVALID AUTHENTIC PACED BALL",
+        {
+          calledCount,
+          result,
+          letter,
+          number
+        }
+      );
+
+      isDrawingBallRef.current =
+        false;
+
+      return;
+    }
+
+    console.log(
+      `🎯 CONTROL PACED DRAW INDEX ${
+        calledCount + 1
+      }/75 -> [${result}]`
+    );
+
+    // ============================================================
+    // 10. FINAL GENERATION VALIDITY CHECK
+    // ============================================================
+
+    if (
+      !generationStillValid()
+    ) {
+      isDrawingBallRef.current =
+        false;
+
+      return;
+    }
+
+    // ============================================================
+    // 11. REMOVE NUMBER FROM REMAINING POOL
+    // ============================================================
+
+    remainingNumbersRef.current =
+      (
+        remainingNumbersRef.current ||
+        []
+      ).filter(
+        (n) => n !== number
+      );
+
+    seenBallsRef.current.add(
+      result
+    );
+
+    // ============================================================
+    // 12. PRELOAD NEXT AUTHENTIC BALL
+    // ============================================================
+
+    nextBingoBallRef.current =
+      null;
+
+    const nextCallIndex =
+      calledCount + 1;
+
+    if (
+      nextCallIndex < 75
+    ) {
+      const nextResultRaw =
+        String(
+          frontendAuthSequence[
+            nextCallIndex
+          ]
+        ).trim();
+
+      const nextParts =
+        nextResultRaw.split(
+          /\s+/
+        );
+
+      const nextLetter =
+        String(
+          nextParts[0]
+        ).trim();
+
+      const nextNumber =
+        Number(
+          nextParts[1]
+        );
+
+      if (
+        nextLetter &&
+        Number.isFinite(
+          nextNumber
+        )
+      ) {
+        nextBingoBallRef.current =
+          {
+            number:
+              nextNumber,
+
+            letter:
+              nextLetter,
+
+            result:
+              nextResultRaw
+          };
+
+        preloadNextBingoVoice(
+          nextLetter,
+          nextNumber
+        );
+      }
+    }
+
+    // ============================================================
+    // 13. UPDATE CALLED STATE
+    // ============================================================
+
+    const updatedCalled = [
+      ...calledRef.current,
+      result
+    ];
+
+    calledRef.current =
+      updatedCalled;
+
+    setCalled(
+      updatedCalled
+    );
+
+    setCurrent(
+      result
+    );
+
+    stateRef.current.called =
+      updatedCalled;
+
+    stateRef.current.current =
+      result;
+
+    // ============================================================
+    // 14. SAVE BALL TO BACKEND
+    // ============================================================
+
+    saveBallWithRetry(
+      currentGameId,
+      result,
+      3
+    ).then(
+      (saved) => {
+        if (!saved) {
+          console.error(
+            "❌ BACKEND TRANSACTION TIMEOUT:",
+            result
+          );
+        }
+      }
+    );
+
+    // ============================================================
+    // 15. SAVE OFFLINE BACKUP
+    // ============================================================
+
+    saveCalledBallOffline(
+      currentGameId,
+      number
+    ).catch(
+      () => {}
+    );
+
+    // ============================================================
+    // 16. PLAY VOICE
+    // ============================================================
+
+    if (
+      isFirstBallOfGame
+    ) {
+      console.log(
+        "⏳ HOLDING FIRST BALL ANNOUNCEMENT VOICE FOR SHUFFLE MUSIC TO FINISH"
+      );
+
+      startupTimeoutRef.current =
+        setTimeout(
+          () => {
+            executeBingoVoicePlayback(
+              letter,
+              number,
+              result,
+              myGenerationId,
+              generationStillValid
+            );
+          },
+          0
+        );
     } else {
-      // 🚀 SPEED MODE FIX: Fire synchronously immediately inside the same engine frame!
-      executeBingoVoicePlayback(letter, number, result, myGenerationId, generationStillValid);
+      executeBingoVoicePlayback(
+        letter,
+        number,
+        result,
+        myGenerationId,
+        generationStillValid
+      );
     }
 
   } catch (err) {
-    console.error("❌ GENERATE NUMBER CRITICAL CONTAINER FAULT EXCEPTION:", err);
-    isDrawingBallRef.current = false;
+    console.error(
+      "❌ GENERATE NUMBER ENGINE CONTAINER FAULT EXCEPTION:",
+      err
+    );
+
+    isDrawingBallRef.current =
+      false;
   }
 }
+
+
 
 function executeBingoVoicePlayback(letter, number, result, myGenerationId, generationCheckFn) {
   if (typeof generationCheckFn === 'function' && !generationCheckFn()) {
@@ -4849,13 +5748,13 @@ const closeVerificationBoard = () => {
         left: "6px",
         zIndex: 9999,
 
-        width: "28px",
-        height: "28px",
+        width: "35px",
+        height: "35px",
 
         borderRadius: "50%",
         border: "1px solid rgba(255,255,255,0.25)",
 
-        background: "rgba(10,20,35,0.85)",
+        background: "rgba(236, 9, 9, 0.85)",
         color: "#ffffff",
 
         display: "flex",
@@ -4978,14 +5877,14 @@ const closeVerificationBoard = () => {
  {/* ============================================================ 
     3. CALLED BALL HISTORY + LARGE CURRENT BALL 
     ============================================================ */} 
- 
-<div 
+ <div 
   className="called-section" 
   style={{ 
    
  
     background: "rgb(0, 0, 0)", 
   width: "100%", 
+    height: "380px", 
     margin: "0", 
     padding: "8px 10px", 
     boxSizing: "border-box", 
@@ -4999,6 +5898,7 @@ const closeVerificationBoard = () => {
     overflow: "hidden", 
   }} 
 > 
+
  
   {/* ============================================================ 
       LEFT — LARGE CURRENT BALL 
@@ -5006,9 +5906,9 @@ const closeVerificationBoard = () => {
  
   <div 
     style={{ 
-      width: "210px", 
-      minWidth: "210px", 
-      height: "165px", 
+      width: "390px", 
+      minWidth: "370px", 
+      height: "0px", 
  
       display: "flex", 
       flexDirection: "column", 
@@ -5042,10 +5942,10 @@ const closeVerificationBoard = () => {
  
     <div 
       style={{ 
-        width: "217px", 
-        height: "217px", 
+        width: "350px", 
+        height: "350px", 
  
-        borderRadius: "50%", 
+        borderRadius: "70%", 
  
         display: "flex", 
  
@@ -5100,7 +6000,7 @@ const closeVerificationBoard = () => {
  
           <span 
             style={{ 
-              fontSize: "55px", 
+              fontSize: "90px", 
               fontWeight: "900", 
  
               lineHeight: "1", 
@@ -5116,7 +6016,7 @@ const closeVerificationBoard = () => {
  
           <span 
             style={{ 
-              fontSize: "120px", 
+              fontSize: "200px", 
               fontWeight: "900", 
  
               lineHeight: "0.9", 
@@ -5189,8 +6089,8 @@ const closeVerificationBoard = () => {
       /> 
  
     </div> 
+</div> 
  
-  </div> 
  
  
   {/* ============================================================ 
@@ -5346,8 +6246,8 @@ const closeVerificationBoard = () => {
             <div 
               key={`${ballStr}-${idx}`} 
               style={{ 
-                width: "210px", 
-                height: "210px", 
+                width: "342px", 
+                height: "342px", 
  
                 minWidth: "105px", 
  
@@ -5391,7 +6291,7 @@ const closeVerificationBoard = () => {
  
               <div 
                 style={{ 
-                  fontSize: "80px", 
+                  fontSize: "120px", 
  
                   fontWeight: "900", 
  
@@ -5410,7 +6310,7 @@ const closeVerificationBoard = () => {
  
               <div 
                 style={{ 
-                  fontSize: "110px", 
+                  fontSize: "170px", 
  
                   fontWeight: "900", 
  
@@ -5535,7 +6435,7 @@ const closeVerificationBoard = () => {
     {/* 🏆 TITLE */}
     <div
       style={{
-        fontSize: "11px",
+        fontSize: "0px",
         fontWeight: "900",
         color: "#ffffff", /* Fixed to white for dark backgrounds */
         letterSpacing: "0.7px",
@@ -5550,8 +6450,8 @@ const closeVerificationBoard = () => {
     {/* 🎟️ BINGO CARD MATRIX */}
     <div
       style={{
-        width: "250px",
-        height: "320px",
+        width: "380px",
+        height: "420px",
         background: "#dce8f2",
         border: "2px solid #657789",
         borderRadius: "6px",
@@ -5578,7 +6478,7 @@ const closeVerificationBoard = () => {
               alignItems: "center",
               justifyContent: "center",
               color: "#0054b8",
-              fontSize: "12px",
+              fontSize: "23px",
               fontWeight: "900",
               textShadow: "0 1px 1px rgba(0,0,0,0.25)",
               borderRight: "1px solid rgba(255,255,255,0.18)",
@@ -5647,125 +6547,54 @@ const closeVerificationBoard = () => {
   </div>
 )}
 
-    {/* =======================================================
-        💙 ITEM 2: LEFT PANEL INTERFACE (CONTROLS & INCOME)
-        ======================================================= */}
-    <div
-      className="left-panel"
-      style={{
-        padding: "6px",
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-        borderTop: "1px solid rgba(255,255,255,0.05)", /* Subtle top line separating from Item 1 */
-        width: "95%",
-        justifyContent: "center",
-        position: "relative",
-        zIndex: 1,
-      }}
-    >
-      {/* CARD ID VERIFICATION SLOT */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-        <input
-          type="text"
-          value={cartelaId}
-          onChange={(e) => setCartelaId(e.target.value)}
-          placeholder={t.cardIdPlaceholder}
-          style={{
-            background: "rgba(12, 22, 45, 0.85)",
-            border: "1.5px solid #edf6ef",
-            color: "#ffffff",
-            borderRadius: "30px",
-            padding: "3px 10px",
-            fontSize: "27px",
-            fontWeight: "bold",
-            outline: "none",
-            textAlign: "center",
-            height: "45px",
-            boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
-          }}
-        />
-
-        <button
-          className="ctrl-btn green-border"
-          style={{
-            justifyContent: "center",
-            padding: "2px",
-            fontSize: "18px",
-            background: "rgb(25, 111, 216)",
-            fontWeight: "bold",
-            letterSpacing: "0.5px",
-            borderRadius: "30px",
-            height: "22px",
-            boxShadow: "0 0 10px rgba(0, 84, 184, 0.3)",
-            cursor: "pointer"
-          }}
-          onClick={checkWinner}
-        >
-          <span>{t.verifyCard}</span>
-        </button>
-      </div>
-
-      {/* PLAY/PAUSE ACTION AND INCOME STATUS CARD */}
-      <div
-        className="info-card"
-        style={{
-          padding: "6px",
-          background: "rgba(13, 29, 45, 0.6)",
-          borderRadius: "14px",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-          backdropFilter: "blur(4px)",
-          boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
-          <button
-            className="ctrl-btn gold-border"
-            style={{
-              padding: "2px 8px",
-              fontSize: "17px",
-              fontWeight: "800",
-              background: "#2278e1",
-              flex: 1,
-              justifyContent: "center",
-              borderRadius: "100px",
-              height: "26px",
-              color: "#ffffffff",
-              boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
-              cursor: "pointer"
-          }}
-          onClick={togglePlayPause}
-        >
-          <span>{paused ? t.play : t.pause}</span>
-        </button>
-      </div>
-
-      <div style={{ textAlign: "center", marginTop: "4px" }}>
-        <div
-          style={{
-            fontSize: "65px",
-            color: "#ffffffff",
-            fontWeight: "bold",
-            letterSpacing: "1px"
-          }}
-        >
-           ደራሽ
-        </div>
-
-        <div
-          style={{
-            fontSize: "70px",
-            color: "#ffffffff",
-            fontWeight: "900",
-            textShadow: "0 0 12px rgba(2, 2, 2, 0.07)",
-            lineHeight: "1.1"
-          }}
-        >
-          {game.netIncome ? game.netIncome : game.prize}
-        </div>
-      </div>
-    </div>
+{/* =======================================================
+    💰 ITEM 2B: GAME PRIZE / NET INCOME
+    ======================================================= */}
+<div
+  className="game-prize-section"
+  style={{
+    width: "95%",
+   
+    marginTop: "6px",
+    padding: "10px 6px",
+    background: "rgba(13, 29, 45, 0.6)",
+    borderRadius: "14px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(4px)",
+    boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
+    textAlign: "center",
+    boxSizing: "border-box",
+  }}
+>
+  {/* PRIZE TITLE */}
+  <div
+    style={{
+      fontSize: "105px",
+      color: "#ffffffff",
+      fontWeight: "bold",
+      letterSpacing: "1px",
+      lineHeight: "1",
+      marginBottom: "4px",
+    }}
+  >
+    ደራሽ
   </div>
+
+  {/* PRIZE VALUE */}
+  <div
+    style={{
+      fontSize: "110px",
+      color: "#ffffffff",
+      fontWeight: "900",
+      textShadow: "0 0 12px rgba(2, 2, 2, 0.07)",
+      lineHeight: "1.1",
+    }}
+  >
+    {game.netIncome ? game.netIncome : game.prize}
+  </div>
+</div>
+
+   
   {/* =======================================================
         ITEM 3: High-Visibility Current Called Display
         ======================================================= */}
@@ -5786,8 +6615,9 @@ const closeVerificationBoard = () => {
   {/* TOTAL CALLS */}
   <span
     style={{
-      fontSize: "28px",
+      fontSize: "40px",
       color: "#ffffff",
+              marginTop: "66px",
       fontWeight: "900",
       letterSpacing: "2px",
       lineHeight: "1",
@@ -5799,7 +6629,7 @@ const closeVerificationBoard = () => {
   {/* NUMBER */}
   <span
     style={{
-      fontSize: "140px",
+      fontSize: "219px",
       color: "#ffffff",
       fontWeight: "900",
       lineHeight: "0.9",
@@ -5812,9 +6642,9 @@ const closeVerificationBoard = () => {
     {/* =======================================================
         🎙️ ITEM 4: TEXT-ONLY COUNTDOWN DISPLAY
         ======================================================= */}
-    {/* =======================================================
-    🎙️ ITEM 4: RECTANGULAR EDITABLE COUNTDOWN DISPLAY
-    ======================================================= */}
+   {/* =========================================================================
+    🎙️ ITEM 4: RECTANGULAR EDITABLE COUNTDOWN DISPLAY (100% FIXED STATIC "s")
+    ========================================================================= */}
 {(() => {
   // 🎨 EDITABLE STYLE CONFIGURATION VARIABLES
   const BOX_WIDTH = "50%";        // Width of the rectangle box container
@@ -5823,14 +6653,12 @@ const closeVerificationBoard = () => {
   const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)";
   const BOX_RADIUS = "8px";       // Box corner roundness
 
-  const FONT_SIZE = "90px";       // Countdown font size
+  const FONT_SIZE = "160px";       // Countdown font size
   const FONT_WEIGHT = "3000";     // Countdown font weight
 
   // Editable individual state text colors
-  const COLOR_PAUSED = "#ffffffff";
   const COLOR_VOICE = "#ffffffff";
-  const COLOR_DELAY = "#fffffffffff";
-  const COLOR_DEFAULT = "#ffffffff";
+  const COLOR_DELAY = "#ffffffff";
 
   return (
     <div
@@ -5838,7 +6666,7 @@ const closeVerificationBoard = () => {
         width: "100%",
         borderTop: "1px solid rgba(255,255,255,0.05)",
         paddingTop: "12px",
-        marginTop: "4px",
+        marginTop: "50px",
         display: "flex",
         justifyContent: "center",
       }}
@@ -5866,7 +6694,7 @@ const closeVerificationBoard = () => {
         <div
           style={{
             color: "#ffffff",
-            fontSize: "24px",
+            fontSize: "32px",
             fontWeight: "900",
             lineHeight: "1",
             marginBottom: "6px",
@@ -5875,107 +6703,177 @@ const closeVerificationBoard = () => {
           NEXT CALL
         </div>
 
-        {/* COUNTDOWN */}
-        {paused ? (
-
-          /* Paused - show nothing */
-          null
-
-        ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? (
-
-          /* Voice playback countdown */
+        {/* CONTAINER FOR THE NUMBER AND THE PERMANENT "s" Suffix */}
+        <div 
+          style={{ 
+            display: "inline-flex", 
+            alignItems: "baseline", 
+            lineHeight: "1" 
+          }}
+        >
+          
+          {/* THE CHANGING NUMBER: This is the ONLY thing that swaps/changes */}
           <span
             style={{
-              color: COLOR_VOICE,
               fontSize: FONT_SIZE,
               fontWeight: FONT_WEIGHT,
-              display: "inline-flex",
-              alignItems: "baseline",
-              lineHeight: "1",
               fontVariantNumeric: "tabular-nums",
+              display: "inline-block",
+              minWidth: "1.2ch",
+              textAlign: "right"
             }}
           >
-            {/* Seconds number */}
-            <span
-              style={{
-                display: "inline-block",
-                minWidth: "1.2ch",
-                textAlign: "right",
-              }}
-            >
-              {Math.ceil(
-                Math.max(0, audioDuration - audioCurrentTime)
-              )}
-            </span>
-
-            {/* s stays beside the number */}
-            <span
-              style={{
-                display: "inline-block",
-                marginLeft: "4px",
-              }}
-            >
-              s
-            </span>
+            {paused ? (
+              /* If game is paused, keep the last number or show 0 so layout doesn't shrink */
+              "0"
+            ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? (
+              /* Voice playback number */
+              <span style={{ color: COLOR_VOICE }}>
+                {Math.ceil(Math.max(0, audioDuration - audioCurrentTime))}
+              </span>
+            ) : current && callIntervalTimeLeft > 0 ? (
+              /* Delay pacing interval number */
+              <span style={{ color: COLOR_DELAY }}>
+                {Math.ceil(callIntervalTimeLeft)}
+              </span>
+            ) : (
+              /* Default/Finished fallback value */
+              "0"
+            )}
           </span>
 
-        ) : current && callIntervalTimeLeft > 0 ? (
-
-          /* Delay pacing interval countdown */
+          {/* ✨ THE FIX: PERMANENT, IMMOVABLE "s" LETTER LETTER ANCHOR */}
+          {/* This letter never hides, never changes, and never blinks! */}
           <span
             style={{
-              color: COLOR_DELAY,
+              color: "#ffffff",
               fontSize: FONT_SIZE,
               fontWeight: FONT_WEIGHT,
-              display: "inline-flex",
-              alignItems: "baseline",
-              lineHeight: "1",
-              fontVariantNumeric: "tabular-nums",
+              display: "inline-block",
+              marginLeft: "4px"
             }}
           >
-            {/* Hourglass */}
-            <span
-              style={{
-                display: "inline-block",
-                marginRight: "8px",
-              }}
-            >
-              ⏳
-            </span>
-
-            {/* Seconds number */}
-            <span
-              style={{
-                display: "inline-block",
-                minWidth: "1.2ch",
-                textAlign: "right",
-              }}
-            >
-              {Math.ceil(callIntervalTimeLeft)}
-            </span>
-
-            {/* s */}
-            <span
-              style={{
-                display: "inline-block",
-                marginLeft: "4px",
-              }}
-            >
-              s
-            </span>
+            s
           </span>
 
-        ) : (
-
-          /* Call finished - hide countdown completely */
-          null
-
-        )}
+        </div>
 
       </div>
     </div>
   );
 })()}
+
+{/* =======================================================
+    💙 ITEM 2A: CARD VERIFICATION + PLAY / PAUSE
+    ======================================================= */}
+<div
+  className="left-panel-controls"
+  style={{
+    padding: "6px",
+     marginTop: "65px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    borderTop: "1px solid rgba(255,255,255,0.05)",
+    width: "95%",
+    justifyContent: "center",
+    position: "relative",
+    zIndex: 1,
+  }}
+>
+  {/* CARD ID VERIFICATION */}
+  <div
+    style={{
+      display: "flex",
+       marginTop: "15px",
+        fontSize: "27px",
+      flexDirection: "column",
+      gap: "4px",
+    }}
+  >
+    <input
+      type="text"
+      value={cartelaId}
+      onChange={(e) => setCartelaId(e.target.value)}
+      placeholder={t.cardIdPlaceholder}
+      style={{
+        background: "rgba(12, 22, 45, 0.85)",
+        border: "1.5px solid #edf6ef",
+        color: "#ffffff",
+        borderRadius: "30px",
+        padding: "3px 10px",
+        fontSize: "27px",
+        fontWeight: "bold",
+        outline: "none",
+        textAlign: "center",
+        height: "60px",
+        boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
+      }}
+    />
+
+    <button
+      className="ctrl-btn green-border"
+      style={{
+        justifyContent: "center",
+        padding: "2px",
+        marginTop: "15px",
+        fontSize: "35px",
+        background: "rgb(25, 111, 216)",
+        fontWeight: "bold",
+        letterSpacing: "0.5px",
+        borderRadius: "30px",
+        height: "60px",
+        boxShadow: "0 0 10px rgba(0, 84, 184, 0.3)",
+        cursor: "pointer",
+      }}
+      onClick={checkWinner}
+    >
+      <span>{t.verifyCard}</span>
+    </button>
+  </div>
+
+  {/* PLAY / PAUSE */}
+  <div
+    className="play-pause-card"
+    style={{
+      padding: "6px",
+      background: "rgba(13, 29, 45, 0.6)",
+      borderRadius: "14px",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+      backdropFilter: "blur(4px)",
+      boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <button
+        className="ctrl-btn gold-border"
+        style={{
+          padding: "2px 8px",
+          fontSize: "35px",
+          fontWeight: "800",
+          background: "#e01010",
+          flex: 1,
+          justifyContent: "center",
+          borderRadius: "100px",
+          height: "60px",
+          color: "#ffffffff",
+          boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
+          cursor: "pointer",
+        }}
+        onClick={togglePlayPause}
+      >
+        <span>{paused ? t.play : t.pause}</span>
+      </button>
+    </div>
+  </div>
+</div>
+
   </div> {/* Closes vertical column wrapper */}
 </div> {/* Closes horizontal side-by-side board wrapper */}
   
