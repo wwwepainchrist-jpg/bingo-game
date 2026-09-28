@@ -89,7 +89,10 @@ function initializeFrontendPacedSequence(
   // ============================================================
   // 1. SELECT RANDOM SOLD CARTELA
   // ============================================================
-  const randomIndex = Math.floor(Math.random() * soldCards.length);
+  const randomIndex = Math.floor(
+    Math.random() * soldCards.length
+  );
+
   const luckyCard = soldCards[randomIndex];
 
   if (!luckyCard) {
@@ -104,9 +107,9 @@ function initializeFrontendPacedSequence(
   // ============================================================
   const chosenCardId = String(
     luckyCard?.id ??
-    luckyCard?.cartela_id ??
-    luckyCard?.cartelaId ??
-    ""
+      luckyCard?.cartela_id ??
+      luckyCard?.cartelaId ??
+      ""
   ).trim();
 
   console.log(
@@ -191,6 +194,7 @@ function initializeFrontendPacedSequence(
             value: rawCellVal,
           }
         );
+
         return [];
       }
 
@@ -215,6 +219,7 @@ function initializeFrontendPacedSequence(
       `❌ CRITICAL: CARTELA #${chosenCardId} FAILED 5x5 MATRIX VALIDATION.`,
       matrixGrid
     );
+
     return [];
   }
 
@@ -237,89 +242,247 @@ function initializeFrontendPacedSequence(
   );
 
   // ============================================================
-  // 6. RANDOM STRATEGIC ROW SELECTION
+  // 6. BUILD ALL 12 POSSIBLE WINNING LINES
   // ============================================================
-  // There are 5 rows:
   //
-  // Row 0
-  // Row 1
-  // Row 2
-  // Row 3
-  // Row 4
+  // 5 ROWS
+  //   Row 0
+  //   Row 1
+  //   Row 2
+  //   Row 3
+  //   Row 4
   //
-  // Possible combinations:
+  // 5 COLUMNS
+  //   Column 0 = B
+  //   Column 1 = I
+  //   Column 2 = N
+  //   Column 3 = G
+  //   Column 4 = O
   //
-  // 0 + 1
-  // 0 + 2
-  // 0 + 3
-  // 0 + 4
-  // 1 + 2
-  // 1 + 3
-  // 1 + 4
-  // 2 + 3
-  // 2 + 4
-  // 3 + 4
+  // 2 DIAGONALS
+  //   Diagonal 0 = top-left -> bottom-right
+  //   Diagonal 1 = top-right -> bottom-left
   //
-  // TOTAL = 10 possible combinations.
-  // Each NEW GAME randomly chooses one combination.
+  // TOTAL = 12 POSSIBLE LINES
+  //
+  // EXACTLY 2 DIFFERENT LINES WILL BE RANDOMLY SELECTED.
+  //
+  // 12 choose 2 = 66 POSSIBLE COMBINATIONS.
   // ============================================================
 
-  const possibleRowPairs = [
-    [0, 1],
-    [0, 2],
-    [0, 3],
-    [0, 4],
-    [1, 2],
-    [1, 3],
-    [1, 4],
-    [2, 3],
-    [2, 4],
-    [3, 4],
-  ];
+  const possibleWinningLines = [];
 
-  const randomRowPair =
-    possibleRowPairs[
-      Math.floor(
-        Math.random() * possibleRowPairs.length
-      )
-    ];
+  // ------------------------------------------------------------
+  // ROWS
+  // ------------------------------------------------------------
+  for (let rowIndex = 0; rowIndex < 5; rowIndex++) {
+    possibleWinningLines.push({
+      type: "row",
+      index: rowIndex,
+      label: `Row ${rowIndex}`,
+    });
+  }
 
-  const targetRow1 = randomRowPair[0];
-  const targetRow2 = randomRowPair[1];
+  // ------------------------------------------------------------
+  // COLUMNS
+  // ------------------------------------------------------------
+  for (let columnIndex = 0; columnIndex < 5; columnIndex++) {
+    possibleWinningLines.push({
+      type: "column",
+      index: columnIndex,
+      label: `Column ${columnIndex}`,
+    });
+  }
+
+  // ------------------------------------------------------------
+  // DIAGONALS
+  // ------------------------------------------------------------
+  possibleWinningLines.push({
+    type: "diagonal",
+    index: 0,
+    label: "Diagonal ↘",
+  });
+
+  possibleWinningLines.push({
+    type: "diagonal",
+    index: 1,
+    label: "Diagonal ↙",
+  });
 
   console.log(
-    `%c🎲 RANDOM STRATEGIC ROWS SELECTED: Row Index ${targetRow1} and Row Index ${targetRow2}`,
+    `🎯 TOTAL POSSIBLE WINNING LINES: ${possibleWinningLines.length}`
+  );
+
+  // ============================================================
+  // 7. RANDOMLY SELECT EXACTLY 2 DIFFERENT LINES
+  // ============================================================
+  //
+  // IMPORTANT:
+  // We select WITHOUT replacement.
+  //
+  // Therefore:
+  // - Row + Row is possible
+  // - Row + Column is possible
+  // - Row + Diagonal is possible
+  // - Column + Column is possible
+  // - Column + Diagonal is possible
+  // - Diagonal + Diagonal is possible
+  //
+  // But the SAME line cannot be selected twice.
+  // ============================================================
+
+  const firstLineIndex = Math.floor(
+    Math.random() * possibleWinningLines.length
+  );
+
+  let secondLineIndex = Math.floor(
+    Math.random() * possibleWinningLines.length
+  );
+
+  while (secondLineIndex === firstLineIndex) {
+    secondLineIndex = Math.floor(
+      Math.random() * possibleWinningLines.length
+    );
+  }
+
+  const selectedLine1 =
+    possibleWinningLines[firstLineIndex];
+
+  const selectedLine2 =
+    possibleWinningLines[secondLineIndex];
+
+  const selectedWinningLines = [
+    selectedLine1,
+    selectedLine2,
+  ];
+
+  console.log(
+    `%c🎲 RANDOM WINNING LINES SELECTED`,
     "background:#332200;color:#ffcc00;font-weight:bold;padding:7px;"
   );
 
   console.log(
-    `%c🎯 RANDOM ROW COMBINATION: [${targetRow1}, ${targetRow2}]`,
-    "background:#003311;color:#00ff66;font-weight:bold;padding:5px;"
+    `🎯 LINE 1: ${selectedLine1.label}`
+  );
+
+  console.log(
+    `🎯 LINE 2: ${selectedLine2.label}`
+  );
+
+  console.log(
+    `🎯 RANDOM COMBINATION: ${selectedLine1.label} + ${selectedLine2.label}`
   );
 
   // ============================================================
-  // 7. BUILD AUTHENTIC CARD NUMBER POOLS
+  // 8. EXTRACT AUTHENTIC NUMBERS FROM SELECTED LINES
   // ============================================================
   const winningLineNumbers = new Set();
-  const remainingCardNumbers = new Set();
   const allLuckyCardNumbers = new Set();
 
-  matrixGrid.forEach((row, rIdx) => {
+  // ------------------------------------------------------------
+  // FIRST: COLLECT EVERY AUTHENTIC NUMBER FROM THE CARD
+  // ------------------------------------------------------------
+  matrixGrid.forEach((row) => {
     row.forEach((cell) => {
       if (
         cell !== "FREE" &&
         String(cell).toUpperCase() !== "FREE"
       ) {
         allLuckyCardNumbers.add(cell);
+      }
+    });
+  });
 
-        // ONLY THE RANDOMLY SELECTED TWO ROWS
-        // ARE THE STRATEGIC TARGET ROWS.
+  // ------------------------------------------------------------
+  // FUNCTION: ADD NUMBERS FROM ONE SELECTED LINE
+  // ------------------------------------------------------------
+  const addLineNumbers = (line) => {
+    if (!line) return;
+
+    // ==========================================================
+    // ROW
+    // ==========================================================
+    if (line.type === "row") {
+      const row = matrixGrid[line.index];
+
+      if (!Array.isArray(row)) {
+        return;
+      }
+
+      row.forEach((cell) => {
         if (
-          rIdx === targetRow1 ||
-          rIdx === targetRow2
+          cell !== "FREE" &&
+          String(cell).toUpperCase() !== "FREE"
         ) {
           winningLineNumbers.add(cell);
-        } else {
+        }
+      });
+
+      return;
+    }
+
+    // ==========================================================
+    // COLUMN
+    // ==========================================================
+    if (line.type === "column") {
+      for (let rowIndex = 0; rowIndex < 5; rowIndex++) {
+        const cell = matrixGrid[rowIndex]?.[line.index];
+
+        if (
+          cell !== undefined &&
+          cell !== "FREE" &&
+          String(cell).toUpperCase() !== "FREE"
+        ) {
+          winningLineNumbers.add(cell);
+        }
+      }
+
+      return;
+    }
+
+    // ==========================================================
+    // DIAGONAL
+    // ==========================================================
+    if (line.type === "diagonal") {
+      for (let rowIndex = 0; rowIndex < 5; rowIndex++) {
+        const columnIndex =
+          line.index === 0
+            ? rowIndex
+            : 4 - rowIndex;
+
+        const cell =
+          matrixGrid[rowIndex]?.[columnIndex];
+
+        if (
+          cell !== undefined &&
+          cell !== "FREE" &&
+          String(cell).toUpperCase() !== "FREE"
+        ) {
+          winningLineNumbers.add(cell);
+        }
+      }
+
+      return;
+    }
+  };
+
+  // ============================================================
+  // ADD BOTH RANDOMLY SELECTED LINES
+  // ============================================================
+  selectedWinningLines.forEach(addLineNumbers);
+
+  // ============================================================
+  // 9. BUILD REMAINING CARD NUMBER POOL
+  // ============================================================
+  const remainingCardNumbers = new Set();
+
+  matrixGrid.forEach((row) => {
+    row.forEach((cell) => {
+      if (
+        cell !== "FREE" &&
+        String(cell).toUpperCase() !== "FREE"
+      ) {
+        if (!winningLineNumbers.has(cell)) {
           remainingCardNumbers.add(cell);
         }
       }
@@ -333,7 +496,7 @@ function initializeFrontendPacedSequence(
     Array.from(remainingCardNumbers);
 
   // ============================================================
-  // 8. BUILD OUTSIDE POOL
+  // 10. BUILD OUTSIDE POOL
   // ============================================================
   const outsidePool = [];
 
@@ -343,6 +506,26 @@ function initializeFrontendPacedSequence(
     }
   }
 
+  // ============================================================
+  // 11. LOG SELECTED TARGET NUMBERS
+  // ============================================================
+  console.log(
+    `%c🎯 RANDOM TARGET LINE NUMBERS:`,
+    "background:#003311;color:#00ff66;font-weight:bold;padding:6px;"
+  );
+
+  console.log(
+    winningLineArray
+  );
+
+  console.log(
+    `🎯 TARGET NUMBER COUNT: ${winningLineArray.length}`
+  );
+
+  console.log(
+    `🎯 REMAINING CARD NUMBER COUNT: ${remainingCardArray.length}`
+  );
+
   // =========================================================================
   // 🧠 ENFORCED TIMELINE PHASES
   //
@@ -350,8 +533,8 @@ function initializeFrontendPacedSequence(
   // Phase 2: Calls 25-35
   // Phase 3: Calls 36-75
   //
-  // IMPORTANT:
-  // The selected strategic rows are now RANDOM for every NEW GAME.
+  // The two randomly selected winning lines are distributed through
+  // the sequence using the same pacing structure as your current system.
   // =========================================================================
 
   const shuffledWinning =
@@ -370,7 +553,7 @@ function initializeFrontendPacedSequence(
     );
 
   // ============================================================
-  // 9. SPLIT STRATEGIC NUMBERS
+  // 12. SPLIT STRATEGIC NUMBERS
   // ============================================================
 
   const earlyWinningNums =
@@ -380,7 +563,7 @@ function initializeFrontendPacedSequence(
     shuffledWinning.slice(0, 2);
 
   // ============================================================
-  // 10. PHASE 1 — CALLS 1 TO 24
+  // 13. PHASE 1 — CALLS 1 TO 24
   // ============================================================
 
   const phase1CardNums =
@@ -390,6 +573,19 @@ function initializeFrontendPacedSequence(
     24 -
     earlyWinningNums.length -
     phase1CardNums.length;
+
+  if (phase1OutsideCount < 0) {
+    console.error(
+      "❌ PACING ABORTED: PHASE 1 OUTSIDE COUNT BECAME NEGATIVE.",
+      {
+        winningCount: winningLineArray.length,
+        earlyWinningCount: earlyWinningNums.length,
+        phase1CardCount: phase1CardNums.length,
+      }
+    );
+
+    return [];
+  }
 
   const phase1OutsideNums =
     shuffledOutside.slice(
@@ -404,7 +600,7 @@ function initializeFrontendPacedSequence(
   ].sort(() => Math.random() - 0.5);
 
   // ============================================================
-  // 11. PHASE 2 — CALLS 25 TO 35
+  // 14. PHASE 2 — CALLS 25 TO 35
   // ============================================================
 
   const phase2CardNums =
@@ -415,10 +611,24 @@ function initializeFrontendPacedSequence(
     finalTriggerNums.length -
     phase2CardNums.length;
 
+  if (phase2OutsideCount < 0) {
+    console.error(
+      "❌ PACING ABORTED: PHASE 2 OUTSIDE COUNT BECAME NEGATIVE.",
+      {
+        winningCount: winningLineArray.length,
+        finalTriggerCount: finalTriggerNums.length,
+        phase2CardCount: phase2CardNums.length,
+      }
+    );
+
+    return [];
+  }
+
   const phase2OutsideNums =
     shuffledOutside.slice(
       phase1OutsideCount,
-      phase1OutsideCount + phase2OutsideCount
+      phase1OutsideCount +
+        phase2OutsideCount
     );
 
   const phase2Pool = [
@@ -428,7 +638,7 @@ function initializeFrontendPacedSequence(
   ].sort(() => Math.random() - 0.5);
 
   // ============================================================
-  // 12. PHASE 3 — CALLS 36 TO 75
+  // 15. PHASE 3 — CALLS 36 TO 75
   // ============================================================
 
   const phase3Pool = [
@@ -440,7 +650,7 @@ function initializeFrontendPacedSequence(
   ].sort(() => Math.random() - 0.5);
 
   // ============================================================
-  // 13. FINAL 75-BALL SEQUENCE
+  // 16. FINAL 75-BALL SEQUENCE
   // ============================================================
 
   const ordered75Balls = [
@@ -450,7 +660,7 @@ function initializeFrontendPacedSequence(
   ];
 
   // ============================================================
-  // 14. FINAL VALIDATION
+  // 17. FINAL VALIDATION
   // ============================================================
 
   if (ordered75Balls.length !== 75) {
@@ -458,7 +668,7 @@ function initializeFrontendPacedSequence(
       "❌ PACING ABORTED: GENERATED SEQUENCE IS NOT 75 BALLS.",
       {
         length: ordered75Balls.length,
-        targetRows: [targetRow1, targetRow2],
+        selectedLines: selectedWinningLines,
         chosenCardId,
       }
     );
@@ -466,7 +676,8 @@ function initializeFrontendPacedSequence(
     return [];
   }
 
-  const uniqueBalls = new Set(ordered75Balls);
+  const uniqueBalls =
+    new Set(ordered75Balls);
 
   if (uniqueBalls.size !== 75) {
     console.error(
@@ -474,7 +685,8 @@ function initializeFrontendPacedSequence(
       {
         unique: uniqueBalls.size,
         total: ordered75Balls.length,
-        targetRows: [targetRow1, targetRow2],
+        selectedLines: selectedWinningLines,
+        chosenCardId,
       }
     );
 
@@ -482,11 +694,11 @@ function initializeFrontendPacedSequence(
   }
 
   // ============================================================
-  // 15. CONVERT TO B/I/N/G/O FORMAT
+  // 18. CONVERT TO B/I/N/G/O FORMAT
   // ============================================================
 
-  const finalSequence = ordered75Balls.map(
-    (num) => {
+  const finalSequence =
+    ordered75Balls.map((num) => {
       let letter = "B";
 
       if (num >= 16 && num <= 30) {
@@ -500,15 +712,14 @@ function initializeFrontendPacedSequence(
       }
 
       return `${letter} ${num}`;
-    }
-  );
+    });
 
   // ============================================================
-  // 16. FINAL LOG
+  // 19. FINAL LOG
   // ============================================================
 
   console.log(
-    `%c🎯 FINAL RANDOMIZED PACING READY`,
+    `%c🎯 FINAL RANDOMIZED MIXED-LINE PACING READY`,
     "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
   );
 
@@ -517,7 +728,11 @@ function initializeFrontendPacedSequence(
   );
 
   console.log(
-    `🎲 SELECTED ROWS: ${targetRow1} + ${targetRow2}`
+    `🎲 LINE 1: ${selectedLine1.label}`
+  );
+
+  console.log(
+    `🎲 LINE 2: ${selectedLine2.label}`
   );
 
   console.log(
@@ -538,6 +753,109 @@ function initializeFrontendPacedSequence(
 
 function getPacingSequenceStorageKey(gameId) {
   return `bingo_auth_pacing_sequence_${String(gameId)}`;
+}
+// ============================================================
+// 🔐 PERSISTENT AUTHENTIC PACING LOCK
+// ============================================================
+
+function getAuthenticPacingLockKey(gameId) {
+  return `bingo_authentic_pacing_lock_${String(gameId)}`;
+}
+
+function saveAuthenticPacingLock(gameId, sequence) {
+  try {
+    if (
+      !gameId ||
+      !Array.isArray(sequence) ||
+      sequence.length !== 75
+    ) {
+      console.error(
+        "❌ CANNOT SAVE PACING LOCK — INVALID DATA"
+      );
+      return false;
+    }
+
+    localStorage.setItem(
+      getAuthenticPacingLockKey(gameId),
+      JSON.stringify({
+        gameId: String(gameId),
+        sequence,
+        savedAt: Date.now(),
+      })
+    );
+
+    console.log(
+      `%c🔒 PACING LOCK SAVED — GAME ${gameId}`,
+      "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO SAVE PACING LOCK:",
+      error
+    );
+
+    return false;
+  }
+}
+
+function loadAuthenticPacingLock(gameId) {
+  try {
+    if (!gameId) {
+      return null;
+    }
+
+    const key =
+      getAuthenticPacingLockKey(gameId);
+
+    const saved =
+      localStorage.getItem(key);
+
+    if (!saved) {
+      console.log(
+        `ℹ️ NO PACING LOCK FOUND FOR GAME ${gameId}`
+      );
+
+      return null;
+    }
+
+    const parsed =
+      JSON.parse(saved);
+
+    if (
+      !parsed ||
+      !Array.isArray(parsed.sequence) ||
+      parsed.sequence.length !== 75
+    ) {
+      console.error(
+        `❌ INVALID PACING LOCK FOR GAME ${gameId}`
+      );
+
+      localStorage.removeItem(key);
+
+      return null;
+    }
+
+    console.log(
+      `%c♻️ PACING LOCK RESTORED — GAME ${gameId}`,
+      "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
+    );
+
+    console.log(
+      "♻️ RESTORED 75-BALL SEQUENCE:",
+      parsed.sequence
+    );
+
+    return parsed;
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD PACING LOCK:",
+      error
+    );
+
+    return null;
+  }
 }
 
 function saveAuthenticPacingSequence(gameId, sequence) {
@@ -864,7 +1182,69 @@ const preloadedVoicesCacheRef = useRef({}); // Tracks { [path]: audioObject }
   useState(selectedWinningPattern);
 
   const [showSoldCartelas, setShowSoldCartelas] = useState(false);
+  const [showPrizeHistory, setShowPrizeHistory] = useState(false);
+const [prizeHistory, setPrizeHistory] = useState([]);
+const [loadingPrizeHistory, setLoadingPrizeHistory] = useState(false);
+const loadPrizeHistory = async () => {
+  try {
+    setLoadingPrizeHistory(true);
 
+    const response = await fetch(
+      `${API_URL}/games`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}`
+      );
+    }
+
+    const data =
+      await response.json();
+
+    const games =
+      Array.isArray(data)
+        ? data
+        : Array.isArray(data?.games)
+          ? data.games
+          : [];
+
+    const history = games
+      .filter(
+        (game) =>
+          Number(game?.prize || 0) > 0
+      )
+      .sort((a, b) => {
+        const dateA = new Date(
+          a?.game_date ||
+          a?.created_at ||
+          0
+        ).getTime();
+
+        const dateB = new Date(
+          b?.game_date ||
+          b?.created_at ||
+          0
+        ).getTime();
+
+        return dateB - dateA;
+      })
+      .slice(0, 5);
+
+    setPrizeHistory(history);
+
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD PRIZE HISTORY:",
+      error
+    );
+
+    setPrizeHistory([]);
+
+  } finally {
+    setLoadingPrizeHistory(false);
+  }
+};
 const soldCartelaSource =
   Array.isArray(passedGame?.soldCartelas)
     ? passedGame.soldCartelas
@@ -3964,132 +4344,236 @@ async function generateNumber() {
       calledRef.current.length;
 
     // ============================================================
-    // 🔐 5. FIRST BALL — LOAD DATABASE CARTELAS
-    // ============================================================
+// 🔐 5. RESTORE OR CREATE AUTHENTIC PACING LOCK
+//
+// IMPORTANT:
+// - NEW GAME  = create the pacing lock
+// - REFRESH   = restore the existing pacing lock
+// - NEVER     = create a new random cartela/sequence for
+//               an existing game that already has called balls
+// ============================================================
 
-    if (calledCount === 0) {
-      isFirstBallOfGame = true;
 
-      console.log(
-        `%c🔐 FIRST BALL — LOADING AUTHENTIC SOLD CARTELAS FOR GAME ${currentGameId}`,
-        "background:#002b36;color:#00ffff;font-weight:bold;padding:7px;"
-      );
 
-      // ----------------------------------------------------------
-      // IMPORTANT:
-      // Do NOT call initializeFrontendPacedSequence()
-      // until the backend cartelas have arrived.
-      // ----------------------------------------------------------
+let pacingLock =
+  loadAuthenticPacingLock(
+    currentGameId
+  );
 
-      const authenticSoldCartelas =
-        await loadAuthenticSoldCartelas(
-          currentGameId
-        );
+// ============================================================
+// ♻️ EXISTING PACING LOCK FOUND
+// ============================================================
 
-      // ----------------------------------------------------------
-      // GENERATION MAY HAVE BEEN CANCELLED DURING FETCH
-      // ----------------------------------------------------------
+if (
+  pacingLock &&
+  Array.isArray(pacingLock.sequence) &&
+  pacingLock.sequence.length === 75
+) {
 
-      if (
-        !generationStillValid()
-      ) {
-        console.warn(
-          "🛑 GENERATION CANCELLED WHILE LOADING AUTHENTIC CARTELAS"
-        );
+  frontendAuthSequence =
+    pacingLock.sequence;
 
-        isDrawingBallRef.current =
-          false;
+  console.log(
+    `%c♻️ EXISTING PACING SYSTEM RESTORED — GAME ${currentGameId}`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
+  );
 
-        return;
-      }
+  console.log(
+    "♻️ CALLED BALLS:",
+    calledCount
+  );
 
-      // ----------------------------------------------------------
-      // DATABASE CARTELAS ARE REQUIRED
-      // ----------------------------------------------------------
+  console.log(
+    "♻️ NEXT DRAW INDEX:",
+    calledCount + 1
+  );
 
-      if (
-        !Array.isArray(
-          authenticSoldCartelas
-        ) ||
-        authenticSoldCartelas.length === 0
-      ) {
-        console.error(
-          `%c❌ NO AUTHENTIC SOLD CARTELAS RETURNED FOR GAME ${currentGameId}`,
-          "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
-        );
+  console.log(
+    "♻️ NEXT BALL:",
+    frontendAuthSequence[calledCount]
+  );
 
-        console.error(
-          "❌ DRAW ABORTED.",
-          "PostgreSQL cartelas are required."
-        );
+  // ----------------------------------------------------------
+  // IMPORTANT:
+  // This is NOT a new game.
+  // Do not play initial shuffle again.
+  // Do not start random board blinking again.
+  // ----------------------------------------------------------
 
-        frontendAuthSequence = [];
+  if (calledCount > 0) {
 
-        isDrawingBallRef.current =
-          false;
+    hasPlayedShuffleRef.current =
+      true;
 
-        return;
-      }
+    sessionStorage.setItem(
+      "bingo_shuffle_played",
+      "true"
+    );
 
-      console.log(
-        `%c🔐 DATABASE CARTELAS LOADED: ${authenticSoldCartelas.length}`,
-        "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
-      );
+    firstGamePlayRef.current =
+      false;
 
-      // ==========================================================
-      // 🎯 6. BUILD AUTHENTIC 75-BALL SEQUENCE
-      // ==========================================================
+    stopRandomBingoBlink();
 
-      frontendAuthSequence = [];
+    console.log(
+      "♻️ INITIAL SHUFFLE SKIPPED"
+    );
 
-      frontendAuthSequence =
-        initializeFrontendPacedSequence(
-          stateRef,
-          authenticSoldCartelas
-        );
+    console.log(
+      "♻️ RANDOM BOARD BLINK SKIPPED"
+    );
+  }
 
-      console.log(
-        "🚀 AUTHENTIC FRONTEND 75-BALL SEQUENCE:",
-        frontendAuthSequence.slice(
-          0,
-          40
-        )
-      );
+}
 
-      // ==========================================================
-      // 🛑 STRICT VALIDATION
-      // ==========================================================
+// ============================================================
+// 🆕 NEW GAME — CREATE PACING LOCK
+// ============================================================
 
-      if (
-        !Array.isArray(
-          frontendAuthSequence
-        ) ||
-        frontendAuthSequence.length !==
-          75
-      ) {
-        console.error(
-          `%c❌ AUTHENTIC PACING SEQUENCE FAILED FOR GAME ${currentGameId}`,
-          "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
-        );
+else if (calledCount === 0) {
 
-        console.error(
-          "❌ RANDOM FALLBACK IS DISABLED."
-        );
+  console.log(
+    `%c🆕 NEW GAME PACING INITIALIZATION — GAME ${currentGameId}`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
+  );
 
-        frontendAuthSequence = [];
+  const authenticSoldCartelas =
+    await loadAuthenticSoldCartelas(
+      currentGameId
+    );
 
-        isDrawingBallRef.current =
-          false;
+  // ----------------------------------------------------------
+  // GENERATION MAY HAVE BEEN CANCELLED
+  // ----------------------------------------------------------
 
-        return;
-      }
+  if (
+    !generationStillValid()
+  ) {
 
-      console.log(
-        `%c🔒 AUTHENTIC DATABASE PACING LOCKED FOR GAME ${currentGameId}`,
-        "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
-      );
-    }
+    console.warn(
+      "🛑 GENERATION CANCELLED WHILE LOADING AUTHENTIC CARTELAS"
+    );
 
+    isDrawingBallRef.current =
+      false;
+
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // DATABASE CARTELAS REQUIRED
+  // ----------------------------------------------------------
+
+  if (
+    !Array.isArray(
+      authenticSoldCartelas
+    ) ||
+    authenticSoldCartelas.length === 0
+  ) {
+
+    console.error(
+      `%c❌ NO AUTHENTIC SOLD CARTELAS RETURNED FOR GAME ${currentGameId}`,
+      "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
+    );
+
+    frontendAuthSequence = [];
+
+    isDrawingBallRef.current =
+      false;
+
+    return;
+  }
+
+  console.log(
+    `%c🔐 DATABASE CARTELAS LOADED: ${authenticSoldCartelas.length}`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:7px;"
+  );
+
+  // ----------------------------------------------------------
+  // BUILD THE RANDOM PACING SYSTEM ONLY ONCE
+  // ----------------------------------------------------------
+
+  frontendAuthSequence =
+    initializeFrontendPacedSequence(
+      stateRef,
+      authenticSoldCartelas
+    );
+
+  console.log(
+    "🚀 AUTHENTIC FRONTEND 75-BALL SEQUENCE:",
+    frontendAuthSequence
+  );
+
+  // ----------------------------------------------------------
+  // STRICT VALIDATION
+  // ----------------------------------------------------------
+
+  if (
+    !Array.isArray(
+      frontendAuthSequence
+    ) ||
+    frontendAuthSequence.length !== 75
+  ) {
+
+    console.error(
+      `%c❌ AUTHENTIC PACING SEQUENCE FAILED FOR GAME ${currentGameId}`,
+      "background:#440000;color:#ff4444;font-weight:bold;padding:8px;"
+    );
+
+    frontendAuthSequence = [];
+
+    isDrawingBallRef.current =
+      false;
+
+    return;
+  }
+
+  // ----------------------------------------------------------
+  // 🔒 SAVE THE EXACT RANDOM RESULT
+  // ----------------------------------------------------------
+
+  saveAuthenticPacingLock(
+    currentGameId,
+    frontendAuthSequence
+  );
+
+  // Also keep your existing sequence storage
+  saveAuthenticPacingSequence(
+    currentGameId,
+    frontendAuthSequence
+  );
+
+  console.log(
+    `%c🔒 AUTHENTIC DATABASE PACING LOCKED FOR GAME ${currentGameId}`,
+    "background:#003300;color:#00ff66;font-weight:bold;padding:8px;"
+  );
+
+}
+
+// ============================================================
+// 🚨 EXISTING GAME WITHOUT PACING LOCK
+// ============================================================
+
+else {
+
+  console.error(
+    `%c❌ EXISTING GAME HAS ${calledCount} CALLED BALLS BUT NO PACING LOCK`,
+    "background:#440000;color:#ffffff;font-weight:bold;padding:8px;"
+  );
+
+  console.error(
+    "❌ REFUSING TO GENERATE A NEW RANDOM PACING SYSTEM."
+  );
+
+  console.error(
+    "❌ REFRESH WILL NOT REPLACE THE EXISTING GAME SEQUENCE."
+  );
+
+  isDrawingBallRef.current =
+    false;
+
+  return;
+}
     // ============================================================
     // 🎯 7. DRAW ONLY FROM AUTHENTIC PACED SEQUENCE
     // ============================================================
@@ -5990,7 +6474,7 @@ const closeVerificationBoard = () => {
  
             lineHeight: "1", 
  
-            color: "#172033", 
+            color: "#000000", 
  
             fontWeight: "900", 
           }} 
@@ -6648,7 +7132,7 @@ const closeVerificationBoard = () => {
 {(() => {
   // 🎨 EDITABLE STYLE CONFIGURATION VARIABLES
   const BOX_WIDTH = "50%";        // Width of the rectangle box container
-  const BOX_HEIGHT = "100px";     // Height of the rectangle box container
+  const BOX_HEIGHT = "150px";     // Height of the rectangle box container
   const BOX_BG = "#09090a";       // Background color
   const BOX_BORDER = "1px solid rgba(12, 12, 12, 0)";
   const BOX_RADIUS = "8px";       // Box corner roundness
@@ -6689,79 +7173,83 @@ const closeVerificationBoard = () => {
           boxShadow: "0 2px 8px rgba(0, 0, 0, 0.9)",
         }}
       >
-
-        {/* NEXT CALL */}
-        <div
-          style={{
-            color: "#ffffff",
-            fontSize: "32px",
-            fontWeight: "900",
-            lineHeight: "1",
-            marginBottom: "6px",
-          }}
-        >
-          NEXT CALL
-        </div>
-
-        {/* CONTAINER FOR THE NUMBER AND THE PERMANENT "s" Suffix */}
+ 
+     
+ {/* NEXT CALL */} 
         <div 
           style={{ 
-            display: "inline-flex", 
-            alignItems: "baseline", 
-            lineHeight: "1" 
-          }}
-        >
-          
-          {/* THE CHANGING NUMBER: This is the ONLY thing that swaps/changes */}
-          <span
-            style={{
-              fontSize: FONT_SIZE,
-              fontWeight: FONT_WEIGHT,
-              fontVariantNumeric: "tabular-nums",
-              display: "inline-block",
-              minWidth: "1.2ch",
-              textAlign: "right"
-            }}
-          >
-            {paused ? (
-              /* If game is paused, keep the last number or show 0 so layout doesn't shrink */
-              "0"
-            ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? (
-              /* Voice playback number */
-              <span style={{ color: COLOR_VOICE }}>
-                {Math.ceil(Math.max(0, audioDuration - audioCurrentTime))}
-              </span>
-            ) : current && callIntervalTimeLeft > 0 ? (
-              /* Delay pacing interval number */
-              <span style={{ color: COLOR_DELAY }}>
-                {Math.ceil(callIntervalTimeLeft)}
-              </span>
-            ) : (
-              /* Default/Finished fallback value */
-              "0"
-            )}
-          </span>
-
-          {/* ✨ THE FIX: PERMANENT, IMMOVABLE "s" LETTER LETTER ANCHOR */}
-          {/* This letter never hides, never changes, and never blinks! */}
-          <span
-            style={{
+            color: "#ffffff", 
+            fontSize: "32px", 
+            fontWeight: "900", 
+            lineHeight: "1", 
+            marginBottom: "6px", 
+          }} 
+        > 
+          NEXT CALL 
+        </div> 
+ 
+        {/* CONTAINER FOR THE NUMBER AND THE PERMANENT "s" Suffix */} 
+        <div  
+          style={{  
+            display: "inline-flex",  
+            alignItems: "baseline",  
+            lineHeight: "1"  
+          }} 
+        > 
+           
+          {/* THE CHANGING NUMBER: This is the ONLY thing that swaps/changes */} 
+          <span 
+            style={{ 
+              fontSize: FONT_SIZE, 
               color: "#ffffff",
-              fontSize: FONT_SIZE,
-              fontWeight: FONT_WEIGHT,
-              display: "inline-block",
-              marginLeft: "4px"
-            }}
-          >
-            s
-          </span>
+              fontWeight: FONT_WEIGHT, 
+              fontVariantNumeric: "tabular-nums", 
+              display: "inline-block", 
+              minWidth: "1.2ch", 
+              textAlign: "right" 
+            }} 
+          > 
+            {paused ? ( 
+              /* If game is paused, keep the last number or show 0 so layout doesn't shrink */ 
+              "0" 
+            ) : current && audioDuration > 0 && audioCurrentTime < audioDuration ? ( 
+              /* Voice playback number */ 
+              <span style={{ color: COLOR_VOICE }}> 
+                {Math.ceil(Math.max(0, audioDuration - audioCurrentTime))} 
+              </span> 
+            ) : current && callIntervalTimeLeft > 0 ? ( 
+              /* Delay pacing interval number */ 
+              <span style={{ color: COLOR_DELAY }}> 
+                {Math.ceil(callIntervalTimeLeft)} 
+              </span> 
+            ) : ( 
+              /* Default/Finished fallback value */ 
+              "0" 
+            )} 
+          </span> 
+ 
+          {/* ✨ THE FIX: PERMANENT, IMMOVABLE "s" LETTER LETTER ANCHOR */} 
+          {/* This letter never hides, never changes, and never blinks! */} 
+          <span 
+            style={{ 
+              color: "#ffffff", 
+              fontSize: FONT_SIZE, 
+              fontWeight: FONT_WEIGHT, 
+              display: "inline-block", 
+              marginLeft: "4px" 
+            }} 
+          > 
+            s 
+          </span> 
+ 
+        </div> 
+ 
+      </div> 
+    </div> 
+  ); 
+})()}  
 
-        </div>
 
-      </div>
-    </div>
-  );
-})()}
 
 {/* =======================================================
     💙 ITEM 2A: CARD VERIFICATION + PLAY / PAUSE
@@ -6781,7 +7269,7 @@ const closeVerificationBoard = () => {
     zIndex: 1,
   }}
 >
-  {/* CARD ID VERIFICATION */}
+  {/*CARD ID VERIFICATION  */}
   <div
     style={{
       display: "flex",
@@ -6802,11 +7290,11 @@ const closeVerificationBoard = () => {
         color: "#ffffff",
         borderRadius: "30px",
         padding: "3px 10px",
-        fontSize: "27px",
+        fontSize: "50px",
         fontWeight: "bold",
         outline: "none",
         textAlign: "center",
-        height: "60px",
+        height: "67px",
         boxShadow: "0 0 8px rgba(0, 255, 55, 0.25)",
       }}
     />
@@ -6822,7 +7310,7 @@ const closeVerificationBoard = () => {
         fontWeight: "bold",
         letterSpacing: "0.5px",
         borderRadius: "30px",
-        height: "60px",
+        height: "70px",
         boxShadow: "0 0 10px rgba(0, 84, 184, 0.3)",
         cursor: "pointer",
       }}
@@ -6855,13 +7343,13 @@ const closeVerificationBoard = () => {
         className="ctrl-btn gold-border"
         style={{
           padding: "2px 8px",
-          fontSize: "35px",
+          fontSize: "40px",
           fontWeight: "800",
           background: "#e01010",
           flex: 1,
           justifyContent: "center",
           borderRadius: "100px",
-          height: "60px",
+          height: "70px",
           color: "#ffffffff",
           boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
           cursor: "pointer",
@@ -6947,8 +7435,8 @@ const closeVerificationBoard = () => {
              800px x 800px
              900px x 750px
              ====================================================== */
-          width: "700px",
-          height: "700px",
+          width: "1600px",
+          height: "1400px",
 
           maxWidth: "92vw",
           maxHeight: "92vh",
@@ -6957,7 +7445,7 @@ const closeVerificationBoard = () => {
 
           border:
             verificationStatus === "WINNER"
-              ? "3px solid #00ff66"
+              ? "5px solid #00ff66"
               : verificationStatus === "CHECKING"
                 ? "3px solid #00c8ff"
                 : "3px solid #ff3344",
@@ -6989,15 +7477,15 @@ const closeVerificationBoard = () => {
             top: "8px",
             right: "9px",
 
-            width: "30px",
-            height: "30px",
+            width: "70px",
+            height: "70px",
 
             borderRadius: "50%",
             background: "#182236",
             border: "1px solid #475569",
 
             color: "#fff",
-            fontSize: "16px",
+            fontSize: "50px",
             fontWeight: "900",
 
             cursor: "pointer",
@@ -7029,7 +7517,7 @@ const closeVerificationBoard = () => {
         >
           <div
             style={{
-              fontSize: "clamp(16px, 2.5vw, 30px)",
+              fontSize: "clamp(40px, 2.5vw, 60px)",
               fontWeight: "900",
 
               color:
@@ -7042,14 +7530,14 @@ const closeVerificationBoard = () => {
           >
             {verificationStatus === "WINNER"
               ? `🎉 ${t.winner}!`
-              : "❌ NO BINGO YET"}
+              : "❌ NOT WINNER "}
           </div>
 
           <div
             style={{
               marginTop: "1px",
 
-              fontSize: "clamp(12px, 1.5vw, 20px)",
+              fontSize: "clamp(55px, 3.5vw, 70px)",
               color: "#94a3b8",
               fontWeight: "700",
 
@@ -7072,7 +7560,7 @@ const closeVerificationBoard = () => {
 
             width: "100%",
 
-            height: "8%",
+            height: "10%",
 
             marginBottom: "0.6%",
 
@@ -7094,16 +7582,16 @@ const closeVerificationBoard = () => {
 
                 borderRadius: "6px",
 
-                background: "#111c31",
+                background: "#ffffff",
 
                 border: "2px solid #00c8ff",
 
-                color: "#00c8ff",
+                color: "#000000",
 
                 /*
                  * Header text grows with popup width
                  */
-                fontSize: "clamp(16px, 3vw, 36px)",
+                fontSize: "clamp(30px, 3vw, 55px)",
 
                 fontWeight: "900",
 
@@ -7251,7 +7739,7 @@ const closeVerificationBoard = () => {
                         alignItems: "center",
                         justifyContent: "center",
 
-                        fontSize: "clamp(9px, 1.2vw, 18px)",
+                        fontSize: "clamp(29px, 1.2vw, 38px)",
 
                         fontWeight: "900",
 
@@ -7273,8 +7761,8 @@ const closeVerificationBoard = () => {
                        * NUMBER SCALES WITH THE POPUP
                        */
                       fontSize: isFree
-                        ? "clamp(12px, 2vw, 28px)"
-                        : "clamp(20px, 4vw, 52px)",
+                        ? "clamp(32px, 2vw, 48px)"
+                        : "clamp(50px, 4vw, 82px)",
 
                       fontWeight: "900",
 
@@ -7450,7 +7938,24 @@ const closeVerificationBoard = () => {
       justifyContent: "center"
     }}
   >
-
+<button
+  onClick={() => setShowPrizeHistory(true)}
+  style={{
+    padding: "12px 20px",
+    borderRadius: "10px",
+    border: "2px solid rgba(255, 215, 0, 0.8)",
+    background:
+      "linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(120, 80, 0, 0.35))",
+    color: "#ffd700",
+    fontSize: "15px",
+    fontWeight: "900",
+    cursor: "pointer",
+    boxShadow:
+      "0 0 15px rgba(255, 215, 0, 0.18)",
+  }}
+>
+  🏆 PRIZE HISTORY
+</button>
     {/* =====================================================
         TITLE
         ===================================================== */}
@@ -7555,6 +8060,231 @@ const closeVerificationBoard = () => {
       </div>
 
     )}
+    {showPrizeHistory && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0, 0, 0, 0.78)",
+      zIndex: 999999,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+      boxSizing: "border-box",
+    }}
+    onClick={() => setShowPrizeHistory(false)}
+  >
+    <div
+      style={{
+        width: "min(92vw, 1100px)",
+        maxHeight: "82vh",
+        overflowY: "auto",
+        background: "rgba(5, 12, 30, 0.98)",
+        border: "3px solid rgba(255, 215, 0, 0.85)",
+        borderRadius: "16px",
+        padding: "22px",
+        boxSizing: "border-box",
+        boxShadow:
+          "0 12px 55px rgba(0, 0, 0, 0.95)",
+      }}
+      onClick={(event) =>
+        event.stopPropagation()
+      }
+    >
+
+      {/* HEADER */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "15px",
+          marginBottom: "20px",
+          paddingBottom: "14px",
+          borderBottom:
+            "1px solid rgba(255, 215, 0, 0.25)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: "25px",
+            fontWeight: "950",
+            color: "#ffd700",
+            letterSpacing: "1px",
+          }}
+        >
+          🏆 PRIZE HISTORY
+        </div>
+
+        <button
+          onClick={() =>
+            setShowPrizeHistory(false)
+          }
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "50%",
+            border:
+              "1px solid rgba(255,255,255,0.25)",
+            background:
+              "rgba(255,255,255,0.08)",
+            color: "#fff",
+            fontSize: "20px",
+            fontWeight: "900",
+            cursor: "pointer",
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* LOADING */}
+      {loadingPrizeHistory ? (
+        <div
+          style={{
+            padding: "40px",
+            textAlign: "center",
+            color: "#8c9cb3",
+            fontWeight: "800",
+          }}
+        >
+          Loading prize history...
+        </div>
+      ) : prizeHistory.length === 0 ? (
+        <div
+          style={{
+            padding: "40px",
+            textAlign: "center",
+            color: "#8c9cb3",
+            fontWeight: "800",
+          }}
+        >
+          🏆 No prize history available.
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+
+          {prizeHistory.map(
+            (historyGame, index) => {
+
+              const prize =
+                Number(
+                  historyGame?.prize || 0
+                );
+
+              const gameId =
+                historyGame?.game_id ||
+                historyGame?.id ||
+                "—";
+
+              const gameDate =
+                historyGame?.game_date ||
+                historyGame?.created_at;
+
+              let formattedDate = "—";
+
+              if (gameDate) {
+                const date =
+                  new Date(gameDate);
+
+                if (
+                  !Number.isNaN(
+                    date.getTime()
+                  )
+                ) {
+                  formattedDate =
+                    date.toLocaleString();
+                }
+              }
+
+              return (
+                <div
+                  key={`${gameId}-${index}`}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "60px 1fr auto",
+                    alignItems: "center",
+                    gap: "18px",
+                    padding: "16px 18px",
+                    borderRadius: "12px",
+                    background:
+                      "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(5,12,30,0.95))",
+                    border:
+                      "1px solid rgba(255,215,0,0.22)",
+                  }}
+                >
+
+                  {/* RANK */}
+                  <div
+                    style={{
+                      fontSize: "22px",
+                      fontWeight: "950",
+                      color:
+                        index === 0
+                          ? "#ffd700"
+                          : "#8c9cb3",
+                      textAlign: "center",
+                    }}
+                  >
+                    #{index + 1}
+                  </div>
+
+                  {/* GAME INFO */}
+                  <div>
+                    <div
+                      style={{
+                        color: "#ffffff",
+                        fontWeight: "900",
+                        fontSize: "15px",
+                        marginBottom: "5px",
+                      }}
+                    >
+                      GAME {gameId}
+                    </div>
+
+                    <div
+                      style={{
+                        color: "#8c9cb3",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      🕐 {formattedDate}
+                    </div>
+                  </div>
+
+                  {/* PRIZE */}
+                  <div
+                    style={{
+                      textAlign: "right",
+                      color: "#00ff66",
+                      fontSize: "22px",
+                      fontWeight: "950",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {prize.toLocaleString()} Birr
+                  </div>
+
+                </div>
+              );
+            }
+          )}
+
+        </div>
+      )}
+
+    </div>
+  </div>
+)}
 
   </div>
 )}
