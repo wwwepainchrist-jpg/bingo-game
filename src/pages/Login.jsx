@@ -402,6 +402,7 @@ async function login() {
       className="login-container"
       style={{
         minHeight: "100vh",
+       
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -411,63 +412,105 @@ async function login() {
     >
       <div
         className="login-box"
-        style={{
-          maxHeight: "90vh",
-          overflowY: "auto",
-          padding: "20px",
-          boxSizing: "border-box",
-        }}
+       style={{
+  width: "700px",
+  maxWidth: "95vw",
+  minHeight: "700px",
+  maxHeight: "95vh",
+  overflowY: "auto",
+  padding: "45px",
+  boxSizing: "border-box",
+  borderRadius: "20px",
+}}
       >
-        <h1 style={{ marginTop: 0 }}>BULCHA 
-          LOGIN</h1>
+        <h1
+  style={{
+    marginTop: 0,
+    marginBottom: "30px",
+    fontSize: "42px",
+    textAlign: "center",
+    fontWeight: "bold",
+  }}
+>
+  L.SPEED BINGO LOGIN
+</h1>
 
         {/* LANGUAGE SELECTOR */}
-        <div style={{ marginBottom: "18px" }}>
-          <label
-            style={{
-              display: "block",
-              color: "#fff",
-              marginBottom: "8px",
-              fontWeight: "bold",
-            }}
-          >
-            🌐 {t?.language || "Language"}
-          </label>
+      <div style={{ marginBottom: "25px" }}>
+  <label
+    style={{
+      display: "block",
+      fontSize: "30px",
+      color: "#fff",
+      marginBottom: "12px",
+      fontWeight: "bold",
+    }}
+  >
+    🌐 {t?.language || "Language"}
+  </label>
 
-          <select
-            value={language}
-            onChange={(e) => changeLanguage(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px",
-              borderRadius: "8px",
-              fontSize: "15px",
-            }}
-          >
-            <option value="en">🇺🇸 English</option>
-          
-            <option value="om">🇪🇹 Afaan Oromoo</option>
-          </select>
-        </div>
+  <select
+    value={language}
+    onChange={(e) => changeLanguage(e.target.value)}
+    style={{
+      width: "100%",
+      padding: "18px",
+      borderRadius: "10px",
+      fontSize: "33px",
+      fontWeight: "bold",
+      boxSizing: "border-box",
+    }}
+  >
+    <option value="en">🇺🇸 English</option>
+    <option value="om">🇪🇹 Afaan Oromoo</option>
+  </select>
+</div>
 
-        <input
-          placeholder={t?.username || "Username"}
-          value={username}
-          autoComplete="off"
-          onChange={(e) => setUsername(e.target.value)}
-        />
+       <input
+  placeholder={t?.username || "Username"}
+  value={username}
+  autoComplete="off"
+  onChange={(e) => setUsername(e.target.value)}
+  style={{
+    width: "100%",
+    padding: "18px",
+    marginBottom: "18px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+    fontSize: "39px",
+    minHeight: "65px",
+  }}
+/>
 
-        <input
-          type="password"
-          placeholder={t?.password || "Password"}
-          value={password}
-          autoComplete="new-password"
-          onChange={(e) => setPassword(e.target.value)}
-        />
+<input
+  type="password"
+  placeholder={t?.password || "Password"}
+  value={password}
+  autoComplete="new-password"
+  onChange={(e) => setPassword(e.target.value)}
+  style={{
+    width: "100%",
+    padding: "18px",
+    marginBottom: "25px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+    fontSize: "38px",
+    minHeight: "65px",
+  }}
+/>
 
       <button
   onClick={login}
   disabled={loggingIn}
+  style={{
+    width: "100%",
+    minHeight: "75px",
+    padding: "18px",
+    borderRadius: "10px",
+    fontSize: "42px",
+    fontWeight: "bold",
+    cursor: loggingIn ? "not-allowed" : "pointer",
+  }}
 >
   {loggingIn
     ? "LOGGING IN..."
@@ -479,77 +522,109 @@ async function login() {
             textAlign: "center",
           }}
         >
-          <button
-            type="button"
-            onClick={() => setShowChangePassword(!showChangePassword)}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#38bdf8",
-              cursor: "pointer",
-              fontSize: "14px",
-              textDecoration: "underline",
-            }}
-          >
-            {showChangePassword ? "Cancel Password Change" : "Change Password"}
-          </button>
+         <button
+  type="button"
+  onClick={() => setShowChangePassword(!showChangePassword)}
+  style={{
+    background: "transparent",
+    border: "none",
+    color: "#38bdf8",
+    cursor: "pointer",
+    fontSize: "38px",
+    fontWeight: "bold",
+    textDecoration: "underline",
+    padding: "12px",
+  }}
+>
+  {showChangePassword
+    ? "Cancel Password Change"
+    : "Change Password"}
+</button>
         </div>
 
         {showChangePassword && (
-          <div
-            style={{
-              marginTop: "20px",
-              paddingTop: "20px",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "10px",
-            }}
-          >
-            <h3
-              style={{
-                margin: 0,
-                color: "#fff",
-                textAlign: "center",
-              }}
-            >
-              Change Password
-            </h3>
+         <div
+  style={{
+    marginTop: "25px",
+    paddingTop: "25px",
+    borderTop: "1px solid rgba(255,255,255,0.2)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "15px",
+  }}
+>
+        <h3
+  style={{
+    margin: 0,
+    marginBottom: "10px",
+    color: "#fff",
+    textAlign: "center",
+    fontSize: "38px",
+  }}
+>
+  Change Password
+</h3>
+           <input
+  placeholder={t?.username || "Username"}
+  value={changeUsername}
+  onChange={(e) => setChangeUsername(e.target.value)}
+  style={{
+    width: "100%",
+    minHeight: "65px",
+    padding: "18px",
+    fontSize: "36px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+  }}
+/>
 
-            <input
-              placeholder={t?.username || "Username"}
-              value={changeUsername}
-              onChange={(e) => setChangeUsername(e.target.value)}
-            />
+<input
+  type="password"
+  placeholder="Current Password"
+  value={currentPassword}
+  onChange={(e) => setCurrentPassword(e.target.value)}
+  style={{
+    width: "100%",
+    minHeight: "65px",
+    padding: "18px",
+    fontSize: "36px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+  }}
+/>
 
-            <input
-              type="password"
-              placeholder="Current Password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
+<input
+  type="password"
+  placeholder="New Password"
+  value={newPassword}
+  onChange={(e) => setNewPassword(e.target.value)}
+  style={{
+    width: "100%",
+    minHeight: "65px",
+    padding: "18px",
+    fontSize: "38px",
+    boxSizing: "border-box",
+    borderRadius: "10px",
+  }}
+/>
 
             <button
-              onClick={handlePasswordChange}
-              style={{
-                background: "#10b981",
-                color: "#fff",
-                border: "none",
-                padding: "12px",
-                borderRadius: "8px",
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
-            >
-              UPDATE PASSWORD
-            </button>
+  onClick={handlePasswordChange}
+  style={{
+    width: "100%",
+    minHeight: "70px",
+    background: "#10b981",
+    color: "#fff",
+    border: "none",
+    padding: "18px",
+    borderRadius: "10px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    fontSize: "40px",
+  }}
+>
+  UPDATE PASSWORD
+</button>
           </div>
         )}
       </div>

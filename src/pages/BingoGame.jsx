@@ -6838,8 +6838,8 @@ const closeVerificationBoard = () => {
   onClick={() => setShowSoldCartelas((prev) => !prev)}
   title={showSoldCartelas ? "Hide sold Cartelas" : "Show sold Cartelas"}
   style={{
-    width: "28px",
-    height: "28px",
+    width: "110px",
+    height: "48px",
     minWidth: "28px",
     minHeight: "28px",
 
@@ -6855,7 +6855,7 @@ const closeVerificationBoard = () => {
     alignItems: "center",
     justifyContent: "center",
 
-    fontSize: "35px",
+    fontSize: "55px",
     fontWeight: "900",
 
     padding: 0,
@@ -7910,9 +7910,9 @@ const closeVerificationBoard = () => {
 
       transform: "translate(-50%, -50%)",
 
-      width: "min(92vw, 1200px)",
-
-      maxHeight: "80vh",
+      width: "min(600vw, 5100px)",
+      
+      maxHeight: "900vh",
 
       background: "rgba(5, 12, 30, 0.98)",
 
@@ -7920,7 +7920,7 @@ const closeVerificationBoard = () => {
 
       borderRadius: "16px",
 
-      padding: "18px",
+      padding: "98px",
 
       boxSizing: "border-box",
 
@@ -7963,7 +7963,7 @@ const closeVerificationBoard = () => {
       style={{
         color: "#00f0ff",
 
-        fontSize: "70px",
+        fontSize: "60px",
 
         fontWeight: "bold",
 
@@ -7992,7 +7992,7 @@ const closeVerificationBoard = () => {
           gridTemplateColumns:
             "repeat(auto-fit, minmax(65px, 1fr))",
 
-          gap: "40px",
+          gap: "145px",
 
           alignItems: "center",
 
@@ -8007,13 +8007,13 @@ const closeVerificationBoard = () => {
           <div
             key={num}
             style={{
-              width: "100%",
+              width: "200%",
+ width: "200px",
+              minWidth: "190px",
 
-              minWidth: "60px",
+              maxWidth: "100px",
 
-              maxWidth: "90px",
-
-              height: "55px",
+              height: "200px",
 
               display: "flex",
 
@@ -8031,7 +8031,7 @@ const closeVerificationBoard = () => {
 
               color: "#ffffff",
 
-              fontSize: "40px",
+              fontSize: "80px",
 
               fontWeight: "bold",
 
@@ -8293,8 +8293,8 @@ const closeVerificationBoard = () => {
   onClick={() => setShowGameControls((prev) => !prev)}
   title={showGameControls ? "Hide game controls" : "Show game controls"}
   style={{
-    width: "24px",
-    height: "24px",
+    width: "115px",
+    height: "54px",
     minWidth: "24px",
     minHeight: "24px",
 
@@ -8308,7 +8308,7 @@ const closeVerificationBoard = () => {
     alignItems: "center",
     justifyContent: "center",
 
-    fontSize: "40px",
+    fontSize: "50px",
     fontWeight: "bold",
     padding: 0,
     margin: 0,
@@ -8341,7 +8341,7 @@ const closeVerificationBoard = () => {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    width: "42px",
+    width: "102px",
     height: "42px",
     flexShrink: 0,
     zIndex: 1000000,
@@ -8358,43 +8358,26 @@ const closeVerificationBoard = () => {
       ======================================================= */}
 
   {showGameControls && (
-    <div
-      style={{
-        position: "fixed",
-
-        top: "50%",
-
-        right: "20px",
-
-        transform:
-          "translateY(-50%)",
-
-        width: "300px",
-
-        padding: "16px",
-
-        background:
-          "rgba(5,12,30,0.98)",
-
-        border:
-          "2px solid rgba(0,240,255,0.8)",
-
-        borderRadius: "14px",
-
-        boxSizing: "border-box",
-
-        zIndex: 999999,
-
-        boxShadow:
-          "0 10px 40px rgba(0,0,0,0.85)",
-
-        display: "flex",
-
-        flexDirection: "column",
-
-        gap: "14px",
-      }}
-    >
+  <div
+    style={{
+      position: "fixed",
+      top: "50%",
+      right: "20px",
+      transform: "translateY(-50%)",
+      width: "700px",
+      padding: "46px",
+      background: "rgba(5,12,30,0.98)",
+      border: "2px solid rgba(0,240,255,0.8)",
+      borderRadius: "14px",
+      boxSizing: "border-box",
+      zIndex: 999999,
+      boxShadow: "0 10px 40px rgba(0,0,0,0.85)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: "14px",
+    }}
+  >
 
       {/* =====================================================
           VOICE MODE
@@ -8404,6 +8387,7 @@ const closeVerificationBoard = () => {
         style={{
           display: "flex",
           alignItems: "center",
+ 
           justifyContent: "space-between",
           gap: "10px",
         }}
@@ -8413,14 +8397,18 @@ const closeVerificationBoard = () => {
           style={{
             color: "#fff",
             fontWeight: "bold",
-            fontSize: "15px",
+            fontSize: "45px",
           }}
         >
           🎙️ VOICE
         </span>
 
-       <select
+      <select
   value={game?.voiceMode || "recorded-oromo"}
+  style={{
+    fontSize: "35px",
+    fontWeight: "bold",
+  }}
   onChange={(e) => {
     const selectedVoice = e.target.value;
 
@@ -8536,7 +8524,7 @@ const closeVerificationBoard = () => {
             style={{
               color: "#fff",
               fontWeight: "bold",
-              fontSize: "15px",
+              fontSize: "45px",
             }}
           >
             CALL SPEED
@@ -8583,8 +8571,8 @@ const closeVerificationBoard = () => {
 
               }}
               style={{
-                width: "30px",
-                height: "30px",
+                width: "60px",
+                height: "60px",
 
                 borderRadius: "6px",
 
@@ -8596,7 +8584,7 @@ const closeVerificationBoard = () => {
 
                 color: "#00f0ff",
 
-                fontSize: "20px",
+                fontSize: "60px",
 
                 fontWeight: "bold",
 
@@ -8617,7 +8605,7 @@ const closeVerificationBoard = () => {
                 minWidth: "45px",
                 textAlign: "center",
                 color: "#fff",
-                fontSize: "17px",
+                fontSize: "57px",
               }}
             >
               {Number(callInterval)}s
@@ -8655,8 +8643,8 @@ const closeVerificationBoard = () => {
 
               }}
               style={{
-                width: "30px",
-                height: "30px",
+                width: "60px",
+                height: "60px",
 
                 borderRadius: "6px",
 
@@ -8668,7 +8656,7 @@ const closeVerificationBoard = () => {
 
                 color: "#00f0ff",
 
-                fontSize: "20px",
+                fontSize: "60px",
 
                 fontWeight: "bold",
 
@@ -8695,6 +8683,7 @@ const closeVerificationBoard = () => {
         style={{
           display: "flex",
           alignItems: "center",
+         
           gap: "10px",
           width: "100%",
         }}
@@ -8704,7 +8693,7 @@ const closeVerificationBoard = () => {
           style={{
             color: "#fff",
             fontWeight: "bold",
-            fontSize: "15px",
+            fontSize: "55px",
             whiteSpace: "nowrap",
           }}
         >
@@ -8713,6 +8702,7 @@ const closeVerificationBoard = () => {
 
 
         <input
+        
           type="range"
           min="0"
           max="100"
@@ -8738,6 +8728,9 @@ const closeVerificationBoard = () => {
           }}
           style={{
             flex: 1,
+           
+    
+
             minWidth: 0,
             cursor: "pointer",
           }}
@@ -8747,6 +8740,10 @@ const closeVerificationBoard = () => {
         <span
           style={{
             minWidth: "45px",
+           
+    fontSize: "45px",
+    fontWeight: "bold",
+
             textAlign: "right",
             color: "#fff",
             fontWeight: "bold",
@@ -8776,7 +8773,7 @@ const closeVerificationBoard = () => {
           style={{
             color: "#fff",
             fontWeight: "600",
-            fontSize: "15px",
+            fontSize: "55px",
           }}
         >
           Voice Speed
@@ -8795,12 +8792,12 @@ const closeVerificationBoard = () => {
             type="button"
             onClick={decreaseVoiceSpeed}
             style={{
-              width: "32px",
-              height: "32px",
+              width: "62px",
+              height: "62px",
 
               padding: 0,
 
-              fontSize: "18px",
+              fontSize: "58px",
               fontWeight: "bold",
 
               cursor: "pointer",
@@ -8824,6 +8821,7 @@ const closeVerificationBoard = () => {
             style={{
               minWidth: "50px",
               textAlign: "center",
+               fontSize: "48px",
               color: "#fff",
               fontWeight: "bold",
             }}
@@ -8836,12 +8834,12 @@ const closeVerificationBoard = () => {
             type="button"
             onClick={increaseVoiceSpeed}
             style={{
-              width: "32px",
-              height: "32px",
+              width: "62px",
+              height: "62px",
 
               padding: 0,
 
-              fontSize: "18px",
+              fontSize: "58px",
               fontWeight: "bold",
 
               cursor: "pointer",
