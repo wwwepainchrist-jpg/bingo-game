@@ -2249,7 +2249,41 @@ useEffect(() => {
            
           </div>
 
-          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: "2px" }}>
+
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '48px', marginTop: "2px" }}>
+
+{/* SHOW / HIDE BAR */}
+  <button
+    type="button"
+    onClick={() =>
+      setShowWinningPattern(!showWinningPattern)
+    }
+    style={{
+      width: "10%",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: "9px 12px",
+      background: "transparent",
+      border: "none",
+      color: "#38bdf8",
+      fontSize: "37px",
+      fontWeight: "900",
+      cursor: "pointer"
+    }}
+  >
+<span>🏆 የማሸነፊያ ዝጎች / PATTERNOOTA MO'AA</span> 
+
+    <span 
+      style={{ 
+        fontSize: "35px", 
+        color: "#de0c0c" 
+      }} 
+    > 
+      {showWinningPattern ? "▲" : "▼"} 
+    </span> 
+  </button> 
+
             <button onClick={() => setSoldCartelas([])} className="btn btn-danger" style={{ padding: "3px 8px", fontSize: "45px", background: "#2278e1", lineHeight: 1.2, textTransform: "none" }}>
               {t?.resetGame || "Reset Game"}
             </button>
@@ -2267,7 +2301,7 @@ useEffect(() => {
                 cursor: isInsufficientPackage ? "not-allowed" : "pointer",
                  background: "#e12222",
                 padding: "2px 6px",
-                fontSize: "50px",
+                fontSize: "60px",
                 lineHeight: 1.2,
                 textTransform: "none",
                 backgroundColor: startClicked ? "#dc2626" : undefined,
@@ -2280,6 +2314,8 @@ useEffect(() => {
                   ? "🔴 STARTED"
                   : (t?.start || "START GAME")}
             </button>
+             
+
             
             <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", background: "#2278e1", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
               
@@ -2309,6 +2345,7 @@ useEffect(() => {
 )}
         </div>
 
+        
         {/* MAIN GRID */}
         <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr", flex: 1, display: "flex", flexDirection: "column" }}>
           <div className="right-column" style={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -2423,37 +2460,7 @@ useEffect(() => {
     overflow: "hidden"
   }}
 >
-  {/* SHOW / HIDE BAR */}
-  <button
-    type="button"
-    onClick={() =>
-      setShowWinningPattern(!showWinningPattern)
-    }
-    style={{
-      width: "100%",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: "8px 10px",
-      background: "transparent",
-      border: "none",
-      color: "#38bdf8",
-      fontSize: "27px",
-      fontWeight: "900",
-      cursor: "pointer"
-    }}
-  >
-<span>🏆 የማሸነፊያ ዝጎች / PATTERNOOTA MO'AA /</span> 
-
-    <span 
-      style={{ 
-        fontSize: "22px", 
-        color: "#ffffff" 
-      }} 
-    > 
-      {showWinningPattern ? "▲" : "▼"} 
-    </span> 
-  </button> 
+ 
 
   {/* EXPANDED CONTENT */} 
   {showWinningPattern && ( 

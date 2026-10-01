@@ -179,9 +179,9 @@ body {
 
 .bingo-board {
     width: 90%;
-     width: 3200px;    
+     width: 3220px;    
     min-width: 1400px;
-    height: 1000px; /* Scaled up height */
+    height: 1100px; /* Scaled up height */
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -220,7 +220,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 58px; /* High-visibility letter headers */
+    font-size: 78px; /* High-visibility letter headers */
     line-height: 1;
     font-weight: 900;
     border-radius: 8px;

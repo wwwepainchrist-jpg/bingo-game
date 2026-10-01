@@ -1042,7 +1042,9 @@ function getSavedCashierVoice() {
   const [paused, setPaused] = useState(true);
   const [speed, setSpeed] = useState(5);
   const [cartelaId, setCartelaId] = useState("");
-  
+  const [recentPrizeHistory, setRecentPrizeHistory] = useState([]);
+
+ 
   const [winnerMessage, setWinnerMessage] = useState("");
   const [checkedCartela, setCheckedCartela] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(""); 
@@ -1182,7 +1184,7 @@ const preloadedVoicesCacheRef = useRef({}); // Tracks { [path]: audioObject }
   useState(selectedWinningPattern);
 
   const [showSoldCartelas, setShowSoldCartelas] = useState(false);
-  const [showPrizeHistory, setShowPrizeHistory] = useState(false);
+ 
 const [prizeHistory, setPrizeHistory] = useState([]);
 const [loadingPrizeHistory, setLoadingPrizeHistory] = useState(false);
 const loadPrizeHistory = async () => {
@@ -1262,6 +1264,18 @@ const soldCartelaIds = soldCartelaSource
   )
   .filter(Number.isFinite)
   .sort((a, b) => a - b);
+useEffect(() => {
+  loadPrizeHistory();
+
+  const prizeHistoryTimer = setInterval(() => {
+    loadPrizeHistory();
+  }, 5000);
+
+  return () => {
+    clearInterval(prizeHistoryTimer);
+  };
+}, []);
+
 const [voiceSpeed, setVoiceSpeed] = useState(1.0);
 const voiceSpeedRef = useRef(1.0);
 const TARGET_GENERATION_INTERVAL_MS = 400;
@@ -6232,8 +6246,8 @@ const closeVerificationBoard = () => {
         left: "6px",
         zIndex: 9999,
 
-        width: "35px",
-        height: "35px",
+        width: "70px",
+        height: "70px",
 
         borderRadius: "50%",
         border: "1px solid rgba(255,255,255,0.25)",
@@ -6245,7 +6259,7 @@ const closeVerificationBoard = () => {
         alignItems: "center",
         justifyContent: "center",
 
-        fontSize: "30px",
+        fontSize: "67px",
         fontWeight: "bold",
 
         cursor: "pointer",
@@ -6836,17 +6850,26 @@ const closeVerificationBoard = () => {
 <button
   type="button"
   onClick={() => setShowSoldCartelas((prev) => !prev)}
-  title={showSoldCartelas ? "Hide sold Cartelas" : "Show sold Cartelas"}
+  title={
+    showSoldCartelas
+      ? "Hide sold Cartelas"
+      : "Show sold Cartelas"
+  }
   style={{
-    width: "110px",
-    height: "48px",
-    minWidth: "28px",
-    minHeight: "28px",
+    width: "72px",
+    height: "72px",
 
-    borderRadius: "6px",
-    border: "1px solid rgba(0,240,255,0.8)",
+    borderRadius: "18px",
 
-    background: "#0b1320",
+    /* GLASS EFFECT */
+    border: "1px solid rgba(255, 255, 255, 0.28)",
+
+    background:
+      "rgba(10, 20, 35, 0.28)",
+
+   background: "rgba(10, 20, 35, 0.15)",
+backdropFilter: "blur(0px)",
+WebkitBackdropFilter: "blur(4px)",
     color: "#00f0ff",
 
     cursor: "pointer",
@@ -6855,23 +6878,32 @@ const closeVerificationBoard = () => {
     alignItems: "center",
     justifyContent: "center",
 
-    fontSize: "55px",
+    fontSize: "35px",
     fontWeight: "900",
 
     padding: 0,
     margin: 0,
+
     lineHeight: 1,
 
     position: "absolute",
+
     right: "6px",
     top: "60%",
+
     transform: "translateY(-50%)",
 
     zIndex: 1000001,
 
-    boxShadow: "0 2px 8px rgba(0,0,0,0.6)",
+    /* GLASS SHADOW */
+    boxShadow:
+      "0 8px 25px rgba(0, 0, 0, 0.35), " +
+      "inset 0 1px 1px rgba(255,255,255,0.25)",
 
     flexShrink: 0,
+
+    /* keeps background/content visible through it */
+    overflow: "hidden",
   }}
 >
   {showSoldCartelas ? "◀" : "▶"}
@@ -6897,7 +6929,7 @@ const closeVerificationBoard = () => {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center", 
-    gap: "16px",
+    gap: "18px",
     flexShrink: 0,
     width: "max-content"
   }}
@@ -7089,7 +7121,9 @@ const closeVerificationBoard = () => {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
+    ,
+    
     gap: "2px",
     marginBottom: "5px",
     color: "#8c9cb3",
@@ -7101,7 +7135,7 @@ const closeVerificationBoard = () => {
     style={{
       fontSize: "40px",
       color: "#ffffff",
-              marginTop: "66px",
+              marginTop: "56px",
       fontWeight: "900",
       letterSpacing: "2px",
       lineHeight: "1",
@@ -7122,7 +7156,6 @@ const closeVerificationBoard = () => {
     {called.length}
   </span>
 </div>
-   
     {/* =======================================================
         🎙️ ITEM 4: TEXT-ONLY COUNTDOWN DISPLAY
         ======================================================= */}
@@ -7895,8 +7928,7 @@ const closeVerificationBoard = () => {
   )}
 </div>
  </div>       
- 
-       {/* =========================================================
+   {/* =========================================================
     SOLD CARTELAS OVERLAY
     ALL NUMBERS VISIBLE — NO SCROLLING
     ========================================================= */}
@@ -7910,9 +7942,9 @@ const closeVerificationBoard = () => {
 
       transform: "translate(-50%, -50%)",
 
-      width: "min(600vw, 5100px)",
-      
-      maxHeight: "900vh",
+      width: "min(92vw, 1600px)",
+
+      maxHeight: "80vh",
 
       background: "rgba(5, 12, 30, 0.98)",
 
@@ -7920,7 +7952,7 @@ const closeVerificationBoard = () => {
 
       borderRadius: "16px",
 
-      padding: "98px",
+      padding: "18px",
 
       boxSizing: "border-box",
 
@@ -7938,24 +7970,148 @@ const closeVerificationBoard = () => {
       justifyContent: "center"
     }}
   >
-<button
-  onClick={() => setShowPrizeHistory(true)}
-  style={{
-    padding: "12px 20px",
-    borderRadius: "10px",
-    border: "2px solid rgba(255, 215, 0, 0.8)",
-    background:
-      "linear-gradient(135deg, rgba(255, 215, 0, 0.18), rgba(120, 80, 0, 0.35))",
-    color: "#ffd700",
-    fontSize: "15px",
-    fontWeight: "900",
-    cursor: "pointer",
-    boxShadow:
-      "0 0 15px rgba(255, 215, 0, 0.18)",
-  }}
->
-  🏆 PRIZE HISTORY
-</button>
+    {/* =====================================================
+        PRIZE HISTORY
+        ===================================================== */}
+
+    <div
+      style={{
+        width: "100%",
+        flexShrink: 0,
+
+        marginBottom: "18px",
+        padding: "12px 16px",
+
+        boxSizing: "border-box",
+
+        background:
+          "rgba(255, 215, 0, 0.08)",
+
+        border:
+          "2px solid rgba(255, 215, 0, 0.55)",
+
+        borderRadius: "14px",
+      }}
+    >
+      <div
+        style={{
+          textAlign: "center",
+
+          color: "#ffd700",
+
+          fontSize: "32px",
+
+          fontWeight: "900",
+
+          marginBottom: "10px",
+        }}
+      >
+        🏆 PRIZE HISTORY
+      </div>
+
+      {loadingPrizeHistory ? (
+
+        <div
+          style={{
+            textAlign: "center",
+            color: "#aaaaaa",
+            padding: "8px",
+          }}
+        >
+          Loading...
+        </div>
+
+      ) : prizeHistory.length === 0 ? (
+
+        <div
+          style={{
+            textAlign: "center",
+            color: "#aaaaaa",
+            padding: "8px",
+          }}
+        >
+          No completed games yet
+        </div>
+
+      ) : (
+
+        <div
+          style={{
+            width: "100%",
+
+            display: "grid",
+
+            gridTemplateColumns:
+              "repeat(5, minmax(0, 1fr))",
+
+            gap: "8px",
+          }}
+        >
+          {prizeHistory.map((item, index) => (
+
+            <div
+              key={`${item.game_id || item.id}-${index}`}
+              style={{
+                padding: "8px",
+
+                textAlign: "center",
+
+                background:
+                  "rgba(255, 255, 255, 0.05)",
+
+                border:
+                  "1px solid rgba(255, 215, 0, 0.35)",
+
+                borderRadius: "8px",
+
+                boxSizing: "border-box",
+              }}
+            >
+
+              <div
+                style={{
+                  color: "#ffd700",
+                  fontSize: "18px",
+                  fontWeight: "900",
+                }}
+              >
+                GAME {index + 1}
+              </div>
+
+              <div
+                style={{
+                  color: "#ffffff",
+                  fontSize: "65px",
+                  fontWeight: "900",
+                  marginTop: "3px",
+                }}
+              >
+                {Number(
+                  item.prize || 0
+                ).toLocaleString()}{" "}
+               
+              </div>
+
+              <div
+                style={{
+                  color: "#888888",
+                  fontSize: "10px",
+                  marginTop: "2px",
+                }}
+              >
+                {item.game_id ||
+                  `#${item.id || ""}`}
+              </div>
+
+            </div>
+
+          ))}
+        </div>
+
+      )}
+    </div>
+
+
     {/* =====================================================
         TITLE
         ===================================================== */}
@@ -7963,7 +8119,7 @@ const closeVerificationBoard = () => {
       style={{
         color: "#00f0ff",
 
-        fontSize: "60px",
+        fontSize: "50px",
 
         fontWeight: "bold",
 
@@ -7992,7 +8148,7 @@ const closeVerificationBoard = () => {
           gridTemplateColumns:
             "repeat(auto-fit, minmax(65px, 1fr))",
 
-          gap: "145px",
+          gap: "57px",
 
           alignItems: "center",
 
@@ -8007,13 +8163,13 @@ const closeVerificationBoard = () => {
           <div
             key={num}
             style={{
-              width: "200%",
- width: "200px",
-              minWidth: "190px",
+              width: "100%",
 
-              maxWidth: "100px",
+              minWidth: "60px",
 
-              height: "200px",
+              maxWidth: "90px",
+
+              height: "55px",
 
               display: "flex",
 
@@ -8021,24 +8177,18 @@ const closeVerificationBoard = () => {
 
               justifyContent: "center",
 
-              background:
-                "rgba(0, 240, 255, 0.15)",
-
-              border:
-                "2px solid rgba(0, 240, 255, 0.55)",
-
-              borderRadius: "40px",
+              
 
               color: "#ffffff",
 
-              fontSize: "80px",
+              fontSize: "68px",
 
               fontWeight: "bold",
 
               boxSizing: "border-box"
             }}
           >
-            #{num}
+            {num}
           </div>
 
         ))}
@@ -8060,242 +8210,17 @@ const closeVerificationBoard = () => {
       </div>
 
     )}
-    {showPrizeHistory && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0, 0, 0, 0.78)",
-      zIndex: 999999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "20px",
-      boxSizing: "border-box",
-    }}
-    onClick={() => setShowPrizeHistory(false)}
-  >
-    <div
-      style={{
-        width: "min(92vw, 1100px)",
-        maxHeight: "82vh",
-        overflowY: "auto",
-        background: "rgba(5, 12, 30, 0.98)",
-        border: "3px solid rgba(255, 215, 0, 0.85)",
-        borderRadius: "16px",
-        padding: "22px",
-        boxSizing: "border-box",
-        boxShadow:
-          "0 12px 55px rgba(0, 0, 0, 0.95)",
-      }}
-      onClick={(event) =>
-        event.stopPropagation()
-      }
-    >
-
-      {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "15px",
-          marginBottom: "20px",
-          paddingBottom: "14px",
-          borderBottom:
-            "1px solid rgba(255, 215, 0, 0.25)",
-        }}
-      >
-        <div
-          style={{
-            fontSize: "25px",
-            fontWeight: "950",
-            color: "#ffd700",
-            letterSpacing: "1px",
-          }}
-        >
-          🏆 PRIZE HISTORY
-        </div>
-
-        <button
-          onClick={() =>
-            setShowPrizeHistory(false)
-          }
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            border:
-              "1px solid rgba(255,255,255,0.25)",
-            background:
-              "rgba(255,255,255,0.08)",
-            color: "#fff",
-            fontSize: "20px",
-            fontWeight: "900",
-            cursor: "pointer",
-          }}
-        >
-          ×
-        </button>
-      </div>
-
-      {/* LOADING */}
-      {loadingPrizeHistory ? (
-        <div
-          style={{
-            padding: "40px",
-            textAlign: "center",
-            color: "#8c9cb3",
-            fontWeight: "800",
-          }}
-        >
-          Loading prize history...
-        </div>
-      ) : prizeHistory.length === 0 ? (
-        <div
-          style={{
-            padding: "40px",
-            textAlign: "center",
-            color: "#8c9cb3",
-            fontWeight: "800",
-          }}
-        >
-          🏆 No prize history available.
-        </div>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "10px",
-          }}
-        >
-
-          {prizeHistory.map(
-            (historyGame, index) => {
-
-              const prize =
-                Number(
-                  historyGame?.prize || 0
-                );
-
-              const gameId =
-                historyGame?.game_id ||
-                historyGame?.id ||
-                "—";
-
-              const gameDate =
-                historyGame?.game_date ||
-                historyGame?.created_at;
-
-              let formattedDate = "—";
-
-              if (gameDate) {
-                const date =
-                  new Date(gameDate);
-
-                if (
-                  !Number.isNaN(
-                    date.getTime()
-                  )
-                ) {
-                  formattedDate =
-                    date.toLocaleString();
-                }
-              }
-
-              return (
-                <div
-                  key={`${gameId}-${index}`}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "60px 1fr auto",
-                    alignItems: "center",
-                    gap: "18px",
-                    padding: "16px 18px",
-                    borderRadius: "12px",
-                    background:
-                      "linear-gradient(135deg, rgba(255,215,0,0.08), rgba(5,12,30,0.95))",
-                    border:
-                      "1px solid rgba(255,215,0,0.22)",
-                  }}
-                >
-
-                  {/* RANK */}
-                  <div
-                    style={{
-                      fontSize: "22px",
-                      fontWeight: "950",
-                      color:
-                        index === 0
-                          ? "#ffd700"
-                          : "#8c9cb3",
-                      textAlign: "center",
-                    }}
-                  >
-                    #{index + 1}
-                  </div>
-
-                  {/* GAME INFO */}
-                  <div>
-                    <div
-                      style={{
-                        color: "#ffffff",
-                        fontWeight: "900",
-                        fontSize: "15px",
-                        marginBottom: "5px",
-                      }}
-                    >
-                      GAME {gameId}
-                    </div>
-
-                    <div
-                      style={{
-                        color: "#8c9cb3",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      🕐 {formattedDate}
-                    </div>
-                  </div>
-
-                  {/* PRIZE */}
-                  <div
-                    style={{
-                      textAlign: "right",
-                      color: "#00ff66",
-                      fontSize: "22px",
-                      fontWeight: "950",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {prize.toLocaleString()} Birr
-                  </div>
-
-                </div>
-              );
-            }
-          )}
-
-        </div>
-      )}
-
-    </div>
-  </div>
-)}
 
   </div>
 )}
-         <button
+   <button
   type="button"
   onClick={() => setShowGameControls((prev) => !prev)}
   title={showGameControls ? "Hide game controls" : "Show game controls"}
   style={{
-    width: "115px",
-    height: "54px",
-    minWidth: "24px",
+    width: "43px",
+    height: "24px",
+    minWidth: "44px",
     minHeight: "24px",
 
     borderRadius: "4px",
@@ -8308,7 +8233,7 @@ const closeVerificationBoard = () => {
     alignItems: "center",
     justifyContent: "center",
 
-    fontSize: "50px",
+    fontSize: "60px",
     fontWeight: "bold",
     padding: 0,
     margin: 0,
@@ -8324,7 +8249,7 @@ const closeVerificationBoard = () => {
     zIndex: 1000001,
   }}
 >
-
+  
  
   {showGameControls ? "◀" : "▶"}
 </button>
