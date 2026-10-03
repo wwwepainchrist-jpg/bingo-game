@@ -323,10 +323,29 @@ router.get("/active/:gameId", async (req, res) => {
     console.log("🔥 ACTIVE GAME REQUEST:", gameId);
 
     // ✅ SAFE: Use SELECT * so we don't break on column name mismatches
-    const result = await pool.query(
-      `SELECT * FROM games WHERE game_id = $1 LIMIT 1`,
-      [gameId]
-    );
+  const result = await pool.query(
+  `
+  SELECT
+    id,
+    game_id,
+    house_id,
+    cashier_id,
+    bet,
+    prize,
+    commission,
+    cards_sold,
+    house_commission,
+    voice_mode,
+    winning_pattern_count,
+    status,
+    game_date,
+    created_at
+  FROM games
+  WHERE game_id = $1
+  LIMIT 1
+  `,
+  [gameId]
+);
 
     if (result.rows.length === 0) {
       console.log("❌ GAME NOT FOUND:", gameId);
@@ -338,9 +357,7 @@ router.get("/active/:gameId", async (req, res) => {
     console.log("✅ EXACT GAME FOUND:", game.game_id);
 
     // ✅ STRIP heavy fields here (JavaScript side) — prevents sending cartela matrices
-    delete game.sold_cartelas;   // snake_case version
-    delete game.soldCartelas;    // camelCase version
-    delete game.called_numbers;  // if this also grows large
+   // if this also grows large
 
     const calledResult = await pool.query(
       `SELECT ball FROM called_balls WHERE game_id = $1 ORDER BY id ASC`,
