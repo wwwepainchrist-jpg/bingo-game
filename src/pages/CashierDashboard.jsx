@@ -86,6 +86,298 @@ export default function CashierDashboard() {
   const [keyboardInput, setKeyboardInput] = useState("");
   const [selectedPatterns, setSelectedPatterns] = useState([]);
   const [showFinance, setShowFinance] = useState(false);
+
+  const [netUnlocked, setNetUnlocked] = useState(false);
+const [netPasswordExists, setNetPasswordExists] = useState(false);
+
+const [showNetLogin, setShowNetLogin] = useState(false);
+const [showCreateNetPassword, setShowCreateNetPassword] = useState(false);
+const [showChangeNetPassword, setShowChangeNetPassword] = useState(false);
+
+const [netPassword, setNetPassword] = useState("");
+const [netPasswordConfirm, setNetPasswordConfirm] = useState("");
+
+const [currentNetPassword, setCurrentNetPassword] = useState("");
+const [newNetPassword, setNewNetPassword] = useState("");
+const [newNetPasswordConfirm, setNewNetPasswordConfirm] = useState("");
+const [houseNetIncome, setHouseNetIncome] = useState(0);
+const [loadingHouseNet, setLoadingHouseNet] = useState(false);
+
+  const checkNetPasswordStatus = async () => {
+  try {
+    const response = await fetch(
+`${API_URL}/cashiers/cashier-net-password/status/${id}`
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "Failed to check NET password"
+      );
+    }
+
+    setNetPasswordExists(
+      Boolean(data.hasPassword)
+    );
+
+    if (data.hasPassword) {
+      setShowNetLogin(true);
+      setShowCreateNetPassword(false);
+    } else {
+      setShowCreateNetPassword(true);
+      setShowNetLogin(false);
+    }
+
+  } catch (error) {
+    console.error(
+      "❌ NET PASSWORD STATUS ERROR:",
+      error
+    );
+
+    alert(
+      error.message ||
+      "Cannot connect to server"
+    );
+  }
+};
+
+const handleCreateNetPassword = async () => {
+  if (!netPassword || !netPasswordConfirm) {
+    alert("Please enter and confirm the password.");
+    return;
+  }
+
+  if (netPassword !== netPasswordConfirm) {
+    alert("Passwords do not match.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+`${API_URL}/cashiers/cashier-net-password/create`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cashierId: id,
+          password: netPassword,
+          confirmPassword: netPasswordConfirm,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "Failed to create password"
+      );
+    }
+
+    setNetPassword("");
+    setNetPasswordConfirm("");
+
+    setNetPasswordExists(true);
+    setShowCreateNetPassword(false);
+    setShowNetLogin(true);
+
+    alert("NET password created successfully.");
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+const handleNetLogin = async () => {
+  if (!netPassword) {
+    alert("Enter your NET password.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/cashiers/cashier-net-password/login`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cashierId: id,
+          password: netPassword,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "Incorrect password"
+      );
+    }
+
+    setNetUnlocked(true);
+setShowNetLogin(false);
+setNetPassword("");
+
+// LOAD THE SAME HOUSE NET USED BY HOUSE DASHBOARD
+await loadHouseNetIncome();
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+const handleChangeNetPassword = async () => {
+  if (
+    !currentNetPassword ||
+    !newNetPassword ||
+    !newNetPasswordConfirm
+  ) {
+    alert("Please fill in all password fields.");
+    return;
+  }
+
+  if (
+    newNetPassword !==
+    newNetPasswordConfirm
+  ) {
+    alert("New passwords do not match.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+     `${API_URL}/cashiers/cashier-net-password/change` ,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          cashierId: id,
+          currentPassword: currentNetPassword,
+          newPassword: newNetPassword,
+          confirmPassword: newNetPasswordConfirm,
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.error || "Failed to change password"
+      );
+    }
+
+    setCurrentNetPassword("");
+    setNewNetPassword("");
+    setNewNetPasswordConfirm("");
+
+    setShowChangeNetPassword(false);
+    setNetUnlocked(false);
+    setShowNetLogin(true);
+
+    alert("NET password changed successfully.");
+
+  } catch (error) {
+    alert(error.message);
+  }
+};
+const loadHouseNetIncome = async () => {
+  try {
+    setLoadingHouseNet(true);
+
+    const response = await fetch(`${API_URL}/games`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to load games: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const games = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.games)
+        ? data.games
+        : [];
+
+    const actualHouseId =
+      currentCashier?.house_id ||
+      localStorage.getItem(`cashier_house_id_${id}`);
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    const todayHouseGames = games.filter((game) => {
+      const gameHouseId = String(
+        game?.house_id ??
+        game?.house ??
+        ""
+      );
+
+      const gameDate = new Date(
+        game?.game_date ??
+        game?.created_at ??
+        game?.date ??
+        0
+      );
+
+      const gameDateString = Number.isNaN(gameDate.getTime())
+        ? ""
+        : gameDate.toISOString().slice(0, 10);
+
+      return (
+        gameHouseId === String(actualHouseId) &&
+        gameDateString === today
+      );
+    });
+
+    const totalHouseNet = todayHouseGames.reduce(
+      (total, game) => {
+        const houseEarned = Number(
+          game?.house_commission ??
+          game?.commission_earned ??
+          game?.commissionDeducted ??
+          0
+        );
+
+        return total + (
+          Number.isFinite(houseEarned)
+            ? houseEarned
+            : 0
+        );
+      },
+      0
+    );
+
+    setHouseNetIncome(totalHouseNet);
+
+    console.log(
+      "💰 CASHIER HOUSE NET LOADED:",
+      {
+        houseId: actualHouseId,
+        gamesToday: todayHouseGames.length,
+        houseNetIncome: totalHouseNet,
+      }
+    );
+
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD CASHIER HOUSE NET:",
+      error
+    );
+
+    setHouseNetIncome(0);
+  } finally {
+    setLoadingHouseNet(false);
+  }
+};
+
   const [showQrModal, setShowQrModal] = useState(false);
 const startingGameRef = useRef(false);
   const [soldCartelas, setSoldCartelas] = useState([]);
@@ -772,6 +1064,10 @@ const netIncome =
   grossIncome -
   commissionAmount;
 
+  // HOUSE DASHBOARD NET
+// NET = HOUSE COMMISSION EARNED
+
+
 
 // ============================================================
 // HOUSE ID
@@ -980,8 +1276,7 @@ async function startGame() {
 
     // HOUSE COMMISSION EARNED
     const commissionAmount =
-      gross *
-      (commissionPercent / 100);
+      gross * (commissionPercent / 100);
 
     // CURRENT PACKAGE
     const currentPackage =
@@ -1006,8 +1301,6 @@ async function startGame() {
 
     // =====================================================
     // CHECK PACKAGE
-    //
-    // PACKAGE IS REDUCED BY HOUSE COMMISSION EARNED
     // =====================================================
     if (
       currentPackage <
@@ -1034,8 +1327,6 @@ async function startGame() {
 
     // =====================================================
     // CREATE GAME ID ONCE
-    //
-    // SAME ID IS USED ONLINE + OFFLINE
     // =====================================================
     const gameId =
       `G-${Date.now()}`;
@@ -1044,7 +1335,15 @@ async function startGame() {
       new Date().toISOString();
 
     // =====================================================
-    // CARTELA STRUCTURE
+    // STRUCTURAL SOLD CARTELAS
+    //
+    // IMPORTANT:
+    // These IDs are sent to the backend.
+    //
+    // DO NOT generate a fake matrix here.
+    //
+    // The real authenticated numbers/matrix will be
+    // downloaded from the backend AFTER the game is created.
     // =====================================================
     const structuralSoldCartelas =
       soldCartelas.map((num) => ({
@@ -1052,38 +1351,33 @@ async function startGame() {
 
         cartela_id:
           String(num),
-
-        matrix:
-          generateMockMatrixForId(num),
       }));
-// =====================================================
-// 🔍 DEBUG EARLY WINNER CARTELAS
-// =====================================================
-console.log(
-  "🎫 EARLY WINNER CARTELAS SENT TO GAME:",
-  structuralSoldCartelas
-);
 
-console.log(
-  "🎯 CARTELA COUNT:",
-  structuralSoldCartelas.length
-);
+    console.log(
+      "🎫 SOLD CARTELA IDS SENT TO GAME:",
+      structuralSoldCartelas
+    );
 
-console.log(
-  "🎯 CARTELA MATRICES:",
-  structuralSoldCartelas.map(c => ({
-    id: c.id,
-    matrix: c.matrix
-  }))
-);
+    console.log(
+      "🎯 CARTELA COUNT:",
+      structuralSoldCartelas.length
+    );
 
-console.log(
-  "🏆 WINNING PATTERN COUNT:",
-  winningPatternCount
-);
+    console.log(
+      "🏆 WINNING PATTERN COUNT:",
+      winningPatternCount
+    );
+
     // =====================================================
     // CREATE COMMON GAME OBJECT
     // ONLINE + OFFLINE
+    //
+    // NOTE:
+    // For a completely offline start, this object still
+    // contains only the structural cartela IDs.
+    //
+    // For an ONLINE start, we replace soldCartelas with
+    // the authentic backend snapshot before saving locally.
     // =====================================================
     const localGame = {
       id:
@@ -1255,7 +1549,352 @@ console.log(
         }
 
         // =================================================
+        // 🔐 LOAD AUTHENTIC SOLD CARTELAS
+        //
+        // THIS IS THE IMPORTANT FIX.
+        //
+        // The backend now gives us the exact B/I/N/G/O
+        // numbers belonging to the sold cartelas.
+        //
+        // These exact numbers are what BingoGame's
+        // offline verifier will later use.
+        // =================================================
+        console.log(
+          "🔐 LOADING AUTHENTIC SOLD CARTELAS:",
+          gameId
+        );
+
+        const authenticCartelaResponse =
+          await fetch(
+            `${API_URL}/games/${encodeURIComponent(gameId)}/sold-cartelas`,
+            {
+              method:
+                "GET",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        console.log(
+          "🔐 AUTHENTIC CARTELA RESPONSE:",
+          authenticCartelaResponse.status,
+          authenticCartelaResponse.statusText
+        );
+
+        if (
+          !authenticCartelaResponse.ok
+        ) {
+          const errorText =
+            await authenticCartelaResponse.text();
+
+          throw new Error(
+            `Could not load authentic sold cartelas: HTTP ${authenticCartelaResponse.status} ${errorText}`
+          );
+        }
+
+        const authenticCartelaData =
+          await authenticCartelaResponse.json();
+
+        if (
+          !authenticCartelaData ||
+          !authenticCartelaData.success
+        ) {
+          throw new Error(
+            authenticCartelaData?.error ||
+            "Backend did not return authentic sold cartelas"
+          );
+        }
+
+        const backendSoldCartelas =
+          Array.isArray(
+            authenticCartelaData.soldCartelas
+          )
+            ? authenticCartelaData.soldCartelas
+            : [];
+
+        if (
+          backendSoldCartelas.length === 0
+        ) {
+          throw new Error(
+            "Backend returned ZERO authentic sold cartelas"
+          );
+        }
+
+        console.log(
+          "✅ AUTHENTIC SOLD CARTELAS RECEIVED:",
+          backendSoldCartelas.length
+        );
+
+        console.table(
+          backendSoldCartelas.map(
+            (card) => ({
+              id:
+                card?.id,
+
+              cartela_id:
+                card?.cartela_id,
+
+              serial:
+                card?.serial,
+
+              hasNumbers:
+                !!card?.numbers,
+
+              B:
+                card?.numbers?.B?.join(",") ||
+                "",
+
+              I:
+                card?.numbers?.I?.join(",") ||
+                "",
+
+              N:
+                card?.numbers?.N?.join(",") ||
+                "",
+
+              G:
+                card?.numbers?.G?.join(",") ||
+                "",
+
+              O:
+                card?.numbers?.O?.join(",") ||
+                "",
+            })
+          )
+        );
+
+        // =================================================
+        // 🔐 BUILD EXACT OFFLINE CARTELA SNAPSHOT
+        //
+        // IMPORTANT:
+        // Keep BOTH:
+        //
+        // 1. numbers
+        // 2. matrix
+        //
+        // BingoGame can use either one.
+        // =================================================
+        const authenticSoldCartelas =
+          backendSoldCartelas.map(
+            (card) => {
+              let numbers =
+                card?.numbers;
+
+              // Backend may return numbers as JSON string
+              if (
+                typeof numbers ===
+                "string"
+              ) {
+                try {
+                  numbers =
+                    JSON.parse(
+                      numbers
+                    );
+                } catch (
+                  parseError
+                ) {
+                  console.error(
+                    "❌ INVALID AUTHENTIC CARTELA NUMBERS:",
+                    card,
+                    parseError
+                  );
+
+                  throw new Error(
+                    `Invalid numbers data for cartela ${card?.id ?? card?.cartela_id}`
+                  );
+                }
+              }
+
+              if (
+                !numbers ||
+                !Array.isArray(numbers.B) ||
+                !Array.isArray(numbers.I) ||
+                !Array.isArray(numbers.N) ||
+                !Array.isArray(numbers.G) ||
+                !Array.isArray(numbers.O)
+              ) {
+                throw new Error(
+                  `Authentic cartela ${card?.id ?? card?.cartela_id} does not contain valid B/I/N/G/O numbers`
+                );
+              }
+
+              if (
+                numbers.B.length !== 5 ||
+                numbers.I.length !== 5 ||
+                numbers.N.length !== 5 ||
+                numbers.G.length !== 5 ||
+                numbers.O.length !== 5
+              ) {
+                throw new Error(
+                  `Authentic cartela ${card?.id ?? card?.cartela_id} does not contain 5 numbers in every column`
+                );
+              }
+
+              const letters =
+                [
+                  "B",
+                  "I",
+                  "N",
+                  "G",
+                  "O",
+                ];
+
+              const matrix = [];
+
+              for (
+                let row = 0;
+                row < 5;
+                row++
+              ) {
+                const boardRow = [];
+
+                for (
+                  let col = 0;
+                  col < 5;
+                  col++
+                ) {
+                  const letter =
+                    letters[col];
+
+                  if (
+                    row === 2 &&
+                    col === 2
+                  ) {
+                    boardRow.push(
+                      "FREE"
+                    );
+                  } else {
+                    boardRow.push(
+                      numbers?.[
+                        letter
+                      ]?.[row] ??
+                        null
+                    );
+                  }
+                }
+
+                matrix.push(
+                  boardRow
+                );
+              }
+
+              return {
+                ...card,
+
+                id:
+                  String(
+                    card?.id ??
+                    card?.cartela_id ??
+                    card?.cartelaId ??
+                    ""
+                  ),
+
+                cartela_id:
+                  String(
+                    card?.cartela_id ??
+                    card?.id ??
+                    card?.cartelaId ??
+                    ""
+                  ),
+
+                numbers,
+
+                matrix,
+              };
+            }
+          );
+
+        // =================================================
+        // 🔐 VERIFY THE BACKEND RETURNED THE SAME CARTELAS
+        // THAT WERE SOLD
+        // =================================================
+        const soldIdSet =
+          new Set(
+            soldCartelas.map(
+              (value) =>
+                String(value)
+            )
+          );
+
+        const authenticIdSet =
+          new Set(
+            authenticSoldCartelas.map(
+              (card) =>
+                String(
+                  card?.cartela_id ??
+                  card?.id ??
+                  ""
+                )
+            )
+          );
+
+        const missingAuthenticCartelas =
+          soldCartelas.filter(
+            (value) =>
+              !authenticIdSet.has(
+                String(value)
+              )
+          );
+
+        if (
+          missingAuthenticCartelas.length >
+          0
+        ) {
+          throw new Error(
+            `Backend authentic cartela response is missing sold cartelas: ${missingAuthenticCartelas.join(", ")}`
+          );
+        }
+
+        const unexpectedAuthenticCartelas =
+          authenticSoldCartelas.filter(
+            (card) =>
+              !soldIdSet.has(
+                String(
+                  card?.cartela_id ??
+                  card?.id ??
+                  ""
+                )
+              )
+          );
+
+        if (
+          unexpectedAuthenticCartelas.length >
+          0
+        ) {
+          console.warn(
+            "⚠️ BACKEND RETURNED ADDITIONAL AUTHENTIC CARTELAS:",
+            unexpectedAuthenticCartelas.map(
+              (card) =>
+                card?.cartela_id ??
+                card?.id
+            )
+          );
+        }
+
+        console.log(
+          "🔐 AUTHENTIC CARTELA SNAPSHOT LOCKED:",
+          authenticSoldCartelas.map(
+            (card) => ({
+              id:
+                card.id,
+
+              cartela_id:
+                card.cartela_id,
+
+              matrix:
+                card.matrix,
+            })
+          )
+        );
+
+        // =================================================
         // SERVER GAME
+        //
+        // IMPORTANT:
+        // soldCartelas is now the AUTHENTIC snapshot.
         // =================================================
         const savedGame = {
           ...result.game,
@@ -1284,21 +1923,22 @@ console.log(
               id
             ),
 
-soldCartelas:
-  structuralSoldCartelas,
+          // 🔐 EXACT AUTHENTIC CARTELAS
+          soldCartelas:
+            authenticSoldCartelas,
 
           cards_sold:
             Number(
               result.game.cards_sold ??
               result.game.cardsSold ??
-              soldCartelas.length
+              authenticSoldCartelas.length
             ),
 
           cardsSold:
             Number(
               result.game.cards_sold ??
               result.game.cardsSold ??
-              soldCartelas.length
+              authenticSoldCartelas.length
             ),
 
           bet:
@@ -1389,10 +2029,18 @@ soldCartelas:
           savedGame
         );
 
+        console.log(
+          "🔐 SAVING AUTHENTIC CARTELAS LOCALLY:",
+          savedGame.soldCartelas
+        );
+
         // =================================================
         // SAVE ONLINE GAME LOCALLY
         //
-        // THIS MAKES ONLINE GAME AVAILABLE OFFLINE
+        // THIS IS CRITICAL.
+        //
+        // If internet disappears later, BingoGame will
+        // read this exact authentic snapshot from IndexedDB.
         // =================================================
         await saveGameOffline(
           savedGame
@@ -1442,18 +2090,8 @@ soldCartelas:
         );
 
         // =================================================
-        // IMPORTANT
-        //
-        // DO NOT DO THIS:
-        //
-        // currentPackage - commissionAmount
-        //
-        // The SERVER has already processed the online game.
-        //
-        // Instead, download the CURRENT server package
-        // and save that exact balance locally.
+        // REFRESH HOUSE PACKAGE FROM SERVER
         // =================================================
-
         try {
           console.log(
             "☁️ REFRESHING HOUSE PACKAGE FROM SERVER:",
@@ -1484,10 +2122,6 @@ soldCartelas:
               "☁️ SERVER PACKAGE:",
               serverPackage
             );
-
-            // -------------------------------------------------
-            // SAVE SERVER PACKAGE LOCALLY
-            // -------------------------------------------------
 
             const serverPackageData =
               serverPackage?.package ||
@@ -1607,9 +2241,15 @@ soldCartelas:
       }
     }
 
-
     // =====================================================
     // OFFLINE GAME CREATION
+    //
+    // IMPORTANT:
+    // This path is only for a game that could not be
+    // created on the server.
+    //
+    // We cannot download authentic numbers from the backend
+    // because the backend game does not exist/was not created.
     // =====================================================
 
     console.log(
@@ -1714,7 +2354,6 @@ soldCartelas:
       }
     );
 
-
     // =====================================================
     // SAVE OFFLINE SOLD CARTELAS
     // =====================================================
@@ -1752,7 +2391,6 @@ soldCartelas:
       );
     }
 
-
     // =====================================================
     // UPDATE OFFLINE PACKAGE
     //
@@ -1773,7 +2411,7 @@ soldCartelas:
       Math.max(
         0,
         packageBeforeGame -
-          commissionAmount
+        commissionAmount
       );
 
     const originalTotalPackage =
@@ -1847,7 +2485,6 @@ soldCartelas:
       }
     );
 
-
     // =====================================================
     // START OFFLINE GAME
     // =====================================================
@@ -1872,7 +2509,6 @@ soldCartelas:
       "🚀 OFFLINE GAME STARTED:",
       gameId
     );
-
 
     // =====================================================
     // GO TO BINGO GAME
@@ -2030,10 +2666,10 @@ useEffect(() => {
       // ==============================
       // 2. REFRESH PACKAGE AFTER SYNC
       // ==============================
-      if (
-        result?.success &&
-        currentHouseId
-      ) {
+     if (
+  result?.success &&
+  currentHouseId
+) {
         try {
           const packageResponse = await fetch(
             `${SYNC_API_URL}/houses/${currentHouseId}/package`,
@@ -2172,7 +2808,7 @@ useEffect(() => {
         {/* DASHBOARD HEADER */}
         <div className="dashboard-header" style={{ padding: "4px 8px", marginBottom: "0px" }}>
           <div className="header-top" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", width: "100%" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "2800px" }}>
               <button
                 type="button"
              onClick={() => navigate("/")}
@@ -2191,9 +2827,7 @@ useEffect(() => {
                 ←
               </button>
              
-            </div>
-
-            {/* CONTROLS */}
+             {/* CONTROLS */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, justifyContent: "flex-end" }}>
               {/* መደብ */}
               <div style={{ 
@@ -2204,24 +2838,51 @@ useEffect(() => {
                 background: "rgba(15, 23, 42, 0.6)", 
                 border: "1px solid rgba(255, 255, 255, 0.15)", 
                 borderRadius: "6px" 
-              }}>
+              }}></div>
+
+            
+  
+          
                 <span style={{ fontSize: "60px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
                 </span>
-                <span style={{ fontSize: "60px", fontWeight: "800", color: "#ffffff", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
-                <div style={{ display: "flex", gap: "4px", marginLeft: "2px" }}>
-                  <button 
-                    onClick={handleDecreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "45px", fontWeight: "bold", background: "#1e293b", color: "#f87171", border: "1px solid #7f1d1d", borderRadius: "4px", cursor: "pointer" }}
-                  >
-                    − 5
-                  </button>
-                  <button 
-                    onClick={handleIncreaseBet} 
-                    style={{ padding: "1px 5px", fontSize: "45px", fontWeight: "bold", background: "#1e293b", color: "#4ade80", border: "1px solid #14532d", borderRadius: "4px", cursor: "pointer" }}
-                  >
-                    + 5
-                  </button>
+                <span style={{ fontSize: "66px", fontWeight: "800", color: "#ffffff", whiteSpace: "nowrap" }}>መደብ: {bet} ETB</span>
+                <div style={{ display: "flex", gap: "6px", marginLeft: "2px" }}>
+                 <button
+  onClick={handleDecreaseBet}
+  style={{
+    padding: "0px 10px",
+    fontSize: "55px",
+    fontWeight: "bold",
+    lineHeight: "1",
+    height: "57px",
+    background: "#1e293b",
+    color: "#f87171",
+    border: "1px solid #7f1d1d",
+    borderRadius: "4px",
+    cursor: "pointer",
+  }}
+>
+  -5
+</button>
+
+<button
+  onClick={handleIncreaseBet}
+  style={{
+    padding: "3px 10px",
+    fontSize: "55px",
+    fontWeight: "bold",
+    lineHeight: "1",
+    height: "57px",
+    background: "#1e293b",
+    color: "#4ade80",
+    border: "1px solid #14532d",
+    borderRadius: "4px",
+    cursor: "pointer",
+  }}
+>
+  +5
+</button>
                 </div>
               </div>
 
