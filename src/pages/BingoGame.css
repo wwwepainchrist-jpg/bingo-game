@@ -734,3 +734,66 @@ input {
       0 0 12px #FFFFFF;
   }
 }
+
+.internet-status-alert {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+
+  padding: 14px 28px;
+  border-radius: 10px;
+
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.internet-status-alert span {
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.internet-status-alert.offline {
+  background: #b91c1c;
+  color: white;
+  border: 2px solid #ef4444;
+}
+
+.internet-status-alert.restored {
+  background: #15803d;
+  color: white;
+  border: 2px solid #22c55e;
+}
+
+/* =========================================================
+   📱 PHONE DEEP PINCH ZOOM
+   ========================================================= */
+
+html,
+body,
+#root,
+.bingo-wrapper {
+  touch-action: auto !important;
+}
+
+.bingo-wrapper {
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bingo-split-layout {
+  min-width: 1400px;
+}
+
+.bingo-board {
+  min-width: 1400px;
+}

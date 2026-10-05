@@ -235,3 +235,21 @@ button.grid-cell-btn.sold:hover {
 .cartela-scroll-grid::-webkit-scrollbar-thumb:hover {
   background: #00e5ff;
 }
+/* ============================================================
+   📱 PHONE PINCH ZOOM — SAFE VERSION
+   ============================================================ */
+
+html,
+body,
+#root {
+  touch-action: auto !important;
+}
+
+/* Do NOT add overflow or scrolling here.
+   Keep the existing PC cartela layout unchanged. */
+
+.dashboard-container,
+.dashboard-wrapper,
+.cartela-scroll-grid {
+  touch-action: auto !important;
+}

@@ -1043,7 +1043,12 @@ function getSavedCashierVoice() {
   const [speed, setSpeed] = useState(5);
   const [cartelaId, setCartelaId] = useState("");
   const [recentPrizeHistory, setRecentPrizeHistory] = useState([]);
+const [isInternetOffline, setIsInternetOffline] = useState(
+  !navigator.onLine
+);
 
+const [showInternetRestored, setShowInternetRestored] =
+  useState(false);
  
   const [winnerMessage, setWinnerMessage] = useState("");
   const [checkedCartela, setCheckedCartela] = useState(null);
@@ -1290,7 +1295,7 @@ const pendingBingoCallRef = useRef(null);
 const playPauseActionRef = useRef(0);
 // Add this near your other useRef allocations at the top
 const globalAudioInstanceRef = useRef(null);
-
+const verificationInProgressRef = useRef(false);
 const resumeAfterGenerationRef = useRef(false);
 const [voiceDepth, setVoiceDepth] = useState(() => {
   const cashierId = localStorage.getItem("logged_in_cashier");
@@ -4084,12 +4089,42 @@ useEffect(() => {
   return () => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
   };
-}, [paused]);
-  useEffect(() => {
+},[paused]);
+
+
+useEffect(() => {
   const handleOffline = () => {
     console.log("❌ OFFLINE");
 
-    setPaused(true);
+    // 🔴 SHOW INTERNET LOST ALERT
+    setIsInternetOffline(true);
+    setShowInternetRestored(false);
+
+    // 🔒 Remember that THIS GAME experienced an internet outage.
+    const gameId =
+      stateRef.current?.game?.game_id ||
+      stateRef.current?.game?.id;
+
+    if (gameId) {
+      localStorage.setItem(
+        `game_offline_interrupted_${gameId}`,
+        "true"
+      );
+
+      console.log(
+        "🔒 LOCAL VERIFICATION LOCKED FOR GAME:",
+        gameId
+      );
+    } else {
+      console.warn(
+        "⚠️ INTERNET LOST BUT NO ACTIVE GAME ID FOUND"
+      );
+    }
+
+    // ⚠️ Do NOT pause React game state.
+    console.log(
+      "📴 INTERNET OFFLINE — KEEPING AUDIO PLAYBACK AVAILABLE"
+    );
 
     if (loopTimeoutRef.current) {
       clearTimeout(loopTimeoutRef.current);
@@ -4101,6 +4136,31 @@ useEffect(() => {
 
   const handleOnline = () => {
     console.log("✅ INTERNET RESTORED");
+
+    // 🟢 HIDE OFFLINE ALERT
+    setIsInternetOffline(false);
+
+    // 🟢 SHOW RESTORED MESSAGE
+    setShowInternetRestored(true);
+
+    const gameId =
+      stateRef.current?.game?.game_id ||
+      stateRef.current?.game?.id;
+
+    if (gameId) {
+      console.log(
+        "🔒 LOCAL VERIFICATION REMAINS ACTIVE FOR GAME:",
+        gameId,
+        localStorage.getItem(
+          `game_offline_interrupted_${gameId}`
+        )
+      );
+    }
+
+    // Hide restored message after 4 seconds
+    setTimeout(() => {
+      setShowInternetRestored(false);
+    }, 4000);
   };
 
   window.addEventListener("offline", handleOffline);
@@ -4113,6 +4173,7 @@ useEffect(() => {
 }, []);
 
 
+ 
 // ============================================================
 // 🎵 PRELOAD THE EXACT RESERVED NEXT BINGO VOICE
 // ============================================================
@@ -5025,7 +5086,10 @@ const checkWinner = async () => {
 // OFFLINE VERIFICATION
 // =====================================================
 
-if (!navigator.onLine) {
+if (
+  !navigator.onLine ||
+  localStorage.getItem(`game_offline_interrupted_${verifyGameId}`) === "true"
+) {
 
   console.log("📴 OFFLINE CARTELA VERIFICATION:", cartelaId);
 
@@ -6212,8 +6276,12 @@ const closeVerificationBoard = () => {
   // Auto-call every 6 seconds when NOT paused
 
 
-  return (
+ return (
+ 
  <div className="bingo-wrapper">
+
+ 
+
     {/* SMALL BACK BUTTON */}
     <button
       type="button"
@@ -6273,6 +6341,20 @@ const closeVerificationBoard = () => {
     >
       ←
     </button>
+ {/* INTERNET OFFLINE ALERT */}
+    {isInternetOffline && (
+      <div className="internet-status-alert offline">
+        <strong>⚠️ NO INTERNET CONNECTION</strong>
+        <span>Game is running offline</span>
+      </div>
+    )}
+
+    {/* INTERNET RESTORED ALERT */}
+    {showInternetRestored && !isInternetOffline && (
+      <div className="internet-status-alert restored">
+        <strong>✅ INTERNET CONNECTION RESTORED</strong>
+      </div>
+    )}
 
     <div 
       className="bingo-container"
@@ -6284,7 +6366,11 @@ const closeVerificationBoard = () => {
         margin: 0,
         padding: 0
       }}
+
+
+
     >
+
  {/* =======================================================
     1. MASTER BINGO GRID (STAYS UP TOP FULL WIDTH)
     ======================================================= */}
