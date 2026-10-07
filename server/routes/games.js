@@ -311,6 +311,52 @@ router.get("/house/:id", async (req, res) => {
   }
 });
 
+
+
+// ============================================================
+// 🏆 GET LAST 3 PREVIOUS PRIZES
+// Returns only the small amount of data needed by BingoGame
+// ============================================================
+router.get("/recent-prizes", async (req, res) => {
+  try {
+    const limit = Math.min(
+      Math.max(Number(req.query.limit) || 3, 1),
+      3
+    );
+
+    const excludeGameId = req.query.excludeGameId || null;
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        game_id,
+        prize,
+        game_date,
+        created_at
+      FROM games
+      WHERE prize > 0
+        AND ($1::text IS NULL OR game_id::text <> $1::text)
+      ORDER BY COALESCE(game_date, created_at) DESC
+      LIMIT $2
+      `,
+      [excludeGameId, limit]
+    );
+
+    res.json({
+      success: true,
+      prizes: result.rows
+    });
+
+  } catch (err) {
+    console.error("❌ FAILED TO LOAD RECENT PRIZES:", err);
+
+    res.status(500).json({
+      success: false,
+      error: "Failed to load recent prizes"
+    });
+  }
+});
 // =======================
 // GET ACTIVE GAME BY CASHIER
 // =======================
