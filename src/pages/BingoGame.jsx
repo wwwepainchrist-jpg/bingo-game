@@ -1064,7 +1064,7 @@ const nextBingoBallRef = useRef(null);
 const nextBingoAudioRef = useRef(null);
 const nextBingoAudioPathRef = useRef(null);
 const nextBingoAudioReadyRef = useRef(false);
-
+const [showPrizeHistory, setShowPrizeHistory] = useState(false);
   const [cageBalls, setCageBalls] = useState(INITIAL_BALLS);
  const [blinkingNumber, setBlinkingNumber] = useState(null);
 
@@ -1192,51 +1192,32 @@ const preloadedVoicesCacheRef = useRef({}); // Tracks { [path]: audioObject }
  
 const [prizeHistory, setPrizeHistory] = useState([]);
 const [loadingPrizeHistory, setLoadingPrizeHistory] = useState(false);
+
 const loadPrizeHistory = async () => {
   try {
     setLoadingPrizeHistory(true);
 
+    const currentGameId =
+      stateRef.current?.game?.game_id ||
+      stateRef.current?.game?.id ||
+      id ||
+      "";
+
     const response = await fetch(
-      `${API_URL}/games`
+      `${API_URL}/games/recent-prizes?limit=3&excludeGameId=${encodeURIComponent(
+        currentGameId
+      )}`
     );
 
     if (!response.ok) {
-      throw new Error(
-        `HTTP ${response.status}`
-      );
+      throw new Error(`HTTP ${response.status}`);
     }
 
-    const data =
-      await response.json();
+    const data = await response.json();
 
-    const games =
-      Array.isArray(data)
-        ? data
-        : Array.isArray(data?.games)
-          ? data.games
-          : [];
-
-    const history = games
-      .filter(
-        (game) =>
-          Number(game?.prize || 0) > 0
-      )
-      .sort((a, b) => {
-        const dateA = new Date(
-          a?.game_date ||
-          a?.created_at ||
-          0
-        ).getTime();
-
-        const dateB = new Date(
-          b?.game_date ||
-          b?.created_at ||
-          0
-        ).getTime();
-
-        return dateB - dateA;
-      })
-      .slice(0, 5);
+    const history = Array.isArray(data?.prizes)
+      ? data.prizes
+      : [];
 
     setPrizeHistory(history);
 
@@ -1252,6 +1233,7 @@ const loadPrizeHistory = async () => {
     setLoadingPrizeHistory(false);
   }
 };
+
 const soldCartelaSource =
   Array.isArray(passedGame?.soldCartelas)
     ? passedGame.soldCartelas
@@ -1269,18 +1251,15 @@ const soldCartelaIds = soldCartelaSource
   )
   .filter(Number.isFinite)
   .sort((a, b) => a - b);
+
+
+// ============================================================
+// 🏆 LOAD PRIZE HISTORY
+// No 5-second polling
+// ============================================================
 useEffect(() => {
   loadPrizeHistory();
-
-  const prizeHistoryTimer = setInterval(() => {
-    loadPrizeHistory();
-  }, 5000);
-
-  return () => {
-    clearInterval(prizeHistoryTimer);
-  };
-}, []);
-
+}, [id]);
 const [voiceSpeed, setVoiceSpeed] = useState(1.0);
 const voiceSpeedRef = useRef(1.0);
 const TARGET_GENERATION_INTERVAL_MS = 400;
@@ -8060,100 +8039,91 @@ WebkitBackdropFilter: "blur(4px)",
         PRIZE HISTORY
         ===================================================== */}
 
+<button
+  onClick={() => setShowPrizeHistory(prev => !prev)}
+  style={{
+    padding: "12px 22px",
+    background: "#0015ffeb",
+    color: "#000",
+    border: "none",
+    borderRadius: "10px",
+    fontSize: "35px",
+    fontWeight: "900",
+    cursor: "pointer",
+  }}
+>
+  ደራሽ HISTORY 
+</button>
+
+{/* =====================================================
+    PREVIOUS PRIZE HISTORY — LAST 3 ONLY
+    ===================================================== */}
+
+{showPrizeHistory && (
+  <div
+    style={{
+      width: "100%",
+      flexShrink: 0,
+      marginBottom: "18px",
+      padding: "12px 16px",
+      boxSizing: "border-box",
+      background: "rgba(255, 215, 0, 0.08)",
+      border: "2px solid rgba(255, 215, 0, 0.55)",
+      borderRadius: "14px",
+    }}
+  >
     <div
       style={{
-        width: "100%",
-        flexShrink: 0,
-
-        marginBottom: "18px",
-        padding: "12px 16px",
-
-        boxSizing: "border-box",
-
-        background:
-          "rgba(255, 215, 0, 0.08)",
-
-        border:
-          "2px solid rgba(255, 215, 0, 0.55)",
-
-        borderRadius: "14px",
+        textAlign: "center",
+        color: "#ffd700",
+        fontSize: "32px",
+        fontWeight: "900",
+        marginBottom: "10px",
       }}
     >
+      🏆 PREVIOUS PRIZES
+    </div>
+
+    {prizeHistory.length === 0 ? (
+
+      /* NO PREVIOUS PRIZES */
       <div
         style={{
           textAlign: "center",
-
-          color: "#ffd700",
-
-          fontSize: "32px",
-
+          color: "#ffffff",
+          fontSize: "65px",
           fontWeight: "900",
-
-          marginBottom: "10px",
         }}
       >
-        🏆 PRIZE HISTORY
+        0
       </div>
 
-      {loadingPrizeHistory ? (
+    ) : (
 
-        <div
-          style={{
-            textAlign: "center",
-            color: "#aaaaaa",
-            padding: "8px",
-          }}
-        >
-          Loading...
-        </div>
-
-      ) : prizeHistory.length === 0 ? (
-
-        <div
-          style={{
-            textAlign: "center",
-            color: "#aaaaaa",
-            padding: "8px",
-          }}
-        >
-          No completed games yet
-        </div>
-
-      ) : (
-
-        <div
-          style={{
-            width: "100%",
-
-            display: "grid",
-
-            gridTemplateColumns:
-              "repeat(5, minmax(0, 1fr))",
-
-            gap: "8px",
-          }}
-        >
-          {prizeHistory.map((item, index) => (
-
+      /* ONLY LAST 3 PREVIOUS PRIZES */
+      <div
+        style={{
+          width: "100%",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+          gap: "8px",
+        }}
+      >
+        {prizeHistory
+          .slice(0, 3)
+          .map((item, index) => (
             <div
               key={`${item.game_id || item.id}-${index}`}
               style={{
                 padding: "8px",
-
                 textAlign: "center",
-
-                background:
-                  "rgba(255, 255, 255, 0.05)",
-
+                background: "rgba(255, 255, 255, 0.05)",
                 border:
                   "1px solid rgba(255, 215, 0, 0.35)",
-
                 borderRadius: "8px",
-
                 boxSizing: "border-box",
               }}
             >
-
               <div
                 style={{
                   color: "#ffd700",
@@ -8161,7 +8131,7 @@ WebkitBackdropFilter: "blur(4px)",
                   fontWeight: "900",
                 }}
               >
-                GAME {index + 1}
+                PREVIOUS {index + 1}
               </div>
 
               <div
@@ -8172,10 +8142,7 @@ WebkitBackdropFilter: "blur(4px)",
                   marginTop: "3px",
                 }}
               >
-                {Number(
-                  item.prize || 0
-                ).toLocaleString()}{" "}
-               
+                {Number(item.prize || 0).toLocaleString()}
               </div>
 
               <div
@@ -8185,19 +8152,14 @@ WebkitBackdropFilter: "blur(4px)",
                   marginTop: "2px",
                 }}
               >
-                {item.game_id ||
-                  `#${item.id || ""}`}
+                {item.game_id || `#${item.id || ""}`}
               </div>
-
             </div>
-
           ))}
-        </div>
-
-      )}
-    </div>
-
-
+      </div>
+    )}
+  </div>
+)}
     {/* =====================================================
         TITLE
         ===================================================== */}
