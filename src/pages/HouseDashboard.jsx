@@ -28,7 +28,8 @@ const [visibleSummaryDays, setVisibleSummaryDays] = useState(5);
 
   // Selected period tab state ('daily' | 'weekly' | 'monthly' | 'yearly')
   const [selectedPeriod, setSelectedPeriod] = useState("daily");
-
+const [selectedPreviousDay, setSelectedPreviousDay] = useState(null);
+const [visiblePreviousDayLogs, setVisiblePreviousDayLogs] = useState(5);
   // Reactive state holders connected to backend / database
   const [houseGames, setHouseGames] = useState([]);
   const [cashiers, setCashiers] = useState([]);
@@ -1952,6 +1953,22 @@ const previousDaysSummary =
       </div>
     );
   };
+// ============================================================
+// SELECTED PREVIOUS DAY GAME LOGS
+// ============================================================
+const selectedPreviousDayGames = selectedPreviousDay
+  ? sortedHouseGames.filter((game) => {
+      const gameDate = getGameDateParts(game);
+
+      if (!gameDate) return false;
+
+      return (
+        gameDate.year === selectedPreviousDay.year &&
+        gameDate.month === selectedPreviousDay.month &&
+        gameDate.day === selectedPreviousDay.day
+      );
+    })
+  : [];
 
   return (
     <div style={styles.container}>
@@ -1999,18 +2016,19 @@ const previousDaysSummary =
       <div style={styles.grid}>
         {/* Package Card */}
         <div style={styles.packageCard}>
-          <h2 style={{ margin: "0 0 15px 0", fontSize: "19px", fontWeight: "600" }}>House Packages</h2>
+          <h2 style={{ margin: "0 0 15px 0", fontSize: "55px", fontWeight: "900" }}>House Packages</h2>
           <div style={{ marginBottom: "15px" }}>
-            <span style={{ fontSize: "11px", opacity: 0.7, fontWeight: "700", letterSpacing: "0.5px" }}>TOTAL PACKAGES ADDED</span>
-            <h2 style={{ margin: 0, fontSize: "28px", fontWeight: "700" }}>{packageInfo.totalAmount} ETB</h2>
+            <span style={{ fontSize: "51px", opacity: 0.7, fontWeight: "700", letterSpacing: "0.5px" }}>TOTAL PACKAGES ADDED</span>
+            <h2 style={{ margin: 0, fontSize: "58px", fontWeight: "700" }}>{packageInfo.totalAmount} ETB</h2>
           </div>
           <div>
-            <span style={{ fontSize: "11px", opacity: 0.7, fontWeight: "700", letterSpacing: "0.5px" }}>REMAINING BALANCE</span>
-            <h2 style={{ margin: 0, fontSize: "28px", color: colors.accentCyan, fontWeight: "700" }}>{packageInfo.remainingAmount.toFixed(2)} ETB</h2>
+            <span style={{ fontSize: "51px", opacity: 0.7, fontWeight: "700", letterSpacing: "0.5px" }}>REMAINING BALANCE</span>
+            <h2 style={{ margin: 0, fontSize: "58px", color: colors.accentCyan, fontWeight: "700" }}>{packageInfo.remainingAmount.toFixed(2)} ETB</h2>
           </div>
 
           <button 
             style={styles.buyPackageBtn}
+          
             onClick={() => alert("Redirecting to Buy Package requested from Super Admin...")}
           >
             Buy Package
@@ -2018,16 +2036,16 @@ const previousDaysSummary =
 
           <div style={styles.tierDisplayContainer}>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
-              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.silver}</div>
+              <div style={{ fontSize: "40px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
+              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.silver}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
-              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.gold}</div>
+              <div style={{ fontSize: "40px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
+              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.gold}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "10px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
-              <div style={{ fontSize: "12px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.diamond}</div>
+              <div style={{ fontSize: "40px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
+              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.diamond}</div>
             </div>
           </div>
         </div>
@@ -2036,7 +2054,7 @@ const previousDaysSummary =
         <div style={styles.card}>
           <h2 style={styles.cardTitle}>House Actions</h2>
           <p style={{ color: colors.textMuted, marginBottom: "20px" }}>Manage and oversee house cashier accounts and credentials.</p>
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex",fontSize: "50px", gap: "10px", flexWrap: "wrap" }}>
             <Link to={`/manage-cashiers/${id}`} style={styles.linkButton}>Manage Cashiers</Link>
           </div>
         </div>
@@ -2075,7 +2093,7 @@ const previousDaysSummary =
             gap: "10px"
           }}
         >
-          <label style={{ fontSize: "13px", color: colors.textMain, fontWeight: "600" }}>
+          <label style={{ fontSize: "33px", color: colors.textMain, fontWeight: "600" }}>
             Commission %:{" "}
           </label>
 
@@ -2115,7 +2133,7 @@ const previousDaysSummary =
             className="finance-input"
             style={{
               padding: "6px 10px",
-              fontSize: "13px",
+              fontSize: "33px",
               borderRadius: "6px",
               border: "1px solid rgba(255, 255, 255, 0.15)",
               background: "rgba(15, 23, 42, 0.8)",
@@ -2200,11 +2218,14 @@ const previousDaysSummary =
     );
 
     if (!previousDaysMap[dateKey]) {
-      previousDaysMap[dateKey] = {
-        date: dateKey,
-        net: 0,
-      };
-    }
+  previousDaysMap[dateKey] = {
+    date: dateKey,
+    year: gameDate.year,
+    month: gameDate.month,
+    day: gameDate.day,
+    net: 0,
+  };
+}
 
     previousDaysMap[dateKey].net +=
       houseEarned;
@@ -2427,6 +2448,8 @@ const betAmount =
                     }
                   )}
 
+                  
+
                 {/* ================= NET ================= */}
 
                 <tr>
@@ -2476,6 +2499,36 @@ const betAmount =
           </tbody>
         </table>
       </div>
+{/* ================= TODAY LOG BUTTON ================= */}
+
+{todayGames.length > 5 && (
+  <button
+    style={styles.showMoreBtn}
+    onClick={() => {
+      if (visibleGameLogsCount > 5) {
+        // Hide 10 logs
+        setVisibleGameLogsCount((prev) =>
+          Math.max(5, prev - 10)
+        );
+      } else {
+        // Show 10 more logs
+        setVisibleGameLogsCount((prev) =>
+          Math.min(
+            todayGames.length,
+            prev + 10
+          )
+        );
+      }
+    }}
+  >
+    {visibleGameLogsCount > 5
+      ? "Hide More Logs"
+      : `Show More Logs (${
+          todayGames.length - visibleGameLogsCount
+        } remaining)`}
+  </button>
+)}
+      
 
       {/* ================= PREVIOUS DAYS ================= */}
 
@@ -2510,34 +2563,62 @@ const betAmount =
                   0,
                   visibleSummaryDays
                 )
-                .map((day) => (
-                  <tr
-                    key={day.date}
-                  >
-                    <td
-                      style={styles.td}
-                    >
-                      {new Date(
-                        day.date
-                      ).toLocaleDateString()}
-                    </td>
+.map((day, index) => {
+  const isSelected =
+    index === 0 &&
+    selectedPreviousDay?.date === day.date;
 
-                    <td
-                      style={{
-                        ...styles.td,
-                        color:
-                          colors.accentCyan,
-                        fontWeight:
-                          "700",
-                      }}
-                    >
-                      {day.net.toFixed(
-                        2
-                      )}{" "}
-                      ETB
-                    </td>
-                  </tr>
-                ))
+  return (
+    <tr
+      key={day.date}
+      onClick={
+        index === 0
+          ? () => {
+              if (isSelected) {
+                // Click again → close history
+                setSelectedPreviousDay(null);
+                setVisiblePreviousDayLogs(5);
+              } else {
+                // First click → open history
+                setSelectedPreviousDay(day);
+                setVisiblePreviousDayLogs(5);
+              }
+            }
+          : undefined
+      }
+      style={{
+        cursor: index === 0 ? "pointer" : "default",
+      }}
+    >
+      <td
+        style={{
+          ...styles.td,
+          fontWeight: index === 0 ? "800" : "400",
+        }}
+      >
+        {new Date(day.date).toLocaleDateString()}
+      </td>
+
+      <td
+        style={{
+          ...styles.td,
+          color: colors.accentCyan,
+          fontWeight: "700",
+        }}
+      >
+        {isSelected ? (
+          <span style={{ opacity: 0 }}>
+            {day.net.toFixed(2)} ETB
+          </span>
+        ) : (
+          <>
+            {day.net.toFixed(2)} ETB
+          </>
+        )}
+      </td>
+    </tr>
+  );
+})
             ) : (
               <tr>
                 <td
@@ -2584,43 +2665,187 @@ const betAmount =
             : `Show All Previous Days (${previousDays.length})`}
         </button>
       )}
+{/* ============================================================
+    SELECTED PREVIOUS DAY — DETAILED GAME HISTORY
+    ============================================================ */}
 
-      {/* ================= TODAY LOG BUTTON ================= */}
+{selectedPreviousDay && (
+  <div style={{ marginTop: "25px" }}>
 
-      {todayGames.length > 5 && (
-        <button
-          style={
-            styles.showMoreBtn
+    <h3
+      style={{
+        color: colors.accentSky,
+        marginBottom: "10px",
+      }}
+    >
+      Detailed Game History Logs —{" "}
+      {new Date(
+        selectedPreviousDay.date
+      ).toLocaleDateString()}
+    </h3>
+
+    <div style={styles.tableWrapper}>
+      <table style={styles.table}>
+        <thead>
+          <tr>
+            <th style={styles.th}>Date & Time</th>
+            <th style={styles.th}>Game ID</th>
+            <th style={styles.th}>Cashier</th>
+            <th style={styles.th}>Cartelas Sold</th>
+            <th style={styles.th}>Total Bet Pool</th>
+            <th style={styles.th}>
+              House Commission Earned
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {selectedPreviousDayGames.length > 0 ? (
+            selectedPreviousDayGames
+              .slice(0, visiblePreviousDayLogs)
+              .map((game, index) => {
+
+                const cartelasCount = Number(
+                  game.cards_sold ??
+                  game.cardsSold ??
+                  game.soldCartelas?.length ??
+                  0
+                );
+
+                const betAmount =
+                  Number(game.bet) || 50;
+
+                const grossPool =
+                  betAmount * cartelasCount;
+
+                const commissionRate =
+                  Number(game.commission) || 15;
+
+                const houseEarned = Number(
+                  game.house_commission ??
+                  game.commission_earned ??
+                  game.commissionDeducted ??
+                  grossPool *
+                    (commissionRate / 100)
+                );
+
+                const gameDate =
+                  game.created_at ||
+                  game.finished_at ||
+                  game.started_at ||
+                  game.date;
+
+                const formattedDate =
+                  gameDate
+                    ? new Date(
+                        gameDate
+                      ).toLocaleString(
+                        "en-US",
+                        {
+                          timeZone:
+                            "Africa/Addis_Ababa",
+                        }
+                      )
+                    : "N/A";
+
+                return (
+                  <tr
+                    key={
+                      game.game_id ||
+                      game.id ||
+                      index
+                    }
+                  >
+                    <td style={styles.td}>
+                      {formattedDate}
+                    </td>
+
+                    <td style={styles.td}>
+                      <strong>
+                        #
+                        {game.game_id ||
+                          game.id}
+                      </strong>
+                    </td>
+
+                    <td style={styles.td}>
+                      {game.cashier ||
+                        game.cashier_id ||
+                        "System"}
+                    </td>
+
+                    <td style={styles.td}>
+                      {cartelasCount} Cards
+                    </td>
+
+                    <td style={styles.td}>
+                      {grossPool} ETB
+                    </td>
+
+                    <td
+                      style={{
+                        ...styles.td,
+                        color:
+                          colors.accentCyan,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {houseEarned.toFixed(2)} ETB
+                    </td>
+                  </tr>
+                );
+              })
+          ) : (
+            <tr>
+              <td
+                colSpan="6"
+                style={{
+                  ...styles.td,
+                  textAlign: "center",
+                }}
+              >
+                No games for this day.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+
+    {/* SHOW MORE / HIDE MORE */}
+
+    {selectedPreviousDayGames.length > 5 && (
+      <button
+        style={styles.showMoreBtn}
+        onClick={() => {
+          if (
+            visiblePreviousDayLogs >=
+            selectedPreviousDayGames.length
+          ) {
+            setVisiblePreviousDayLogs(5);
+          } else {
+            setVisiblePreviousDayLogs(
+              (prev) => prev + 10
+            );
           }
-          onClick={() => {
-            if (
-              visibleGameLogsCount >=
-              todayGames.length
-            ) {
-              setVisibleGameLogsCount(
-                5
-              );
-            } else {
-              setVisibleGameLogsCount(
-                (prev) =>
-                  prev + 10
-              );
-            }
-          }}
-        >
-          {visibleGameLogsCount >=
-          todayGames.length
-            ? "Show Less Logs"
-            : `Show More Logs (${
-                todayGames.length -
-                visibleGameLogsCount
-              } remaining)`}
-        </button>
-      )}
+        }}
+      >
+        {visiblePreviousDayLogs >=
+        selectedPreviousDayGames.length
+          ? "Hide More"
+          : `Show More (${
+              selectedPreviousDayGames.length -
+              visiblePreviousDayLogs
+            } remaining)`}
+      </button>
+    )}
+  </div>
+)}
+    
     </>
   );
 })()}
-
+     
 
       {/* Cashier Passwords and Details Section */}
       <h2 style={{ ...styles.sectionTitle, marginTop: "45px", marginBottom: "15px" }}>Cashier Passwords & Roster</h2>
