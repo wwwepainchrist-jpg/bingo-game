@@ -2036,16 +2036,16 @@ const selectedPreviousDayGames = selectedPreviousDay
 
           <div style={styles.tierDisplayContainer}>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "40px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
-              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.silver}</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", color: "#e2e8f0", textTransform: "uppercase" }}>Silver</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.silver}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "40px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
-              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.gold}</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", color: "#fde047", textTransform: "uppercase" }}>Gold</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.gold}</div>
             </div>
             <div style={styles.tierBadge}>
-              <div style={{ fontSize: "40px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
-              <div style={{ fontSize: "42px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.diamond}</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", color: "#67e8f9", textTransform: "uppercase" }}>Diamond</div>
+              <div style={{ fontSize: "20px", fontWeight: "700", marginTop: "2px", wordBreak: "break-word", lineHeight: "1.2" }}>{tierPackages.diamond}</div>
             </div>
           </div>
         </div>
@@ -2499,34 +2499,53 @@ const betAmount =
           </tbody>
         </table>
       </div>
-{/* ================= TODAY LOG BUTTON ================= */}
+{/* ================= TODAY LOG BUTTONS ================= */}
 
 {todayGames.length > 5 && (
-  <button
-    style={styles.showMoreBtn}
-    onClick={() => {
-      if (visibleGameLogsCount > 5) {
-        // Hide 10 logs
-        setVisibleGameLogsCount((prev) =>
-          Math.max(5, prev - 10)
-        );
-      } else {
-        // Show 10 more logs
-        setVisibleGameLogsCount((prev) =>
-          Math.min(
-            todayGames.length,
-            prev + 10
-          )
-        );
-      }
+  <div
+    style={{
+      display: "flex",
+      gap: "10px",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: "10px",
+      flexWrap: "wrap",
     }}
   >
-    {visibleGameLogsCount > 5
-      ? "Hide More Logs"
-      : `Show More Logs (${
-          todayGames.length - visibleGameLogsCount
+    {/* SHOW MORE */}
+    {visibleGameLogsCount < todayGames.length && (
+      <button
+        style={styles.showMoreBtn}
+        onClick={() => {
+          setVisibleGameLogsCount((prev) =>
+            Math.min(
+              todayGames.length,
+              prev + 10
+            )
+          );
+        }}
+      >
+        {`Show More Logs (${
+          todayGames.length -
+          visibleGameLogsCount
         } remaining)`}
-  </button>
+      </button>
+    )}
+
+    {/* HIDE MORE */}
+    {visibleGameLogsCount > 5 && (
+      <button
+        style={styles.showMoreBtn}
+        onClick={() => {
+          setVisibleGameLogsCount((prev) =>
+            Math.max(5, prev - 10)
+          );
+        }}
+      >
+        Hide More Logs
+      </button>
+    )}
+  </div>
 )}
       
 
