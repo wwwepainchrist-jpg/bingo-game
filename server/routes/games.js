@@ -292,17 +292,40 @@ router.get("/house/:id", async (req, res) => {
     const { id } = req.params;
 
     const result = await pool.query(
-      `SELECT *
-       FROM games
-       WHERE house_id = $1
-       ORDER BY game_date DESC`,
+      `
+      SELECT
+        id,
+        game_id,
+        house_id,
+        cashier_id,
+        bet,
+        prize,
+        commission,
+        cards_sold,
+        house_commission,
+        voice_mode,
+        winning_pattern_count,
+        status,
+        game_date,
+        created_at
+      FROM games
+      WHERE house_id = $1
+      ORDER BY game_date DESC
+      `,
       [id]
     );
-    console.log(result.rows);
+
+    console.log(
+      `🏠 HOUSE ${id} → ${result.rows.length} games loaded`
+    );
+
     res.json(result.rows);
 
   } catch (err) {
-    console.error("Error fetching house games:", err);
+    console.error(
+      "❌ ERROR FETCHING HOUSE GAMES:",
+      err
+    );
 
     res.status(500).json({
       success: false,
