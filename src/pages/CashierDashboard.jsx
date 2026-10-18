@@ -142,6 +142,28 @@ const [loadingHouseNet, setLoadingHouseNet] = useState(false);
   }
 };
 
+// ==========================================
+// INTERNET CUT / RESTORED ALERTS
+// ==========================================
+useEffect(() => {
+  const handleOffline = () => {
+    alert("⚠️ INTERNET IS CUT!");
+  };
+
+  const handleOnline = () => {
+    alert("✅ INTERNET IS BACK!");
+  };
+
+  window.addEventListener("offline", handleOffline);
+  window.addEventListener("online", handleOnline);
+
+  return () => {
+    window.removeEventListener("offline", handleOffline);
+    window.removeEventListener("online", handleOnline);
+  };
+}, []);
+
+
 const handleCreateNetPassword = async () => {
   if (!netPassword || !netPasswordConfirm) {
     alert("Please enter and confirm the password.");
@@ -1243,6 +1265,13 @@ async function sellCartela(cartelaNum = null) {
   }
 
 async function startGame() {
+  console.log("🚨 NEW CASHIER STARTGAME CODE IS RUNNING");
+
+  const startTiming = performance.now();
+
+console.log(
+  "⏱️ START TIMING → START GAME"
+);
   // =====================================================
   // PREVENT MULTIPLE START CLICKS
   // =====================================================
@@ -1459,14 +1488,17 @@ async function startGame() {
     // =====================================================
     // CHECK INTERNET
     // =====================================================
-    const online =
-      navigator.onLine;
+   // =====================================================
+// CHECK INTERNET — ONLINE START ONLY
+// =====================================================
+const online = navigator.onLine;
 
-    console.log(
-      online
-        ? "🌐 ONLINE START"
-        : "📴 OFFLINE START"
-    );
+if (!online) {
+  alert("⚠️ Internet connection is required to start a game.");
+  return;
+}
+
+console.log("🌐 ONLINE START");
 
     // =====================================================
     // ONLINE GAME CREATION
@@ -1484,6 +1516,13 @@ async function startGame() {
         let response;
 
         try {
+
+          const createGameStart =
+  performance.now();
+
+console.log(
+  "⏱️ START TIMING → POST /games"
+);
           response =
             await fetch(
               `${API_URL}/games`,
@@ -1495,6 +1534,8 @@ async function startGame() {
                   "Content-Type":
                     "application/json",
                 },
+
+
 
                 body:
                   JSON.stringify({
@@ -1512,6 +1553,16 @@ async function startGame() {
                   controller.signal,
               }
             );
+
+console.log(
+  "⏱️ POST /games:",
+  (
+    performance.now() -
+    createGameStart
+  ).toFixed(0),
+  "ms"
+);
+
         } catch (fetchError) {
           console.error(
             "❌ GAME FETCH ERROR:",
@@ -1559,25 +1610,37 @@ async function startGame() {
         // These exact numbers are what BingoGame's
         // offline verifier will later use.
         // =================================================
-        console.log(
-          "🔐 LOADING AUTHENTIC SOLD CARTELAS:",
-          gameId
-        );
+       console.log(
+  "🔐 LOADING AUTHENTIC SOLD CARTELAS:",
+  gameId
+);
 
-        const authenticCartelaResponse =
-          await fetch(
-            `${API_URL}/games/${encodeURIComponent(gameId)}/sold-cartelas`,
-            {
-              method:
-                "GET",
+const authenticCartelaStart =
+  performance.now();
 
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-            }
-          );
+console.log(
+  "⏱️ START TIMING → GET AUTHENTIC CARTELAS"
+);
 
+const authenticCartelaResponse =
+  await fetch(
+    `${API_URL}/games/${encodeURIComponent(gameId)}/sold-cartelas`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+console.log(
+  "⏱️ GET AUTHENTIC CARTELAS:",
+  (
+    performance.now() -
+    authenticCartelaStart
+  ).toFixed(0),
+  "ms"
+);
         console.log(
           "🔐 AUTHENTIC CARTELA RESPONSE:",
           authenticCartelaResponse.status,
@@ -2042,9 +2105,21 @@ async function startGame() {
         // If internet disappears later, BingoGame will
         // read this exact authentic snapshot from IndexedDB.
         // =================================================
-        await saveGameOffline(
-          savedGame
-        );
+        const saveGameStart =
+  performance.now();
+
+await saveGameOffline(
+  savedGame
+);
+
+console.log(
+  "⏱️ SAVE GAME LOCAL:",
+  (
+    performance.now() -
+    saveGameStart
+  ).toFixed(0),
+  "ms"
+);
 
         console.log(
           "💾 ONLINE GAME SAVED LOCALLY:",
@@ -2054,11 +2129,14 @@ async function startGame() {
         // =================================================
         // SAVE SOLD CARTELAS LOCALLY
         // =================================================
-        for (
-          const cartelaId
-          of soldCartelas
-        ) {
-          await saveSoldCartelaOffline({
+       const saveCartelasStart =
+  performance.now();
+
+for (
+  const cartelaId
+  of soldCartelas
+) {
+  await saveSoldCartelaOffline({
             game_id:
               String(
                 savedGame.game_id
@@ -2084,161 +2162,164 @@ async function startGame() {
               new Date().toISOString(),
           });
         }
-
+console.log(
+  "⏱️ SAVE SOLD CARTELAS LOCAL:",
+  (
+    performance.now() -
+    saveCartelasStart
+  ).toFixed(0),
+  "ms"
+);
         console.log(
           "💾 ONLINE SOLD CARTELAS SAVED LOCALLY"
         );
 
-        // =================================================
-        // REFRESH HOUSE PACKAGE FROM SERVER
-        // =================================================
-        try {
-          console.log(
-            "☁️ REFRESHING HOUSE PACKAGE FROM SERVER:",
-            actualHouseId
-          );
+        // =====================================================
+// 🚀 START ONLINE GAME IMMEDIATELY
+// =====================================================
 
-          const packageResponse =
-            await fetch(
-              `${API_URL}/houses/${actualHouseId}/package`,
-              {
-                method:
-                  "GET",
+setGameStarted(true);
 
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-              }
-            );
+setStartClicked(true);
 
-          if (
-            packageResponse.ok
-          ) {
-            const serverPackage =
-              await packageResponse.json();
+setSoldCartelas([]);
 
-            console.log(
-              "☁️ SERVER PACKAGE:",
-              serverPackage
-            );
+localStorage.setItem(
+  "logged_in_cashier",
+  String(id)
+);
 
-            const serverPackageData =
-              serverPackage?.package ||
-              serverPackage;
+console.log(
+  "🚀 ONLINE GAME STARTED IMMEDIATELY:",
+  savedGame.game_id
+);
 
-            if (
-              serverPackageData
-            ) {
-              const normalizedPackage = {
-                ...serverPackageData,
+// =====================================================
+// 🚀 GO TO BINGO GAME NOW
+// =====================================================
+console.log(
+  "⏱️ TOTAL BEFORE NAVIGATION:",
+  (
+    performance.now() -
+    startTiming
+  ).toFixed(0),
+  "ms"
+);
+navigate(
+  `/bingo-game/${savedGame.game_id}`,
+  {
+    state: {
+      game: savedGame,
 
-                house_id:
-                  String(actualHouseId),
+      saving: false,
 
-                synced:
-                  true,
+      winningPatternCount:
+        winningPatternCount,
 
-                offline_created:
-                  false,
+      offline: false,
+    },
+  }
+);
 
-                updated_at:
-                  new Date().toISOString(),
-              };
+// =====================================================
+// ☁️ REFRESH HOUSE PACKAGE IN BACKGROUND
+// =====================================================
 
-              await saveLocalPackage(
-                String(actualHouseId),
-                normalizedPackage
-              );
+(async () => {
+  try {
+    console.log(
+      "☁️ BACKGROUND PACKAGE REFRESH:",
+      actualHouseId
+    );
 
-              setRawPackageInfo(
-                normalizedPackage
-              );
+    const packageResponse =
+      await fetch(
+        `${API_URL}/houses/${actualHouseId}/package`,
+        {
+          method: "GET",
 
-              console.log(
-                "💾 SERVER PACKAGE SAVED LOCALLY:",
-                normalizedPackage
-              );
-            }
-
-          } else {
-            console.warn(
-              "⚠️ COULD NOT REFRESH SERVER PACKAGE:",
-              packageResponse.status
-            );
-          }
-
-        } catch (
-          packageError
-        ) {
-          console.warn(
-            "⚠️ SERVER PACKAGE REFRESH FAILED:",
-            packageError
-          );
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
         }
+      );
 
-        // =================================================
-        // START ONLINE GAME UI
-        // =================================================
-        setGameStarted(
-          true
-        );
+    if (
+      packageResponse.ok
+    ) {
+      const serverPackage =
+        await packageResponse.json();
 
-        setStartClicked(
-          true
-        );
+      console.log(
+        "☁️ SERVER PACKAGE:",
+        serverPackage
+      );
 
-        setSoldCartelas(
-          []
-        );
+      const serverPackageData =
+        serverPackage?.package ||
+        serverPackage;
 
-        localStorage.setItem(
-          "logged_in_cashier",
-          String(id)
+      if (
+        serverPackageData
+      ) {
+        const normalizedPackage = {
+          ...serverPackageData,
+
+          house_id:
+            String(actualHouseId),
+
+          synced:
+            true,
+
+          offline_created:
+            false,
+
+          updated_at:
+            new Date().toISOString(),
+        };
+
+        await saveLocalPackage(
+          String(actualHouseId),
+          normalizedPackage
         );
 
         console.log(
-          "🚀 ONLINE GAME STARTED:",
-          savedGame.game_id
+          "💾 SERVER PACKAGE SAVED LOCALLY:",
+          normalizedPackage
         );
-
-        navigate(
-          `/bingo-game/${savedGame.game_id}`,
-          {
-            state: {
-              game:
-                savedGame,
-
-              saving:
-                false,
-
-              winningPatternCount:
-                winningPatternCount,
-
-              offline:
-                false,
-            },
-          }
-        );
-
-        return;
-
-      } catch (
-        onlineError
-      ) {
-
-        console.warn(
-          "⚠️ ONLINE GAME CREATION FAILED:",
-          onlineError
-        );
-
-        console.warn(
-          "📴 USING OFFLINE GAME:",
-          gameId
-        );
-
-        // Continue into OFFLINE creation.
       }
+    } else {
+      console.warn(
+        "⚠️ COULD NOT REFRESH SERVER PACKAGE:",
+        packageResponse.status
+      );
+    }
+  } catch (
+    packageError
+  ) {
+    console.warn(
+      "⚠️ BACKGROUND PACKAGE REFRESH FAILED:",
+      packageError
+    );
+  }
+})();
+
+return;
+
+} catch (onlineError) {
+  console.error(
+    "❌ ONLINE GAME CREATION FAILED:",
+    onlineError
+  );
+
+  throw new Error(
+    `Could not start the game online. ${
+      onlineError?.message ||
+      "Please check your internet and try again."
+    }`
+  );
+}
     }
 
     // =====================================================
@@ -2841,7 +2922,6 @@ useEffect(() => {
               }}></div>
 
              
-  
           
                 <span style={{ fontSize: "60px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
@@ -2949,33 +3029,62 @@ useEffect(() => {
               {t?.resetGame || "Reset Game"}
             </button>
             
-            <button
-             onClick={startGame}
-              className="btn btn-success"
-            disabled={
-  isInsufficientPackage ||
-  startingGameRef.current ||
-  startClicked
-}
-              style={{
-                opacity: isInsufficientPackage ? 0.4 : 1,
-                cursor: isInsufficientPackage ? "not-allowed" : "pointer",
-                 background: "#e12222",
-                padding: "2px 6px",
-                fontSize: "60px",
-                lineHeight: 1.2,
-                textTransform: "none",
-                backgroundColor: startClicked ? "#dc2626" : undefined,
-                borderColor: startClicked ? "#dc2626" : undefined,
-              }}
-            >
-              {isInsufficientPackage
-                ? `⛔ ${t?.insufficient || "Insufficient"}`
-                : startClicked
-                  ? "🔴 STARTED"
-                  : (t?.start || "START GAME")}
-            </button>
-             
+         
+<button
+  onClick={() => {
+    if (startingGameRef.current || startClicked || isInsufficientPackage) {
+      return;
+    }
+
+    startGame();
+  }}
+  className="btn btn-success"
+  disabled={
+    isInsufficientPackage ||
+    startingGameRef.current ||
+    startClicked
+  }
+  style={{
+    opacity: isInsufficientPackage ? 0.4 : 1,
+    cursor:
+      isInsufficientPackage || startingGameRef.current || startClicked
+        ? "not-allowed"
+        : "pointer",
+    background: "#e12222",
+    padding: "2px 6px",
+    fontSize: "60px",
+    lineHeight: 1.2,
+    textTransform: "none",
+    backgroundColor: startClicked ? "#dc2626" : undefined,
+    borderColor: startClicked ? "#dc2626" : undefined,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "14px",
+  }}
+>
+  {isInsufficientPackage ? (
+    `⛔ ${t?.insufficient || "Insufficient"}`
+  ) : startClicked ? (
+    <>
+      <span
+        style={{
+          width: "36px",
+          height: "36px",
+          border: "5px solid rgba(255,255,255,0.35)",
+          borderTopColor: "#ffffff",
+          borderRadius: "50%",
+          display: "inline-block",
+          animation: "bingoStartSpin 0.8s linear infinite",
+          flexShrink: 0,
+        }}
+      />
+      STARTING GAME...
+    </>
+  ) : (
+    t?.start || "START GAME"
+  )}
+</button>
 
             
             <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", background: "#2278e1", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>

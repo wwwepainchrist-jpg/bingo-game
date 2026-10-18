@@ -666,6 +666,10 @@ input {
     🎰 GOLDEN BINGO ROLLING BLINK
     ========================================================== */
 
+
+/* ==========================================================
+   🎰 BOLD WHITE BINGO ROLLING BLINK
+   ========================================================== */
 /* ==========================================================
    🎰 BOLD WHITE BINGO ROLLING BLINK
    ========================================================== */
@@ -677,7 +681,7 @@ input {
   color: #FFFFFF !important;
   font-weight: 1200 !important;
 
-  animation: whiteBingoBlink 0.5s ease-in-out;
+  animation: whiteBingoBlink 0.3s ease-in-out;
 
   transform-origin: center;
 
@@ -734,6 +738,7 @@ input {
       0 0 12px #FFFFFF;
   }
 }
+
 
 .internet-status-alert {
   position: fixed;

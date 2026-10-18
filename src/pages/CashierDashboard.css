@@ -253,3 +253,10 @@ body,
 .cartela-scroll-grid {
   touch-action: auto !important;
 }
+
+
+@keyframes bingoStartSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

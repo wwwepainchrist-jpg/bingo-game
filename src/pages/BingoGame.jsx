@@ -1086,13 +1086,14 @@ const winningCallTargetRef = useRef(null);
 // ONLY DURING INITIAL SHUFFLE
 // ==========================================================
 
+
 const startRandomBingoBlink = () => {
-  // Only first play of a NEW game
   if (!firstGamePlayRef.current) {
+    console.log("⚠️ INITIAL BLINK ALREADY USED");
     return;
   }
 
-  // Clean up anything left over
+  // Clear any previous blink timers.
   if (bingoBlinkTimeoutRef.current) {
     clearTimeout(bingoBlinkTimeoutRef.current);
     bingoBlinkTimeoutRef.current = null;
@@ -1103,45 +1104,31 @@ const startRandomBingoBlink = () => {
     bingoBlinkIntervalRef.current = null;
   }
 
-  console.log("🎰 BOARD BLINK TIMER STARTED");
+  console.log("🎰 SHUFFLE BLINK STARTED");
 
-  // Wait 2 seconds
+  // Start blinking after a short delay.
   bingoBlinkTimeoutRef.current = setTimeout(() => {
+    // Do not check stateRef.current.paused here.
+    // The game is intentionally paused during shuffle.
 
-    if (stateRef.current.paused) {
-      console.log("⏸️ BLINK NOT STARTED - GAME PAUSED");
+    if (!shuffleInProgressRef.current) {
       return;
     }
-
-    if (!firstGamePlayRef.current) {
-      return;
-    }
-
-    console.log("🎰 RANDOM NUMBER BLINK STARTED");
 
     bingoBlinkIntervalRef.current = setInterval(() => {
-
-      if (
-        stateRef.current.paused ||
-        !firstGamePlayRef.current
-      ) {
+      // Keep blinking only while the Shuffle button is active.
+      if (!shuffleInProgressRef.current) {
         return;
       }
 
-      const randomNumber =
-        Math.floor(Math.random() * 75) + 1;
-
+      const randomNumber = Math.floor(Math.random() * 75) + 1;
       setBlinkingNumber(randomNumber);
-
-    }, 50);
-
+    }, 180);
   }, 100);
 };
 
-
 const stopRandomBingoBlink = () => {
-
-  console.log("🛑 STOPPING RANDOM NUMBER BLINK");
+  console.log("🛑 STOPPING SHUFFLE BLINK");
 
   if (bingoBlinkTimeoutRef.current) {
     clearTimeout(bingoBlinkTimeoutRef.current);
@@ -1154,11 +1141,9 @@ const stopRandomBingoBlink = () => {
   }
 
   setBlinkingNumber(null);
-
-  // IMPORTANT:
-  // This game has now used its initial rolling effect.
   firstGamePlayRef.current = false;
 };
+
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
@@ -3630,52 +3615,53 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
 
   
  
+
 function playShuffleSound(onFinished = () => {}) {
-  console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO CHANNEL RESOURCE");
-  
+  console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO");
+
   const audio = new Audio("/oromo/shuffle.wav");
   audio.preload = "auto";
-  
-  // Bind the channel to our global component reference so togglePlayPause can control it
   shuffleAudioRef.current = audio;
 
-  audio.onended = () => {
-    console.log("🧹 CAGE SHUFFLE TRACK ENDED NATURALLY");
-    shuffleAudioRef.current = null;
-    sessionStorage.removeItem("paused_shuffle_timestamp"); // Flush clean tracking cache
-    
-    // Execute our callback pipeline route link
+  let finished = false;
+
+  const finishOnce = () => {
+    if (finished) return;
+    finished = true;
+
+    if (shuffleAudioRef.current === audio) {
+      shuffleAudioRef.current = null;
+    }
+
+    sessionStorage.removeItem("paused_shuffle_timestamp");
+
     try {
       onFinished();
-    } catch(error) {
-      console.error("❌ SHUFFLE COMPLETION HANDSHAKE ERROR:", error);
+    } catch (error) {
+      console.error("❌ SHUFFLE COMPLETION ERROR:", error);
     }
   };
 
-  audio.onerror = (error) => {
-    console.error("❌ SHUFFLE TRACK CRITICAL LOADING FAILURE EXCEPTION:", error);
-    shuffleAudioRef.current = null;
-    sessionStorage.removeItem("paused_shuffle_timestamp");
-    
-    // Failsafe auto-rescue: If the shuffle sound file crashes or fails to load,
-    // fire the completion hook anyway so the game room doesn't stay frozen!
-    onFinished();
+  audio.onended = () => {
+    console.log("🏁 SHUFFLE AUDIO FINISHED");
+    finishOnce();
   };
 
-  // Safe promise-wrapped stream execution execution thread
-  const playPromise = audio.play();
-  if (playPromise !== undefined) {
-    playPromise
-      .then(() => {
-        console.log("▶️ SHUFFLE AUDIO CURRENTLY SPINNING SUCCESSFULLY");
-      })
-      .catch((err) => {
-        console.warn("⚠️ Shuffle element blocked or muted by browser protocols:", err.message);
-        // Fallback auto-advance execution trigger
-        onFinished();
-      });
-  }
+  audio.onerror = (error) => {
+    console.error("❌ SHUFFLE AUDIO FAILED TO LOAD:", error);
+    finishOnce();
+  };
+
+  audio.play()
+    .then(() => {
+      console.log("▶️ SHUFFLE AUDIO PLAYING");
+    })
+    .catch((error) => {
+      console.warn("⚠️ SHUFFLE AUDIO COULD NOT PLAY:", error.message);
+      finishOnce();
+    });
 }
+
 
 
    
@@ -3847,12 +3833,14 @@ function announceLetsGo(callback) {
 }
 
  
+
+ 
 const togglePlayPause = () => {
   const actionId = ++playPauseActionRef.current;
   const isCurrentlyPaused = stateRef.current.paused;
 
   // ==========================================================
-  // ⏸️ PAUSE ENGINE
+  // PAUSE ENGINE
   // ==========================================================
   if (!isCurrentlyPaused) {
     console.log("⏸️ PAUSE");
@@ -3870,34 +3858,33 @@ const togglePlayPause = () => {
       audioFailsafeTimeoutRef.current = null;
     }
 
-    // Capture the precise millisecond marker if the shuffle track is running
+    // Pause shuffle audio if it is playing.
     if (shuffleAudioRef.current) {
-      try { 
-        const currentShuffleTime = Number(shuffleAudioRef.current.currentTime) || 0;
-        console.log("⏸️ PAUSING CAGE SHUFFLE BACKGROUND TRACK MID-RUN AT POSITION:", currentShuffleTime);
-        
-        sessionStorage.setItem("paused_shuffle_timestamp", String(currentShuffleTime));
-        shuffleAudioRef.current.pause(); 
-      } catch(e){}
+      try {
+        const currentShuffleTime =
+          Number(shuffleAudioRef.current.currentTime) || 0;
+
+        sessionStorage.setItem(
+          "paused_shuffle_timestamp",
+          String(currentShuffleTime)
+        );
+
+        shuffleAudioRef.current.pause();
+      } catch (error) {
+        console.error("Error pausing shuffle audio:", error);
+      }
     }
 
+    // Pause the active number voice.
     const audio = activeAudioRef.current;
+
     if (audio && !audio.ended) {
       const currentTime = Number(audio.currentTime) || 0;
-      console.log("⏸️ PAUSING ACTIVE ANNOUNCER VOICE ELEMENT:", audio.src, "AT POSITION:", currentTime);
-      
       const currentBallStr = stateRef.current.current || "";
-const parts = currentBallStr.trim().split(/\s+/);
+      const parts = currentBallStr.trim().split(/\s+/);
 
-const extractedLetter = parts[0] || "";
-const extractedNumber = Number(parts[1]) || 0;
-
-console.log(
-  "💾 PAUSE SNAPSHOT:",
-  extractedLetter,
-  extractedNumber,
-  currentTime
-);
+      const extractedLetter = parts[0] || "";
+      const extractedNumber = Number(parts[1]) || 0;
 
       pausedAudioRef.current = {
         audio,
@@ -3908,124 +3895,124 @@ console.log(
 
       try {
         audio.pause();
-      } catch (error) {}
-      
+      } catch (error) {
+        console.error("Error pausing number audio:", error);
+      }
+
       isDrawingBallRef.current = false;
       return;
     }
 
     if (pendingBingoCallRef.current || isDrawingBallRef.current) {
       console.log("⏸️ DRAW ENGINE DISARMED MID-FLIGHT");
-      audioGenerationRef.current++; 
+
+      audioGenerationRef.current++;
       isDrawingBallRef.current = false;
       return;
     }
+
     return;
   }
 
   // ==========================================================
-  // ▶️ PLAY / RESUME ENGINE (TRUE SEAMLESS RESUMPTION)
+  // PLAY / RESUME ENGINE — NO AUTOMATIC SHUFFLE
   // ==========================================================
   console.log("▶️ PLAY");
 
   stateRef.current.paused = false;
   setPaused(false);
 
- // 🎰 ONLY FIRST PLAY OF NEW GAME
-if (firstGamePlayRef.current) {
-  startRandomBingoBlink();
-}
+  
 
-  // 🎵 INITIAL MATCH LAUNCH GATING RESTRUCTURE
-  if (!hasPlayedShuffleRef.current) {
-    hasPlayedShuffleRef.current = true;
-    sessionStorage.setItem("bingo_shuffle_played", "true");
-    sessionStorage.removeItem("paused_shuffle_timestamp"); 
-
-    console.log("🚀 INITIAL MATCH LAUNCH: FIRING SHUFFLE TRACK ONLY");
-
-    // ✅ FIX: Fire the shuffle track, but do NOT call generateNumber() here!
-    // The number generator is now passed safely as a completion hook inside playShuffleSound.
-   playShuffleSound(() => {
-  console.log("🏁 SHUFFLE AUDIO FINISHED");
-
-  // 🛑 STOP RANDOM NUMBER BLINKING
-  stopRandomBingoBlink();
-
-  if (stateRef.current.paused) {
-    console.log("⏸️ GAME IS PAUSED - NOT GENERATING NUMBER");
-    return;
-  }
-
-  console.log("🎯 GENERATING NUMBER 1 NOW");
-
-  isDrawingBallRef.current = false;
-
-  generateNumber();
-});
-    return;
-  }
-
-  // 🎵 TRUE SHUFFLE RESUME VALVE (If unpausing mid-shuffle before any numbers dropped)
-  const currentRemainingPool = remainingNumbersRef.current || [];
-  if (currentRemainingPool.length === 75) {
-    const savedShuffleTimeStr = sessionStorage.getItem("paused_shuffle_timestamp");
-    const resumeShuffleTime = savedShuffleTimeStr ? Number(savedShuffleTimeStr) : 0;
-    
-    console.log(`🚀 INITIAL SHUFFLE RESUME VALVE: CONTINUING CAGE SOUND FROM POSITION: ${resumeShuffleTime}s`);
-    
-    if (shuffleAudioRef.current) {
-      try { 
-        if (resumeShuffleTime > 0) {
-          shuffleAudioRef.current.currentTime = resumeShuffleTime;
-        }
-        shuffleAudioRef.current.play(); 
-      } catch(e){
-        // Dynamic rescue if the object instance dropped out entirely
-        isDrawingBallRef.current = false;
-        generateNumber();
-      }
-    } else {
-      isDrawingBallRef.current = false;
-      generateNumber();
-    }
-    return;
-  }
-
-  // True voice audio resume gating snapshot
+  // Resume an interrupted number voice if one exists.
   const pausedData = pausedAudioRef.current;
+
   if (pausedData && pausedData.audio) {
     const resumeLetter = pausedData.letter;
     const resumeNumber = pausedData.number;
     const resumeTime = pausedData.time || 0;
-    
-    pausedAudioRef.current = null; 
+
+    pausedAudioRef.current = null;
     pendingBingoCallRef.current = null;
 
     if (actionId !== playPauseActionRef.current) return;
 
     if (resumeLetter && resumeNumber) {
-      console.log(`🚀 TRUE RESUME: REPLAYING INTERRUPTED BALL ${resumeLetter} ${resumeNumber} FROM POSITION: ${resumeTime}s`);
+      console.log(
+        `🚀 RESUMING BALL ${resumeLetter} ${resumeNumber} FROM ${resumeTime}s`
+      );
+
       isDrawingBallRef.current = true;
-      
-      playRecordedBingoCall(resumeLetter, resumeNumber, () => {
-        isDrawingBallRef.current = false;
-        if (stateRef.current.paused) return;
-        generateNumber();
-      }, resumeTime);
+
+      playRecordedBingoCall(
+        resumeLetter,
+        resumeNumber,
+        () => {
+          isDrawingBallRef.current = false;
+
+          if (stateRef.current.paused) return;
+
+          generateNumber();
+        },
+        resumeTime
+      );
+
       return;
     }
   }
 
+  // Prevent duplicate number generation.
   if (isDrawingBallRef.current) {
     console.log("⏳ CALL GENERATION STILL IN PROGRESS");
     return;
   }
 
-  console.log("🚀 ADVANCING ENGINE TIMELINE SAFELY");
+  // Start or continue calling numbers immediately.
+  console.log("🚀 STARTING NUMBER CALLING");
   generateNumber();
 };
 
+
+
+
+const shuffleInProgressRef = useRef(false);
+
+
+const handleShuffleClick = () => {
+  if (shuffleInProgressRef.current) {
+    console.log("⏳ SHUFFLE IS ALREADY IN PROGRESS");
+    return;
+  }
+
+  const remaining = remainingNumbersRef.current || [];
+
+  if (remaining.length < 75) {
+    console.log("⚠️ SHUFFLE IS ONLY AVAILABLE BEFORE THE FIRST BALL");
+    return;
+  }
+
+  shuffleInProgressRef.current = true;
+
+  stateRef.current.paused = true;
+  setPaused(true);
+
+  console.log("🔀 SHUFFLE BUTTON CLICKED — STARTING BLINK");
+
+  // Start blinking only for the Shuffle button.
+  startRandomBingoBlink();
+
+  playShuffleSound(() => {
+    shuffleInProgressRef.current = false;
+
+    console.log("🏁 SHUFFLE FINISHED — STOPPING BLINK");
+
+    stopRandomBingoBlink();
+
+    if (stateRef.current.paused) {
+      togglePlayPause();
+    }
+  });
+};
 
 
 
@@ -7418,46 +7405,77 @@ WebkitBackdropFilter: "blur(4px)",
     </button>
   </div>
 
-  {/* PLAY / PAUSE */}
+  
+{/* PLAY / PAUSE / SHUFFLE */}
+<div
+  className="play-pause-card"
+  style={{
+    padding: "6px",
+    background: "rgba(13, 29, 45, 0.6)",
+    borderRadius: "14px",
+    border: "1px solid rgba(255, 255, 255, 0.08)",
+    backdropFilter: "blur(4px)",
+    boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
+  }}
+>
   <div
-    className="play-pause-card"
     style={{
-      padding: "6px",
-      background: "rgba(13, 29, 45, 0.6)",
-      borderRadius: "14px",
-      border: "1px solid rgba(255, 255, 255, 0.08)",
-      backdropFilter: "blur(4px)",
-      boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
+      display: "flex",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: "16px",
     }}
   >
-    <div
+
+ {/* SHUFFLE BUTTON */}
+    <button
+      type="button"
+      className="ctrl-btn"
       style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
+        padding: "2px 12px",
+        fontSize: "22px",
+        fontWeight: "800",
+        background: "#106fdb",
+        border: "2px solid #000000",
+        borderRadius: "100px",
+        height: "70px",
+        color: "#060606",
+      
+        cursor: "pointer",
       }}
+      onClick={handleShuffleClick}
     >
-      <button
-        className="ctrl-btn gold-border"
-        style={{
-          padding: "2px 8px",
-          fontSize: "40px",
-          fontWeight: "800",
-          background: "#e01010",
-          flex: 1,
-          justifyContent: "center",
-          borderRadius: "100px",
-          height: "70px",
-          color: "#ffffffff",
-          boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
-          cursor: "pointer",
-        }}
-        onClick={togglePlayPause}
-      >
-        <span>{paused ? t.play : t.pause}</span>
-      </button>
-    </div>
+      🔀 SHUFFLE
+    </button>
+
+
+    {/* PLAY / PAUSE BUTTON */}
+    <button
+      type="button"
+      className="ctrl-btn gold-border"
+      style={{
+        padding: "2px 8px",
+        fontSize: "40px",
+        fontWeight: "800",
+        background: "#e01010",
+       flex: "0 1 550px",
+width: "150px",
+        justifyContent: "center",
+        borderRadius: "100px",
+        height: "70px",
+      
+        color: "#ffffff",
+        boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
+        cursor: "pointer",
+      }}
+      onClick={togglePlayPause}
+    >
+      <span>{paused ? t.play : t.pause}</span>
+    </button>
+
+   
   </div>
+</div>
 </div>
 
   </div> {/* Closes vertical column wrapper */}
