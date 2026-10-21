@@ -1053,6 +1053,148 @@ const [showInternetRestored, setShowInternetRestored] =
   const [winnerMessage, setWinnerMessage] = useState("");
   const [checkedCartela, setCheckedCartela] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(""); 
+
+  
+  const [winnerCartelaHistory, setWinnerCartelaHistory] = useState([]);
+const [showWinnerCartelaHistory, setShowWinnerCartelaHistory] = useState(false);
+
+// ============================================================
+// 🏆 RECORD A REAL WINNING CARTELA
+// Uses the actual cartela numbers and called balls.
+// ============================================================
+const recordWinnerCartela = (
+  cartela,
+  callList = called,
+  patternName = "BINGO"
+) => {
+  if (!cartela) return;
+
+  const cartelaIdValue =
+    cartela.cartelaId ??
+    cartela.cartela_id ??
+    cartela.id ??
+    cartelaId.trim();
+
+  // Prefer authentic sold-cartela data if the verifier
+  // returned only the cartela ID.
+  let sourceCartela = cartela;
+
+  const hasNumbers =
+    sourceCartela.numbers ||
+    sourceCartela.matrix;
+
+  if (!hasNumbers) {
+    const matchingCartela = soldCartelaSource.find((item) => {
+      const itemId =
+        typeof item === "object"
+          ? item.cartelaId ?? item.cartela_id ?? item.id
+          : item;
+
+      return String(itemId) === String(cartelaIdValue);
+    });
+
+    if (matchingCartela) {
+      sourceCartela = matchingCartela;
+    }
+  }
+
+  let numbers = sourceCartela.numbers;
+  let matrix = sourceCartela.matrix;
+
+  try {
+    if (typeof numbers === "string") {
+      numbers = JSON.parse(numbers);
+    }
+
+    if (typeof matrix === "string") {
+      matrix = JSON.parse(matrix);
+    }
+  } catch (error) {
+    console.error("Could not parse winning cartela:", error);
+    return;
+  }
+
+  // Build the actual 5×5 board from the B/I/N/G/O columns
+  // when a matrix is not already available.
+  if (
+    !Array.isArray(matrix) &&
+    numbers &&
+    ["B", "I", "N", "G", "O"].every(
+      (letter) =>
+        Array.isArray(numbers[letter]) &&
+        numbers[letter].length === 5
+    )
+  ) {
+    matrix = Array.from({ length: 5 }, (_, row) =>
+      ["B", "I", "N", "G", "O"].map((letter, col) =>
+        row === 2 && col === 2
+          ? "FREE"
+          : numbers[letter][row]
+      )
+    );
+  }
+
+  if (
+    !Array.isArray(matrix) ||
+    matrix.length !== 5 ||
+    matrix.some(
+      (row) => !Array.isArray(row) || row.length !== 5
+    )
+  ) {
+    console.error(
+      "Winning cartela has no valid 5×5 matrix:",
+      cartelaIdValue
+    );
+    return;
+  }
+
+  const normalizedMatrix = matrix.map((row, rowIndex) =>
+    row.map((cell, colIndex) =>
+      rowIndex === 2 && colIndex === 2
+        ? "FREE"
+        : cell
+    )
+  );
+
+  const balls = Array.isArray(callList) ? callList : [];
+
+  const calledNumbers = balls
+    .map((ball) => {
+      const value =
+        typeof ball === "object"
+          ? ball.number ?? ball.ball
+          : ball;
+
+      return parseInt(
+        String(value).trim().split(/\s+/).pop(),
+        10
+      );
+    })
+    .filter(Number.isFinite);
+
+  setWinnerCartelaHistory((previous) => {
+    // Avoid duplicate entries if the same cartela is checked again.
+    if (
+      previous.some(
+        (item) => String(item.id) === String(cartelaIdValue)
+      )
+    ) {
+      return previous;
+    }
+
+    return [
+      {
+        id: cartelaIdValue,
+        matrix: normalizedMatrix,
+        calledNumbers,
+        callCount: balls.length,
+        pattern: patternName,
+        wonAt: new Date().toLocaleTimeString(),
+      },
+      ...previous,
+    ];
+  });
+};
 // ============================================================
 // 🎵 NEXT BINGO AUDIO PRELOADER
 // Keeps the next ball's MP3 ready before it is displayed.
@@ -4182,6 +4324,57 @@ async function saveBallWithRetry(gameId, ball, retries = 3) {
   return false; // Failed all 3 attempts
 }
 
+
+
+async function scanWinnerCartelaHistory(gameId) {
+  if (!gameId || !navigator.onLine) return;
+
+  try {
+    const response = await fetch(
+      `${API_URL}/games/${encodeURIComponent(gameId)}/winner-history/scan`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Winner history scan failed: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.success) return;
+
+    // Convert the backend's call groups into entries for the current UI.
+    const history = (data.groups || []).flatMap((group) =>
+      (group.cartelas || []).map((cartela) => ({
+        id: cartela.id,
+        pattern: cartela.pattern,
+        matrix: cartela.matrix,
+        callCount: group.callCount,
+        wonAt: `Call #${group.callCount}`,
+        gameId: data.gameId,
+      }))
+    );
+
+    setWinnerCartelaHistory(history);
+  } catch (error) {
+    console.error("Could not refresh winner cartela history:", error);
+  }
+}
+
+
+
+useEffect(() => {
+  const activeGameId =
+    game?.game_id ||
+    game?.id ||
+    stateRef.current?.game?.game_id ||
+    id;
+
+  if (!activeGameId || !navigator.onLine) return;
+
+  // Restore saved winners whenever the active game becomes available.
+  scanWinnerCartelaHistory(activeGameId);
+}, [id, game?.game_id, game?.id]);
+
+
 // ==========================================================
 // 🎱 2. AUTHORITATIVE GENERATOR ENGINE (Blazing 0s Instant Mode)
 // ==========================================================
@@ -4821,6 +5014,7 @@ else {
     stateRef.current.current =
       result;
 
+    
     // ============================================================
     // 14. SAVE BALL TO BACKEND
     // ============================================================
@@ -4829,16 +5023,18 @@ else {
       currentGameId,
       result,
       3
-    ).then(
-      (saved) => {
-        if (!saved) {
-          console.error(
-            "❌ BACKEND TRANSACTION TIMEOUT:",
-            result
-          );
-        }
+    ).then((saved) => {
+      if (!saved) {
+        console.error(
+          "❌ BACKEND TRANSACTION TIMEOUT:",
+          result
+        );
+        return;
       }
-    );
+
+      // 🏆 Automatically scan and refresh winning cartela history.
+      scanWinnerCartelaHistory(currentGameId);
+    });
 
     // ============================================================
     // 15. SAVE OFFLINE BACKUP
@@ -5983,7 +6179,7 @@ if (
     setWinnerMessage(
       patternName
     );
-
+recordWinnerCartela(soldCartela, called, patternName);
     setVerificationStatus(
       "WINNER"
     );
@@ -6152,7 +6348,10 @@ playRecordedAudio("notsold");
       setWinnerMessage(
         patternName
       );
+console.log("ONLINE WINNER CARTELA:", verificationData.cartela);
+console.log("SOLD CARTELA SOURCE:", soldCartelaSource);
 
+recordWinnerCartela(verificationData.cartela, called, patternName);
       setVerificationStatus(
         "WINNER"
       );
@@ -7440,7 +7639,7 @@ WebkitBackdropFilter: "blur(4px)",
         borderRadius: "100px",
         height: "70px",
         color: "#060606",
-      
+        boxShadow: "0 0 10px rgba(240, 193, 75, 0.45)",
         cursor: "pointer",
       }}
       onClick={handleShuffleClick}
@@ -8016,6 +8215,8 @@ width: "150px",
     ALL NUMBERS VISIBLE — NO SCROLLING
     ========================================================= */}
 {showSoldCartelas && (
+
+ 
   <div
     style={{
       position: "fixed",
@@ -8028,6 +8229,7 @@ width: "150px",
       width: "min(92vw, 1600px)",
 
       maxHeight: "80vh",
+overflowY: "auto",
 
       background: "rgba(5, 12, 30, 0.98)",
 
@@ -8050,9 +8252,153 @@ width: "150px",
 
       alignItems: "center",
 
-      justifyContent: "center"
+     justifyContent: "flex-start"
+
     }}
   >
+
+
+
+
+
+{showWinnerCartelaHistory && (
+  <div
+    style={{
+      width: "100%",
+      maxHeight: "350px",
+      overflowY: "auto",
+      flexShrink: 0,
+      marginBottom: "16px",
+      color: "#ffffff",
+      boxSizing: "border-box",
+    }}
+  >
+    {winnerCartelaHistory.length === 0 ? (
+      <p style={{ textAlign: "center" }}>
+        No winning cartelas recorded yet.
+      </p>
+    ) : (
+      winnerCartelaHistory.map((winner, index) => (
+        <div
+          key={`${winner.id}-${index}`}
+          style={{
+            marginBottom: "16px",
+            padding: "12px",
+            border: "1px solid #00f0ff",
+            borderRadius: "8px",
+            background: "rgba(0, 240, 255, 0.06)",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: "bold",
+              fontSize: "16px",
+              marginBottom: "6px",
+            }}
+          >
+            🏆 Cartela: {winner.id} — {winner.pattern}
+          </div>
+
+          <div
+            style={{
+              fontSize: "13px",
+              marginBottom: "10px",
+              color: "#cccccc",
+            }}
+          >
+            Call #{winner.callCount} | Won at: {winner.wonAt}
+          </div>
+
+          {/* BINGO COLUMN HEADERS */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+              gap: "4px",
+              marginBottom: "4px",
+            }}
+          >
+            {["B", "I", "N", "G", "O"].map((letter) => (
+              <div
+                key={letter}
+                style={{
+                  textAlign: "center",
+                  fontWeight: "bold",
+                  color: "#00f0ff",
+                  padding: "5px",
+                }}
+              >
+                {letter}
+              </div>
+            ))}
+          </div>
+
+          {/* COMPLETE 5x5 CARTELA */}
+          {Array.isArray(winner.matrix) &&
+          winner.matrix.length === 5 ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: "4px",
+              }}
+            >
+              {winner.matrix.flatMap((row, rowIndex) =>
+                row.map((number, colIndex) => {
+                  const value = String(number);
+                  const numericValue = Number(
+                    value.replace(/^[BINGO]\s*/i, "")
+                  );
+
+                  const isFree =
+                    rowIndex === 2 && colIndex === 2;
+
+                  const isCalled =
+                    isFree ||
+                    (
+                      Array.isArray(winner.calledNumbers) &&
+                      winner.calledNumbers.includes(numericValue)
+                    );
+
+                  return (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      style={{
+                        minWidth: 0,
+                        padding: "10px 2px",
+                        textAlign: "center",
+                        borderRadius: "4px",
+                        backgroundColor: isCalled
+                          ? "#16a34a"
+                          : "#e5e7eb",
+                        color: isCalled
+                          ? "#ffffff"
+                          : "#111827",
+                        fontWeight: "bold",
+                        fontSize: "14px",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {isFree
+                        ? "FREE"
+                        : value.replace(/^[BINGO]\s*/i, "")}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ) : (
+            <p style={{ color: "#fca5a5" }}>
+              Cartela numbers are unavailable for this winner.
+            </p>
+          )}
+        </div>
+      ))
+    )}
+  </div>
+)}
+
+
     {/* =====================================================
         PRIZE HISTORY
         ===================================================== */}
@@ -8178,6 +8524,10 @@ width: "150px",
     )}
   </div>
 )}
+
+
+
+
     {/* =====================================================
         TITLE
         ===================================================== */}

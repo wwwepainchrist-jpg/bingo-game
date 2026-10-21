@@ -86,6 +86,62 @@ export default function CashierDashboard() {
   const [keyboardInput, setKeyboardInput] = useState("");
   const [selectedPatterns, setSelectedPatterns] = useState([]);
   const [showFinance, setShowFinance] = useState(false);
+  // 🏆 WINNER CARTELA HISTORY
+const [winnerHistoryGameId, setWinnerHistoryGameId] = useState(
+  () => localStorage.getItem(`winner_history_game_id_${id}`) || ""
+);
+const [cashierWinnerGroups, setCashierWinnerGroups] = useState([]);
+const [loadingWinnerHistory, setLoadingWinnerHistory] = useState(false);
+const [winnerHistoryError, setWinnerHistoryError] = useState("");
+
+const loadCashierWinnerHistory = async (gameId) => {
+  if (!gameId || !navigator.onLine) {
+    setCashierWinnerGroups([]);
+    return;
+  }
+
+  setLoadingWinnerHistory(true);
+  setWinnerHistoryError("");
+
+  try {
+    const response = await fetch(
+      `${API_URL}/games/${encodeURIComponent(gameId)}/winner-history/scan`
+    );
+
+    if (!response.ok) {
+      throw new Error(`History request failed (${response.status})`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || "Could not load winner history");
+    }
+
+    setCashierWinnerGroups(
+      Array.isArray(data.groups) ? data.groups : []
+    );
+  } catch (error) {
+    console.error("Failed to load cashier winner history:", error);
+    setWinnerHistoryError(error.message || "Could not load winner history");
+  } finally {
+    setLoadingWinnerHistory(false);
+  }
+};
+
+useEffect(() => {
+  const savedGameId = localStorage.getItem(
+    `winner_history_game_id_${id}`
+  ) || "";
+
+  setWinnerHistoryGameId(savedGameId);
+
+  if (savedGameId) {
+    loadCashierWinnerHistory(savedGameId);
+  } else {
+    setCashierWinnerGroups([]);
+  }
+}, [id]);
 
   const [netUnlocked, setNetUnlocked] = useState(false);
 const [netPasswordExists, setNetPasswordExists] = useState(false);
@@ -2189,6 +2245,16 @@ localStorage.setItem(
   String(id)
 );
 
+
+// 🏆 Remember which game's winner history to display
+localStorage.setItem(
+  `winner_history_game_id_${id}`,
+  String(savedGame.game_id)
+);
+
+setWinnerHistoryGameId(String(savedGame.game_id));
+setCashierWinnerGroups([]);
+
 console.log(
   "🚀 ONLINE GAME STARTED IMMEDIATELY:",
   savedGame.game_id
@@ -2921,7 +2987,284 @@ useEffect(() => {
                 borderRadius: "6px" 
               }}></div>
 
-             
+             <div 
+  style={{ 
+    marginTop: "12px", 
+    padding: "16px", 
+    borderRadius: "14px", 
+    background: "rgba(15, 23, 42, 0.75)", 
+    border: "1px solid rgba(0, 240, 255, 0.35)", 
+    minWidth: "220px", 
+  }} 
+> 
+  {!netUnlocked ? ( 
+    <> 
+      <div 
+        style={{ 
+          fontSize: "18px", 
+          fontWeight: "800", 
+          color: "#00f0ff", 
+          marginBottom: "10px", 
+        }} 
+      > 
+        🔐 NET 
+      </div> 
+ 
+      {!showCreateNetPassword && 
+        !showNetLogin && 
+        !showChangeNetPassword && ( 
+          <button 
+            type="button" 
+            onClick={checkNetPasswordStatus} 
+            style={{ 
+              padding: "10px 18px", 
+              borderRadius: "8px", 
+              border: "1px solid #00f0ff", 
+              background: "rgba(0,240,255,0.10)", 
+              color: "#00f0ff", 
+              fontWeight: "800", 
+              cursor: "pointer", 
+            }} 
+          > 
+            SHOW NET 
+          </button> 
+        )} 
+ 
+      {showCreateNetPassword && ( 
+        <div> 
+          <div style={{ marginBottom: "8px" }}> 
+            Create NET Password 
+          </div> 
+ 
+          <input 
+            type="password" 
+            placeholder="Create password" 
+            value={netPassword} 
+            onChange={(e) => 
+              setNetPassword(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <input 
+            type="password" 
+            placeholder="Confirm password" 
+            value={netPasswordConfirm} 
+            onChange={(e) => 
+              setNetPasswordConfirm(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <button 
+            type="button" 
+            onClick={handleCreateNetPassword} 
+            style={{ 
+              padding: "9px 14px", 
+              marginRight: "6px", 
+              cursor: "pointer", 
+            }} 
+          > 
+            CREATE PASSWORD 
+          </button> 
+        </div> 
+      )} 
+ 
+      {showNetLogin && ( 
+        <div> 
+          <div style={{ marginBottom: "8px" }}> 
+            NET LOGIN 
+          </div> 
+ 
+          <input 
+            type="password" 
+            placeholder="Enter password" 
+            value={netPassword} 
+            onChange={(e) => 
+              setNetPassword(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <button 
+            type="button" 
+            onClick={handleNetLogin} 
+            style={{ 
+              padding: "9px 14px", 
+              marginRight: "6px", 
+              cursor: "pointer", 
+            }} 
+          > 
+            LOGIN 
+          </button> 
+ 
+          <button 
+            type="button" 
+            onClick={() => { 
+              setShowNetLogin(false); 
+              setShowChangeNetPassword(true); 
+            }} 
+            style={{ 
+              padding: "9px 14px", 
+              cursor: "pointer", 
+            }} 
+          > 
+            CHANGE PASSWORD 
+          </button> 
+        </div> 
+      )} 
+ 
+      {showChangeNetPassword && ( 
+        <div> 
+          <div style={{ marginBottom: "8px" }}> 
+            CHANGE NET PASSWORD 
+          </div> 
+ 
+          <input 
+            type="password" 
+            placeholder="Current password" 
+            value={currentNetPassword} 
+            onChange={(e) => 
+              setCurrentNetPassword(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <input 
+            type="password" 
+            placeholder="New password" 
+            value={newNetPassword} 
+            onChange={(e) => 
+              setNewNetPassword(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <input 
+            type="password" 
+            placeholder="Confirm new password" 
+            value={newNetPasswordConfirm} 
+            onChange={(e) => 
+              setNewNetPasswordConfirm(e.target.value) 
+            } 
+            style={{ 
+              display: "block", 
+              width: "100%", 
+              marginBottom: "8px", 
+              padding: "10px", 
+              boxSizing: "border-box", 
+            }} 
+          /> 
+ 
+          <button 
+            type="button" 
+            onClick={handleChangeNetPassword} 
+            style={{ 
+              padding: "9px 14px", 
+              cursor: "pointer", 
+            }} 
+          > 
+            CHANGE PASSWORD 
+          </button> 
+        </div> 
+      )} 
+    </> 
+  ) : ( 
+    <> 
+      <div 
+  style={{ 
+    fontSize: "15px", 
+    fontWeight: "800", 
+    color: "#94a3b8", 
+    textTransform: "uppercase", 
+  }} 
+> 
+  HOUSE COMMISSION EARNED 
+</div> 
+ 
+<div 
+  style={{ 
+    fontSize: "13px", 
+    fontWeight: "800", 
+    color: "#64748b", 
+    marginTop: "2px", 
+    textTransform: "uppercase", 
+  }} 
+> 
+  NET 
+</div> 
+ 
+<div 
+  style={{ 
+    fontSize: "52px", 
+    fontWeight: "900", 
+    color: "#00f0ff", 
+    marginTop: "4px", 
+  }} 
+> 
+{Number(houseNetIncome || 0).toFixed(2)} 
+</div>
+
+<button
+  type="button"
+  onClick={() => {
+    setNetUnlocked(false);
+    setShowNetLogin(false);
+    setShowCreateNetPassword(false);
+    setShowChangeNetPassword(false);
+
+    setNetPassword("");
+    setCurrentNetPassword("");
+    setNewNetPassword("");
+    setNewNetPasswordConfirm("");
+  }}
+  style={{
+    marginTop: "12px",
+    padding: "9px 16px",
+    borderRadius: "8px",
+    border: "1px solid rgba(0,240,255,0.45)",
+    background: "rgba(0,240,255,0.08)",
+    color: "#00f0ff",
+    fontWeight: "800",
+    cursor: "pointer",
+  }}
+>
+  🔒 HIDE NET
+</button>
+</>
+)}
+</div> 
+  
           
                 <span style={{ fontSize: "60px", fontWeight: "700", color: "#94a3b8", whiteSpace: "nowrap", textTransform: "none" }}>
                   {t?.bet || "መደብ"}:
@@ -3087,8 +3430,8 @@ useEffect(() => {
 </button>
 
             
-            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "2px 6px", background: "#2278e1", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
-              
+            <button onClick={() => setShowFinance(!showFinance)} className="btn btn-neutral" style={{ padding: "22px 26px", background: "#ec0c0c", fontSize: "40px", lineHeight: 1.2, textTransform: "none" }}>
+             
             </button>
 
             <button 
@@ -3099,6 +3442,9 @@ useEffect(() => {
              
             </button>
           </div> 
+
+
+
 
          {showFinance && (
   <div
@@ -3111,7 +3457,300 @@ useEffect(() => {
     >
       Gross: {grossIncome} ETB
     </div>
+
+ {/* 🏆 WINNER CARTELA HISTORY */}
+<div
+  style={{
+    marginTop: "10px",
+    padding: "22px",
+    borderRadius: "10px",
+    background: "#211044",
+    border: "2px solid #8b5cf6",
+    color: "#ffffff",
+    width: "100%",
+    boxSizing: "border-box",
+  }}
+>
+  {/* HEADER */}
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: "8px",
+    }}
+  >
+    <h3 style={{ margin: 0, fontSize: "18px" }}>
+      🏆 WINNER CARTELA HISTORY (
+      {cashierWinnerGroups.reduce(
+        (total, group) =>
+          total + (group.cartelas?.length || 0),
+        0
+      )}
+      )
+    </h3>
+
+    <button
+      type="button"
+      disabled={!winnerHistoryGameId || loadingWinnerHistory}
+      onClick={() => loadCashierWinnerHistory(winnerHistoryGameId)}
+      style={{
+        padding: "7px 12px",
+        borderRadius: "6px",
+        border: "1px solid #c4b5fd",
+        background: "#6d28d9",
+        color: "#ffffff",
+        fontWeight: "bold",
+        cursor: loadingWinnerHistory ? "wait" : "pointer",
+        opacity: loadingWinnerHistory ? 0.7 : 1,
+      }}
+    >
+      {loadingWinnerHistory ? "LOADING..." : "↻ REFRESH"}
+    </button>
   </div>
+
+  {/* GAME ID */}
+  <div style={{ marginTop: "8px", fontSize: "13px" }}>
+    Game ID:{" "}
+    <strong>{winnerHistoryGameId || "No game selected"}</strong>
+  </div>
+
+  {/* ERRORS */}
+  {winnerHistoryError && (
+    <p style={{ color: "#fca5a5", marginBottom: "8px" }}>
+      {winnerHistoryError}
+    </p>
+  )}
+
+  {!winnerHistoryGameId && (
+    <p>Start a game to display its winning cartelas here.</p>
+  )}
+
+  {winnerHistoryGameId &&
+    !loadingWinnerHistory &&
+    cashierWinnerGroups.length === 0 &&
+    !winnerHistoryError && (
+      <p>No winning cartelas have been recorded for this game yet.</p>
+    )}
+
+  {/* WINNER GROUPS */}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "column",
+      gap: "12px",
+    }}
+  >
+    {cashierWinnerGroups.map((group) => (
+      <div
+        key={group.callCount}
+        style={{
+          marginTop: "8px",
+          padding: "10px",
+          borderRadius: "8px",
+          background: "#32145b",
+          border: "1px solid #7c3aed",
+        }}
+      >
+        <div style={{ fontWeight: "bold", fontSize: "31px",   marginBottom: "10px" }}>
+          🎱 ጥሪ   CALL #{group.callCount}
+        </div>
+
+        {(group.cartelas || []).map((winner, index) => (
+          <div
+            key={`${winner.id}-${index}`}
+            style={{
+              marginBottom: "12px",
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#1a1030",
+            }}
+          >
+            <div style={{  fontSize: "38px",   marginBottom: "5px" }}>
+              <strong>Cartela NUMBER:</strong> {winner.id}
+            </div>
+
+            <div style={{ marginBottom: "10px" }}>
+              <strong>Winning Pattern:</strong> {winner.pattern}
+            </div>
+
+            {/* CARTELA MATRIX */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+
+               
+                gap: "4px",
+                maxWidth: "420px",
+              }}
+            >
+              {(Array.isArray(winner.matrix) ? winner.matrix : []).map(
+                (row, rowIndex) =>
+                  (Array.isArray(row) ? row : []).map(
+                    (cell, colIndex) => {
+                      // Matrix cells can be strings such as "B 5",
+                      // "I 30", or "FREE".
+                      const cellText = String(cell).trim();
+                      const isFree =
+                        rowIndex === 2 &&
+                        colIndex === 2;
+
+                      const cellNumber = isFree
+                        ? null
+                        : parseInt(
+                            cellText.split(/\s+/).pop(),
+                            10
+                          );
+
+                      const isWinningCell =
+                        Array.isArray(winner.winningCells) &&
+                        winner.winningCells.some(
+                          (position) =>
+                            Array.isArray(position) &&
+                            Number(position[0]) === rowIndex &&
+                            Number(position[1]) === colIndex
+                        );
+
+                      const isWinningNumber =
+                        Array.isArray(winner.winningNumbers) &&
+                        cellNumber !== null &&
+                        winner.winningNumbers.some(
+                          (number) =>
+                            Number(number) === cellNumber
+                        );
+
+                      const isCalledNumber =
+                        Array.isArray(winner.calledNumbers) &&
+                        cellNumber !== null &&
+                        winner.calledNumbers.some(
+                          (number) =>
+                            Number(number) === cellNumber
+                        );
+
+                      // Winning red takes priority over called blue.
+                      const cellBackground = isFree
+                        ? "#f59e0b"
+                        : isWinningCell || isWinningNumber
+                          ? "#dc2626"
+                          : isCalledNumber
+                            ? "#2563eb"
+                            : "#4c1d95";
+
+                      return (
+                        <div
+                          key={`${rowIndex}-${colIndex}`}
+                          title={
+                            isFree
+                              ? "FREE"
+                              : isWinningCell || isWinningNumber
+                                ? "Winning number"
+                                : isCalledNumber
+                                  ? "Called number"
+                                  : "Not called"
+                          }
+                          style={{
+                            minWidth: 0,
+                            aspectRatio: "1 / 1",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: "10px",
+                            background: cellBackground,
+                            color: "#ffffff",
+                            border: "1px solid #a78bfa",
+                            fontSize: "clamp(39px, 5vw, 39px)",
+                            fontWeight: "bold",
+                            overflowWrap: "anywhere",
+                          }}
+                        >
+                          {cell}
+                        </div>
+                      );
+                    }
+                  )
+              )}
+            </div>
+
+            {/* COLOR LEGEND */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "12px",
+                marginTop: "10px",
+                fontSize: "11px",
+              }}
+            >
+              <span>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "2px",
+                    background: "#dc2626",
+                    marginRight: "4px",
+                  }}
+                />
+                Winning
+              </span>
+
+              <span>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "40px",
+                    height: "50px",
+                    borderRadius: "2px",
+                    background: "#2563eb",
+                    marginRight: "4px",
+                  }}
+                />
+                Called
+              </span>
+
+              <span>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "2px",
+                    background: "#f59e0b",
+                    marginRight: "4px",
+                  }}
+                />
+                FREE
+              </span>
+
+              <span>
+                <span
+                  style={{
+                    display: "inline-block",
+                    width: "10px",
+                    height: "10px",
+                    borderRadius: "2px",
+                    background: "#4c1d95",
+                    marginRight: "4px",
+                  }}
+                />
+                Not called
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    ))}
+  </div>
+</div>
+
+
+  </div>
+
+
+
 )}
         </div>
 

@@ -284,6 +284,58 @@ router.get("/", async (req, res) => {
   }
 });
 
+
+// ============================================================
+// GET GAMES FOR ONE HOUSE + ONE SPECIFIC DATE
+// Used by House Dashboard Detailed Previous History
+// ============================================================
+router.get("/house/:id/date/:date", async (req, res) => {
+  try {
+    const { id, date } = req.params;
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        game_id,
+        house_id,
+        cashier_id,
+        bet,
+        prize,
+        commission,
+        cards_sold,
+        house_commission,
+        voice_mode,
+        winning_pattern_count,
+        status,
+        game_date,
+        created_at
+      FROM games
+      WHERE house_id = $1
+        AND DATE(game_date AT TIME ZONE 'Africa/Addis_Ababa') = $2
+      ORDER BY game_date DESC
+      `,
+      [id, date]
+    );
+
+    console.log(
+      `🏠 HOUSE ${id} → ${result.rows.length} games for ${date}`
+    );
+
+    res.json(result.rows);
+
+  } catch (err) {
+    console.error(
+      "❌ ERROR FETCHING HOUSE GAMES BY DATE:",
+      err
+    );
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
 // =======================
 // GET GAMES BY HOUSE
 // =======================
@@ -590,6 +642,356 @@ router.post("/:gameId/call-number", async (req, res) => {
     });
   }
 });
+
+
+router.get("/:gameId/winner-history/scan", async (req, res) => {
+  try {
+    const { gameId } = req.params;
+
+    // 1. Find the game and its winning rules.
+    const gameResult = await pool.query(
+      `SELECT id, game_id, winning_pattern_count
+       FROM games
+       WHERE game_id::text = $1
+       LIMIT 1`,
+      [String(gameId)]
+    );
+
+    if (!gameResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        error: "Game not found",
+      });
+    }
+
+    const game = gameResult.rows[0];
+
+    const fullHouseRequired =
+      String(game.winning_pattern_count).toUpperCase() ===
+      "FULL_HOUSE";
+
+    const requiredPatterns = fullHouseRequired
+      ? null
+      : Math.max(1, Number(game.winning_pattern_count) || 1);
+
+    // 2. Load sold cartelas.
+    const soldResult = await pool.query(
+      `SELECT c.id, c.serial, c.numbers
+       FROM sold_cartelas sc
+       JOIN cartelas c
+         ON c.id::text = sc.cartela_id::text
+       WHERE sc.game_id::text = $1
+       ORDER BY c.id ASC`,
+      [String(gameId)]
+    );
+
+    // 3. Load called balls in their actual call order.
+    const ballsResult = await pool.query(
+      `SELECT ball
+       FROM called_balls
+       WHERE game_id = $1
+       ORDER BY id ASC`,
+      [game.id]
+    );
+
+    const calledBalls = ballsResult.rows.map((row) => row.ball);
+    const letters = ["B", "I", "N", "G", "O"];
+    const newlySaved = [];
+
+    const getNumber = (cell) => {
+      if (String(cell).trim().toUpperCase() === "FREE") {
+        return null;
+      }
+
+      const number = parseInt(
+        String(cell).trim().split(/\s+/).pop(),
+        10
+      );
+
+      return Number.isFinite(number) ? number : null;
+    };
+
+    const isMarked = (cell, calledSet) => {
+      if (String(cell).trim().toUpperCase() === "FREE") {
+        return true;
+      }
+
+      const number = getNumber(cell);
+
+      return number !== null && calledSet.has(number);
+    };
+
+    // Return completed patterns AND their exact cell coordinates.
+    function getCompletedPatterns(board, calledSet) {
+      const patterns = [];
+
+      const addPattern = (name, cells) => {
+        if (cells.every(([r, c]) => isMarked(board[r][c], calledSet))) {
+          patterns.push({ name, cells });
+        }
+      };
+
+      // Horizontal lines.
+      for (let r = 0; r < 5; r++) {
+        addPattern(
+          "HORIZONTAL",
+          [0, 1, 2, 3, 4].map((c) => [r, c])
+        );
+      }
+
+      // Vertical lines.
+      for (let c = 0; c < 5; c++) {
+        addPattern(
+          "VERTICAL",
+          [0, 1, 2, 3, 4].map((r) => [r, c])
+        );
+      }
+
+      // Both diagonals.
+      addPattern(
+        "DIAGONAL",
+        [0, 1, 2, 3, 4].map((i) => [i, i])
+      );
+
+      addPattern(
+        "DIAGONAL",
+        [0, 1, 2, 3, 4].map((i) => [i, 4 - i])
+      );
+
+      // Four outer corners.
+      addPattern("FOUR_CORNERS", [
+        [0, 0],
+        [0, 4],
+        [4, 0],
+        [4, 4],
+      ]);
+
+      // Four corners around FREE.
+      addPattern("FOUR_CORNERS_NEAR_STAR", [
+        [1, 1],
+        [1, 3],
+        [3, 1],
+        [3, 3],
+      ]);
+
+      // Full house.
+      const fullHouse = board.every((row) =>
+        row.every((cell) => isMarked(cell, calledSet))
+      );
+
+      if (fullHouse) {
+        patterns.push({
+          name: "FULL_HOUSE",
+          cells: board.flatMap((row, r) =>
+            row.map((_, c) => [r, c])
+          ),
+        });
+      }
+
+      return { patterns, fullHouse };
+    }
+
+    // 4. Find the first winning call for every sold cartela.
+    for (const cartela of soldResult.rows) {
+      let numbers = cartela.numbers;
+
+      try {
+        if (typeof numbers === "string") {
+          numbers = JSON.parse(numbers);
+        }
+      } catch (error) {
+        console.error("Invalid cartela JSON:", cartela.id, error);
+        continue;
+      }
+
+      if (
+        !numbers ||
+        !letters.every(
+          (letter) =>
+            Array.isArray(numbers[letter]) &&
+            numbers[letter].length === 5
+        )
+      ) {
+        console.error("Skipping invalid cartela:", cartela.id);
+        continue;
+      }
+
+      const matrix = Array.from({ length: 5 }, (_, r) =>
+        letters.map((letter, c) =>
+          r === 2 && c === 2
+            ? "FREE"
+            : `${letter} ${numbers[letter][r]}`
+        )
+      );
+
+      const calledSet = new Set();
+      let winner = null;
+
+      for (let i = 0; i < calledBalls.length; i++) {
+        const ballNumber = getNumber(calledBalls[i]);
+
+        if (ballNumber !== null) {
+          calledSet.add(ballNumber);
+        }
+
+        const result = getCompletedPatterns(matrix, calledSet);
+
+        const isWinner = fullHouseRequired
+          ? result.fullHouse
+          : result.patterns.length >= requiredPatterns;
+
+        if (isWinner) {
+          // Use the patterns completed at the winning call.
+          const selectedPatterns = fullHouseRequired
+            ? result.patterns.filter((p) => p.name === "FULL_HOUSE")
+            : result.patterns.slice(0, requiredPatterns);
+
+          const winningCells = [
+            ...new Map(
+              selectedPatterns
+                .flatMap((pattern) => pattern.cells)
+                .map(([r, c]) => [`${r}-${c}`, [r, c]])
+            ).values(),
+          ];
+
+          const winningNumbers = [
+            ...new Set(
+              winningCells
+                .map(([r, c]) => getNumber(matrix[r][c]))
+                .filter((n) => n !== null)
+            ),
+          ];
+
+          winner = {
+            id: String(cartela.id),
+            serial: cartela.serial,
+            callCount: i + 1,
+            pattern: selectedPatterns
+              .map((p) => p.name)
+              .join(", "),
+            matrix,
+            calledNumbers: [...calledSet],
+            winningNumbers,
+            winningCells,
+          };
+
+          break;
+        }
+      }
+
+      if (!winner) continue;
+
+      // 5. Save the winner once per game and cartela.
+      // Existing records are not overwritten by this INSERT.
+      const saved = await pool.query(
+        `INSERT INTO winner_cartela_history
+           (game_id, cartela_id, call_count, pattern, matrix)
+         VALUES ($1, $2, $3, $4, $5::jsonb)
+         ON CONFLICT (game_id, cartela_id) DO NOTHING
+         RETURNING id`,
+        [
+          String(game.game_id),
+          winner.id,
+          winner.callCount,
+          winner.pattern,
+          JSON.stringify(winner.matrix),
+        ]
+      );
+
+      if (saved.rows.length) {
+        newlySaved.push(winner);
+      }
+    }
+
+    // 6. Load persistent history.
+    const historyResult = await pool.query(
+      `SELECT id, game_id, cartela_id, call_count, pattern,
+              matrix, created_at
+       FROM winner_cartela_history
+       WHERE game_id = $1
+       ORDER BY call_count ASC, cartela_id ASC`,
+      [String(game.game_id)]
+    );
+
+    const groups = {};
+
+    for (const row of historyResult.rows) {
+      const key = String(row.call_count);
+
+      if (!groups[key]) {
+        groups[key] = {
+          callCount: row.call_count,
+          cartelas: [],
+        };
+      }
+
+      // Reconstruct the called numbers at this historical call.
+      const calledNumbers = calledBalls
+        .slice(0, Number(row.call_count))
+        .map(getNumber)
+        .filter((n) => n !== null);
+
+      const calledSet = new Set(calledNumbers);
+      const matrix = Array.isArray(row.matrix) ? row.matrix : [];
+
+      // Recalculate the exact patterns completed at this call.
+      const result = getCompletedPatterns(matrix, calledSet);
+
+      const patternNames = String(row.pattern)
+        .toUpperCase()
+        .split(",")
+        .map((p) => p.trim());
+
+      const selectedPatterns = result.patterns.filter((p) =>
+        patternNames.includes(p.name)
+      );
+
+      const winningCells = [
+        ...new Map(
+          selectedPatterns
+            .flatMap((pattern) => pattern.cells)
+            .map(([r, c]) => [`${r}-${c}`, [r, c]])
+        ).values(),
+      ];
+
+      const winningNumbers = [
+        ...new Set(
+          winningCells
+            .map(([r, c]) => getNumber(matrix[r]?.[c]))
+            .filter((n) => n !== null)
+        ),
+      ];
+
+      groups[key].cartelas.push({
+        id: row.cartela_id,
+        pattern: row.pattern,
+        matrix,
+        calledNumbers,
+        winningNumbers,
+        winningCells,
+        createdAt: row.created_at,
+      });
+    }
+
+    return res.json({
+      success: true,
+      gameId: String(game.game_id),
+      soldCartelasChecked: soldResult.rows.length,
+      calledCount: calledBalls.length,
+      newlySaved: newlySaved.length,
+      groups: Object.values(groups),
+    });
+  } catch (error) {
+    console.error("WINNER HISTORY SCAN ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+
 router.post("/:gameId/verify-cartela", async (req, res) => {
   try {
     const { gameId } = req.params;
