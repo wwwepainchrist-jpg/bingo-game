@@ -3399,7 +3399,7 @@ useEffect(() => {
   background: cellBackground,
   color: "#ffffff",
   border: "1px solid #a78bfa",
-  fontSize: "42px",
+  fontSize: "39px",
   fontWeight: 700,
   lineHeight: 1,
   overflow: "hidden",
