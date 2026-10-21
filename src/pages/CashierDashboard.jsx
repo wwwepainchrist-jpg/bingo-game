@@ -3397,7 +3397,7 @@ useEffect(() => {
                             background: cellBackground,
                             color: "#ffffff",
                             border: "1px solid #a78bfa",
-                            fontSize: "clamp(39px, 5vw, 39px)",
+                            fontSize: "clamp(41px, 4vw, 6px)",
                             fontWeight: "bold",
                             overflowWrap: "anywhere",
                           }}
