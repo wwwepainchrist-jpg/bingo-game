@@ -3387,20 +3387,24 @@ useEffect(() => {
                                   ? "Called number"
                                   : "Not called"
                           }
-                          style={{
-                            minWidth: 0,
-                            aspectRatio: "1 / 1",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "10px",
-                            background: cellBackground,
-                            color: "#ffffff",
-                            border: "1px solid #a78bfa",
-                            fontSize: "clamp(41px, 4vw, 6px)",
-                            fontWeight: "bold",
-                            overflowWrap: "anywhere",
-                          }}
+                         style={{
+  width: "100%",
+  minWidth: 0,
+  aspectRatio: "1 / 1",
+  boxSizing: "border-box",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: "10px",
+  background: cellBackground,
+  color: "#ffffff",
+  border: "1px solid #a78bfa",
+  fontSize: "42px",
+  fontWeight: 700,
+  lineHeight: 1,
+  overflow: "hidden",
+  whiteSpace: "nowrap",
+}}
                         >
                           {cell}
                         </div>
