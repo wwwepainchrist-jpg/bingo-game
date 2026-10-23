@@ -29,6 +29,8 @@ const [visibleSummaryDays, setVisibleSummaryDays] = useState(5);
   // Selected period tab state ('daily' | 'weekly' | 'monthly' | 'yearly')
   const [selectedPeriod, setSelectedPeriod] = useState("daily");
 const [selectedPreviousDay, setSelectedPreviousDay] = useState(null);
+const [selectedPreviousDayGames, setSelectedPreviousDayGames] = useState([]);
+const [loadingPreviousDayGames, setLoadingPreviousDayGames] = useState(false);
 const [visiblePreviousDayLogs, setVisiblePreviousDayLogs] = useState(5);
   // Reactive state holders connected to backend / database
   const [houseGames, setHouseGames] = useState([]);
@@ -1956,20 +1958,45 @@ const previousDaysSummary =
 // ============================================================
 // SELECTED PREVIOUS DAY GAME LOGS
 // ============================================================
-const selectedPreviousDayGames = selectedPreviousDay
-  ? sortedHouseGames.filter((game) => {
-      const gameDate = getGameDateParts(game);
+// ============================================================
+// LOAD ONLY SELECTED PREVIOUS DAY GAME LOGS
+// ============================================================
+const loadPreviousDayGames = async (day) => {
+  if (!day) return;
 
-      if (!gameDate) return false;
+  setLoadingPreviousDayGames(true);
 
-      return (
-        gameDate.year === selectedPreviousDay.year &&
-        gameDate.month === selectedPreviousDay.month &&
-        gameDate.day === selectedPreviousDay.day
+  try {
+    const response = await fetch(
+      `http://localhost:5000/api/games/house/${encodeURIComponent(
+        id
+      )}/date/${day.date}`
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Previous day games request failed: ${response.status}`
       );
-    })
-  : [];
+    }
 
+    const data = await response.json();
+
+    if (Array.isArray(data)) {
+      setSelectedPreviousDayGames(data);
+    } else {
+      setSelectedPreviousDayGames([]);
+    }
+  } catch (error) {
+    console.error(
+      "❌ FAILED TO LOAD PREVIOUS DAY GAMES:",
+      error
+    );
+
+    setSelectedPreviousDayGames([]);
+  } finally {
+    setLoadingPreviousDayGames(false);
+  }
+};
   return (
     <div style={styles.container}>
       {/* Top Header */}
@@ -2276,229 +2303,222 @@ const selectedPreviousDayGames = selectedPreviousDay
 
   return (
     <>
-      {/* ================= TODAY ================= */}
+{/* ================= TODAY ================= */}
 
-      <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>
-                Date & Time
-              </th>
+<div style={styles.tableWrapper}>
+  <table style={styles.table}>
+    <thead>
+      <tr>
+        <th style={styles.th}>Date & Time</th>
+        <th style={styles.th}>Game ID</th>
+        <th style={styles.th}>Cashier</th>
+        <th style={styles.th}>Cartelas Sold</th>
+        <th style={styles.th}>Total Bet Pool</th>
+        <th style={styles.th}>Prize After Commission</th>
+        <th style={styles.th}>Extra Amount NET</th>
+        <th style={styles.th}>House Commission Earned</th>
+      </tr>
+    </thead>
 
-              <th style={styles.th}>
-                Game ID
-              </th>
+    <tbody>
+      {todayGames.length > 0 ? (
+        <>
+          {todayGames
+            .slice(0, visibleGameLogsCount)
+            .map((game, index) => {
+              // CARTELAS SOLD
+              const cartelasCount = Number(
+                game.cards_sold ??
+                game.cardsSold ??
+                game.soldCartelas?.length ??
+                0
+              );
 
-              <th style={styles.th}>
-                Cashier
-              </th>
+              // TOTAL BET POOL
+              const betAmount = Number(game.bet) || 50;
+              const grossPool = betAmount * cartelasCount;
 
-              <th style={styles.th}>
-                Cartelas Sold
-              </th>
+              // HOUSE COMMISSION
+              const commissionRate =
+                Number(game.commission) || 15;
 
-              <th style={styles.th}>
-                Total Bet Pool
-              </th>
+              const houseEarned = Number(
+                game.house_commission ??
+                game.commission_earned ??
+                game.commissionDeducted ??
+                grossPool * (commissionRate / 100)
+              );
 
-              <th style={styles.th}>
-                House Commission Earned
-              </th>
-            </tr>
-          </thead>
+              // PRIZE AFTER COMMISSION
+              const prizeAfterCommission = Math.max(
+                0,
+                grossPool - houseEarned
+              );
 
-          <tbody>
-            {todayGames.length > 0 ? (
-              <>
-                {todayGames
-                  .slice(
-                    0,
-                    visibleGameLogsCount
-                  )
-                  .map(
-                    (game, index) => {
-                      /*
-                       * SAME ORIGINAL CARTELA LOGIC
-                       */
-                      const cartelasCount =
-                        Number(
-                          game.cards_sold ??
-                          game.cardsSold ??
-                          game.soldCartelas?.length ??
-                          0
-                        );
+              // EXTRA AMOUNT NET FOR THIS GAME
+              const extraAmountNet =
+                prizeAfterCommission > 0
+                  ? (10 - (prizeAfterCommission % 10)) % 10
+                  : 0;
 
-                      /*
-                       * SAME ORIGINAL BET LOGIC
-                       */
-                     
-const betAmount =
-                        Number(game.bet) ||
-                        50;
+              // DATE & TIME
+              const gameDate =
+                game.created_at ||
+                game.finished_at ||
+                game.started_at ||
+                game.date;
 
-                      const grossPool =
-                        betAmount *
-                        cartelasCount;
+              const formattedDate = gameDate
+                ? new Date(gameDate).toLocaleString("en-US", {
+                    timeZone: "Africa/Addis_Ababa",
+                  })
+                : "N/A";
 
-                      /*
-                       * SAME ORIGINAL COMMISSION LOGIC
-                       */
-                      const commissionRate =
-                        Number(
-                          game.commission
-                        ) || 15;
+              return (
+                <tr key={game.game_id || game.id || index}>
+                  <td style={styles.td}>{formattedDate}</td>
 
-                      const houseEarned =
-                        Number(
-                          game.house_commission ??
-                          game.commission_earned ??
-                          game.commissionDeducted ??
-                          grossPool *
-                            (commissionRate /
-                              100)
-                        );
-
-                      /*
-                       * KEEP YOUR DATE FIELD ORDER
-                       */
-                      const gameDate =
-                        game.created_at ||
-                        game.finished_at ||
-                        game.started_at ||
-                        game.date;
-
-                      /*
-                       * DISPLAY ETHIOPIA TIME
-                       */
-                      const formattedDate =
-                        gameDate
-                          ? new Date(
-                              gameDate
-                            ).toLocaleString(
-                              "en-US",
-                              {
-                                timeZone:
-                                  "Africa/Addis_Ababa",
-                              }
-                            )
-                          : "N/A";
-
-                      return (
-                        <tr
-                          key={
-                            game.game_id ||
-                            game.id ||
-                            index
-                          }
-                        >
-                          <td
-                            style={styles.td}
-                          >
-                            {formattedDate}
-                          </td>
-
-                          <td
-                            style={styles.td}
-                          >
-                            <strong>
-                              #
-                              {game.game_id ||
-                                game.id}
-                            </strong>
-                          </td>
-
-                          <td
-                            style={styles.td}
-                          >
-                            {game.cashier ||
-                              game.cashier_id ||
-                              "System"}
-                          </td>
-
-                          <td
-                            style={styles.td}
-                          >
-                            {cartelasCount}{" "}
-                            Cards
-                          </td>
-
-                          <td
-                            style={styles.td}
-                          >
-                            {grossPool} ETB
-                          </td>
-
-                          <td
-                            style={{
-                              ...styles.td,
-                              color:
-                                colors.accentCyan,
-                              fontWeight:
-                                "700",
-                            }}
-                          >
-                            {houseEarned.toFixed(
-                              2
-                            )}{" "}
-                            ETB
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-
-                  
-
-                {/* ================= NET ================= */}
-
-                <tr>
-                  <td
-                    colSpan="5"
-                    style={{
-                      ...styles.td,
-                      textAlign: "right",
-                      fontWeight: "800",
-                      borderTop:
-                        "2px solid #2dd4bf",
-                    }}
-                  >
-                    NET
+                  <td style={styles.td}>
+                    <strong>#{game.game_id || game.id}</strong>
                   </td>
 
+                  <td style={styles.td}>
+                    {game.cashier || game.cashier_id || "System"}
+                  </td>
+
+                  <td style={styles.td}>
+                    {cartelasCount} Cards
+                  </td>
+
+                  <td style={styles.td}>
+                    {grossPool.toFixed(2)} ETB
+                  </td>
+
+                  {/*ደራሽ ብር/PRIZE */}
                   <td
                     style={{
                       ...styles.td,
-                      color:
-                        colors.accentCyan,
-                      fontWeight: "800",
-                      borderTop:
-                        "2px solid #2dd4bf",
+                      color: "#fbbf24",
+                      fontWeight: "700",
                     }}
                   >
-                    {todayNet.toFixed(
-                      2
-                    )}{" "}
-                    ETB
+                    {prizeAfterCommission.toFixed(2)} ETB
+                  </td>
+
+                  {/*  ፋርዳ/EXTRA amount */}
+                  <td
+                    style={{
+                      ...styles.td,
+                      color: colors.accentCyan,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {extraAmountNet.toFixed(2)} ETB
+                  </td>
+
+                  {/* HOUSE COMMISSION EARNED */}
+                  <td
+                    style={{
+                      ...styles.td,
+                      color: colors.accentCyan,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {houseEarned.toFixed(2)} ETB
                   </td>
                 </tr>
-              </>
-            ) : (
-              <tr>
-                <td
-                  colSpan="6"
-                  style={{
-                    ...styles.td,
-                    textAlign: "center",
-                  }}
-                >
-                  No games played today.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+              );
+            })}
+
+          {/* ================= TOTALS ROW ================= */}
+          <tr>
+            {/* Columns 1 to 5 combined */}
+            <td
+              colSpan={5}
+              style={{
+                ...styles.td,
+                borderTop: "2px solid #2dd4bf",
+                textAlign: "right",
+                fontWeight: "800",
+                color: colors.accentCyan,
+              }}
+            >
+              TOTALS:
+            </td>
+
+            {/* Column 6: Empty spacer under Prize After Commission */}
+            <td
+              style={{
+                ...styles.td,
+                borderTop: "2px solid #2dd4bf",
+              }}
+            />
+
+            {/* Column 7: Extra Amount NET Total */}
+            <td
+              style={{
+                ...styles.td,
+                color: colors.accentCyan,
+                fontWeight: "800",
+                borderTop: "2px solid #2dd4bf",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {todayGames
+                .reduce((total, game) => {
+                  const cards = Number(
+                    game.cards_sold ??
+                    game.cardsSold ??
+                    game.soldCartelas?.length ??
+                    0
+                  );
+                  const gross = (Number(game.bet) || 50) * cards;
+                  const rate = Number(game.commission) || 15;
+                  const commission = Number(
+                    game.house_commission ??
+                    game.commission_earned ??
+                    game.commissionDeducted ??
+                    gross * (rate / 100)
+                  );
+                  const prize = Math.max(0, gross - commission);
+                  const extra = prize > 0 ? (10 - (prize % 10)) % 10 : 0;
+                  return total + extra;
+                }, 0)
+                .toFixed(2)}{" "}
+              ETB
+            </td>
+
+            {/* Column 8: House Commission NET Total */}
+            <td
+              style={{
+                ...styles.td,
+                color: colors.accentCyan,
+                fontWeight: "800",
+                borderTop: "2px solid #2dd4bf",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {todayNet.toFixed(2)} ETB
+            </td>
+          </tr>
+        </>
+      ) : (
+        <tr>
+          <td
+            colSpan={8}
+            style={{
+              ...styles.td,
+              textAlign: "center",
+            }}
+          >
+            No games played today.
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>
+         
 {/* ================= TODAY LOG BUTTONS ================= */}
 
 {todayGames.length > 5 && (
@@ -2590,21 +2610,26 @@ const betAmount =
   return (
     <tr
       key={day.date}
-      onClick={
-        index === 0
-          ? () => {
-              if (isSelected) {
-                // Click again → close history
-                setSelectedPreviousDay(null);
-                setVisiblePreviousDayLogs(5);
-              } else {
-                // First click → open history
-                setSelectedPreviousDay(day);
-                setVisiblePreviousDayLogs(5);
-              }
-            }
-          : undefined
+     onClick={
+  index === 0
+    ? async () => {
+        if (isSelected) {
+          // Click again → close history
+          setSelectedPreviousDay(null);
+          setSelectedPreviousDayGames([]);
+          setVisiblePreviousDayLogs(5);
+          return;
+        }
+
+        // Open immediately
+        setSelectedPreviousDay(day);
+        setVisiblePreviousDayLogs(5);
+
+        // Load ONLY this day's games
+        await loadPreviousDayGames(day);
       }
+    : undefined
+}
       style={{
         cursor: index === 0 ? "pointer" : "default",
       }}
@@ -2719,7 +2744,20 @@ const betAmount =
         </thead>
 
         <tbody>
-          {selectedPreviousDayGames.length > 0 ? (
+         {loadingPreviousDayGames ? (
+  <tr>
+    <td
+      colSpan="6"
+      style={{
+        ...styles.td,
+        textAlign: "center",
+        padding: "20px",
+      }}
+    >
+      Loading previous day history...
+    </td>
+  </tr>
+) : selectedPreviousDayGames.length > 0 ? (
             selectedPreviousDayGames
               .slice(0, visiblePreviousDayLogs)
               .map((game, index) => {
@@ -2748,11 +2786,12 @@ const betAmount =
                     (commissionRate / 100)
                 );
 
-                const gameDate =
-                  game.created_at ||
-                  game.finished_at ||
-                  game.started_at ||
-                  game.date;
+               const gameDate =
+  game.created_at ||
+  game.finished_at ||
+  game.started_at ||
+  game.game_date ||
+  game.date;
 
                 const formattedDate =
                   gameDate
