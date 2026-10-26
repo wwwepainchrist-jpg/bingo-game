@@ -1,49 +1,10 @@
-
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
-  // The app is hosted at the root of its Render domain.
   base: "/",
 
-  plugins: [
-    react(),
-
-    VitePWA({
-      registerType: "autoUpdate",
-
-      manifest: {
-        name: "Bingo Game",
-        short_name: "Bingo",
-        description: "Offline Bingo App",
-        theme_color: "#000000",
-        background_color: "#ffffff",
-        display: "standalone",
-        start_url: "/",
-        scope: "/",
-
-        icons: [
-          {
-            src: "/icon-192.png",
-            sizes: "192x192",
-            type: "image/png",
-          },
-          {
-            src: "/icon-512.png",
-            sizes: "512x512",
-            type: "image/png",
-          },
-        ],
-      },
-
-      workbox: {
-        globPatterns: [
-          "**/*.{js,css,html,png,jpg,jpeg,svg,wav}"
-        ],
-      },
-    }),
-  ],
+  plugins: [react()],
 
   preview: {
     allowedHosts: ["bingo-frontend-ovn3.onrender.com"],
