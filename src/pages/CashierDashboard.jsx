@@ -459,6 +459,599 @@ const loadHouseNetIncome = async () => {
   const [showQrModal, setShowQrModal] = useState(false);
 const startingGameRef = useRef(false);
   const [soldCartelas, setSoldCartelas] = useState([]);
+
+/* =====================================================
+   CARD VERIFICATION — STATE
+===================================================== */
+
+const [showCardVerification, setShowCardVerification] = useState(false);
+const [verificationCartelaId, setVerificationCartelaId] = useState("");
+const [verificationLoading, setVerificationLoading] = useState(false);
+const [verificationResult, setVerificationResult] = useState(null);
+const [verificationError, setVerificationError] = useState("");
+const [verificationCalledNumbers, setVerificationCalledNumbers] = useState([]);
+
+
+/* =====================================================
+   CARD VERIFICATION — STATE
+===================================================== */
+
+
+
+/* =====================================================
+   HELPERS
+===================================================== */
+
+const parseVerificationField = (value) => {
+  if (typeof value !== "string") return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
+const isValidVerificationMatrix = (matrix) =>
+  Array.isArray(matrix) &&
+  matrix.length === 5 &&
+  matrix.every((row) => Array.isArray(row) && row.length === 5);
+
+const makeVerificationMatrix = (cartela) => {
+  if (!cartela) return null;
+
+  let matrix = parseVerificationField(cartela.matrix);
+  const numbers = parseVerificationField(cartela.numbers);
+
+  if (isValidVerificationMatrix(matrix)) {
+    return matrix;
+  }
+
+  const columns = ["B", "I", "N", "G", "O"];
+
+  // Supports B/I/N/G/O arrays directly on the cartela.
+  const directColumnsExist = columns.every(
+    (letter) =>
+      Array.isArray(cartela[letter]) &&
+      cartela[letter].length === 5
+  );
+
+  // Also supports { numbers: { B: [], I: [], ... } }.
+  const nestedColumnsExist = columns.every(
+    (letter) =>
+      Array.isArray(numbers?.[letter]) &&
+      numbers[letter].length === 5
+  );
+
+  if (directColumnsExist || nestedColumnsExist) {
+    const source = directColumnsExist ? cartela : numbers;
+
+    return Array.from({ length: 5 }, (_, row) =>
+      columns.map((letter, col) =>
+        row === 2 && col === 2
+          ? "FREE"
+          : source[letter][row]
+      )
+    );
+  }
+
+  // Supports a flat array containing 25 cells.
+  if (Array.isArray(numbers) && numbers.length === 25) {
+    return Array.from({ length: 5 }, (_, row) =>
+      numbers.slice(row * 5, row * 5 + 5)
+    );
+  }
+
+  if (isValidVerificationMatrix(numbers)) {
+    return numbers;
+  }
+
+  return null;
+};
+
+/* =====================================================
+   VERIFY CARTELA
+===================================================== */
+
+
+/* =====================================================
+   VERIFY CARTELA — WITH WINNING PATTERN CELLS
+===================================================== */
+
+
+const verifyCashierCartela = async () => {
+  const enteredId = String(verificationCartelaId).trim();
+
+  if (!enteredId) {
+    setVerificationError("Please enter a Cartela ID first.");
+    setVerificationResult(null);
+    return;
+  }
+
+  const gameId =
+    winnerHistoryGameId ||
+    localStorage.getItem(`winner_history_game_id_${id}`);
+
+  if (!gameId) {
+    setVerificationError(
+      "No game ID found. Start a game before verifying a cartela."
+    );
+    setVerificationResult(null);
+    return;
+  }
+
+  if (!navigator.onLine) {
+    setVerificationError(
+      "Online verification is required. Please reconnect and try again."
+    );
+    setVerificationResult(null);
+    return;
+  }
+
+  setVerificationLoading(true);
+  setVerificationError("");
+  setVerificationResult(null);
+  setVerificationCalledNumbers([]);
+
+  try {
+    const encodedGameId = encodeURIComponent(gameId);
+
+    // 1. Verify that this cartela was sold in the selected game.
+    const verifyResponse = await fetch(
+      `${API_URL}/games/${encodedGameId}/verify-cartela`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartelaId: enteredId }),
+      }
+    );
+
+    const data = await verifyResponse.json();
+
+    if (!verifyResponse.ok) {
+      throw new Error(
+        data?.error ||
+        data?.message ||
+        `Verification failed (${verifyResponse.status})`
+      );
+    }
+
+    if (!data || typeof data.sold !== "boolean") {
+      throw new Error("Unexpected verification response from the server.");
+    }
+
+    if (!data.sold) {
+      setVerificationResult({
+        sold: false,
+        cartelaId: enteredId,
+        isWinner: false,
+        winOnCallNumber: null,
+        winningCells: [],
+        winningNumbers: [],
+        message: `CARTELA #${enteredId} WAS NOT SOLD IN THIS GAME`,
+        cartela: null,
+      });
+      return;
+    }
+
+    // 2. Get the cartela matrix.
+    let cartela = data.cartela ?? data.soldCartela ?? null;
+    let matrix = makeVerificationMatrix(cartela);
+
+    if (!matrix) {
+      const cardsResponse = await fetch(
+        `${API_URL}/games/${encodedGameId}/sold-cartelas`
+      );
+
+      if (!cardsResponse.ok) {
+        throw new Error(
+          "Cartela verified, but its numbers could not be loaded."
+        );
+      }
+
+      const cardsData = await cardsResponse.json();
+
+      const soldCards = Array.isArray(cardsData)
+        ? cardsData
+        : cardsData?.soldCartelas;
+
+      if (!Array.isArray(soldCards)) {
+        throw new Error(
+          "The sold-cartelas endpoint did not return a cartela list."
+        );
+      }
+
+      const matchingCard = soldCards.find((card) => {
+        const cardId =
+          card?.cartelaId ??
+          card?.cartela_id ??
+          card?.serial ??
+          card?.id;
+
+        return String(cardId ?? "").trim() === enteredId;
+      });
+
+      if (matchingCard) {
+        cartela = matchingCard;
+        matrix = makeVerificationMatrix(cartela);
+      }
+    }
+
+    if (!matrix) {
+      throw new Error(
+        "The cartela was verified, but its 5x5 matrix could not be built."
+      );
+    }
+
+    // 3. Load the current game's calls.
+    const gameResponse = await fetch(
+      `${API_URL}/games/active/${encodedGameId}`
+    );
+
+    if (!gameResponse.ok) {
+      throw new Error(
+        "Cartela verified, but the called numbers could not be loaded."
+      );
+    }
+
+    const gameData = await gameResponse.json();
+
+    const normalizeNumber = (value) => {
+      if (value === null || value === undefined) return null;
+
+      if (typeof value === "object") {
+        value =
+          value.number ??
+          value.value ??
+          value.ball ??
+          value.called_number ??
+          "";
+      }
+
+      const valueText = String(value).trim().toUpperCase();
+
+      if (!valueText || valueText === "FREE") return null;
+
+      const match = valueText.match(/\d+/);
+      return match ? Number(match[0]) : null;
+    };
+
+    const rawCalls =
+      gameData.calledNumbers ??
+      gameData.called_numbers ??
+      gameData.called ??
+      [];
+
+    const calledNumbers = Array.isArray(rawCalls)
+      ? rawCalls
+      : [];
+
+    setVerificationCalledNumbers(calledNumbers);
+
+    const calledSet = new Set(
+      calledNumbers
+        .map(normalizeNumber)
+        .filter((number) => number !== null)
+    );
+
+    // 4. Identify FREE and called cells.
+    const isFreeCell = (row, col) => {
+      const value = matrix[row][col];
+
+      const cellValue =
+        value && typeof value === "object"
+          ? value.number ?? value.value ?? ""
+          : value;
+
+      return (
+        (row === 2 && col === 2) ||
+        String(cellValue).trim().toUpperCase() === "FREE"
+      );
+    };
+
+    const cellIsCalled = (row, col, numbersSet = calledSet) => {
+      if (isFreeCell(row, col)) return true;
+
+      const value = matrix[row][col];
+
+      const cellValue =
+        value && typeof value === "object"
+          ? value.number ?? value.value ?? ""
+          : value;
+
+      const number = normalizeNumber(cellValue);
+
+      return number !== null && numbersSet.has(number);
+    };
+
+    // 5. Define the supported patterns in game pattern order.
+    const patterns = [];
+
+    for (let row = 0; row < 5; row++) {
+      patterns.push({
+        name: `ROW_${row + 1}`,
+        cells: Array.from({ length: 5 }, (_, col) => [row, col]),
+      });
+    }
+
+    for (let col = 0; col < 5; col++) {
+      patterns.push({
+        name: `COLUMN_${col + 1}`,
+        cells: Array.from({ length: 5 }, (_, row) => [row, col]),
+      });
+    }
+
+    patterns.push({
+      name: "DIAGONAL_1",
+      cells: Array.from({ length: 5 }, (_, i) => [i, i]),
+    });
+
+    patterns.push({
+      name: "DIAGONAL_2",
+      cells: Array.from({ length: 5 }, (_, i) => [i, 4 - i]),
+    });
+
+    patterns.push({
+      name: "FOUR_CORNERS",
+      cells: [
+        [0, 0],
+        [0, 4],
+        [4, 0],
+        [4, 4],
+      ],
+    });
+
+    patterns.push({
+      name: "FOUR_CORNERS_NEAR_STAR",
+      cells: [
+        [1, 1],
+        [1, 3],
+        [3, 1],
+        [3, 3],
+      ],
+    });
+
+    const completedPatterns = patterns.filter((pattern) =>
+      pattern.cells.every(([row, col]) => cellIsCalled(row, col))
+    );
+
+    const isFullHouse = matrix.every((row, rowIndex) =>
+      row.every((_, colIndex) =>
+        cellIsCalled(rowIndex, colIndex)
+      )
+    );
+
+    // 6. Read the game's configured winning rule.
+    const winningPatternCount =
+      gameData.winning_pattern_count ??
+      gameData.winningPatternCount ??
+      data.winning_pattern_count ??
+      data.winningPatternCount ??
+      1;
+
+    const fullHouseTarget =
+      String(winningPatternCount).toUpperCase() === "FULL_HOUSE";
+
+    const targetCount = Math.max(
+      1,
+      Number(winningPatternCount) || 1
+    );
+
+    const serverSaysWinner = Boolean(data.isWinner);
+
+    // 7. Retrieve the recorded call number from Winner Cartela History.
+    // The backend groups each winner under its original callCount.
+    let winOnCallNumber = null;
+    let recordedWinningPattern = null;
+
+    try {
+      const historyResponse = await fetch(
+        `${API_URL}/games/${encodedGameId}/winner-history/scan`
+      );
+
+      if (historyResponse.ok) {
+        const historyData = await historyResponse.json();
+
+        if (historyData?.success && Array.isArray(historyData.groups)) {
+          for (const group of historyData.groups) {
+            const matchingWinner = (group.cartelas || []).find(
+              (winner) =>
+                String(winner.id ?? "").trim() === enteredId
+            );
+
+            if (matchingWinner) {
+              const callCount = Number(group.callCount);
+
+              if (Number.isInteger(callCount) && callCount > 0) {
+                winOnCallNumber = callCount;
+                recordedWinningPattern = matchingWinner.pattern ?? null;
+              }
+
+              break;
+            }
+          }
+        }
+      }
+    } catch (historyError) {
+      console.warn(
+        "Could not retrieve recorded winner call number:",
+        historyError
+      );
+    }
+
+    // 8. Accept both backend winning-cell formats:
+    // "1-1" and [1, 1].
+    const parseWinningCell = (position) => {
+      let row;
+      let col;
+
+      if (typeof position === "string") {
+        const match = position.match(/^(\d)-(\d)$/);
+        if (!match) return null;
+
+        row = Number(match[1]);
+        col = Number(match[2]);
+      } else if (Array.isArray(position) && position.length >= 2) {
+        row = Number(position[0]);
+        col = Number(position[1]);
+      } else {
+        return null;
+      }
+
+      if (
+        !Number.isInteger(row) ||
+        !Number.isInteger(col) ||
+        row < 0 || row > 4 ||
+        col < 0 || col > 4
+      ) {
+        return null;
+      }
+
+      return [row, col];
+    };
+
+    let winningCells = Array.isArray(data.winningCells)
+      ? data.winningCells.map(parseWinningCell).filter(Boolean)
+      : [];
+
+    let winningNumbers = Array.isArray(data.winningNumbers)
+      ? data.winningNumbers
+          .map(normalizeNumber)
+          .filter((number) => number !== null)
+      : [];
+
+    // 9. If the backend did not return exact winning cells,
+    // use the recorded winning pattern when available.
+    if (winningCells.length === 0) {
+      const patternNames = String(recordedWinningPattern || "")
+        .toUpperCase()
+        .split(",")
+        .map((name) => name.trim())
+        .filter(Boolean);
+
+      if (
+        data.isFullHouse ||
+        (fullHouseTarget && isFullHouse) ||
+        patternNames.includes("FULL_HOUSE")
+      ) {
+        winningCells = matrix.flatMap((row, rowIndex) =>
+          row.flatMap((_, colIndex) =>
+            isFreeCell(rowIndex, colIndex)
+              ? []
+              : [[rowIndex, colIndex]]
+          )
+        );
+      } else if (serverSaysWinner) {
+        const selectedPatterns = patternNames.length
+          ? patterns.filter((pattern) =>
+              patternNames.includes(pattern.name)
+            )
+          : completedPatterns.slice(0, targetCount);
+
+        winningCells = selectedPatterns.flatMap(
+          (pattern) => pattern.cells
+        );
+      }
+    }
+
+    // Remove duplicate cells.
+    winningCells = [
+      ...new Map(
+        winningCells.map(([row, col]) => [
+          `${row}-${col}`,
+          [row, col],
+        ])
+      ).values(),
+    ];
+
+    if (winningNumbers.length === 0) {
+      winningNumbers = winningCells
+        .filter(([row, col]) => !isFreeCell(row, col))
+        .map(([row, col]) => {
+          const value = matrix[row][col];
+
+          const cellValue =
+            value && typeof value === "object"
+              ? value.number ?? value.value ?? ""
+              : value;
+
+          return normalizeNumber(cellValue);
+        })
+        .filter((number) => number !== null);
+    }
+
+    // 10. Use a fallback calculation only if history has no saved call.
+    // Do not overwrite a call number already saved in winner history.
+    if (serverSaysWinner && winOnCallNumber === null) {
+      const requiresFullHouse =
+        fullHouseTarget || Boolean(data.isFullHouse);
+
+      for (let callIndex = 0; callIndex < calledNumbers.length; callIndex++) {
+        const callsAtMoment = new Set(
+          calledNumbers
+            .slice(0, callIndex + 1)
+            .map(normalizeNumber)
+            .filter((number) => number !== null)
+        );
+
+        const completedAtMoment = patterns.filter((pattern) =>
+          pattern.cells.every(([row, col]) =>
+            cellIsCalled(row, col, callsAtMoment)
+          )
+        );
+
+        const fullHouseAtMoment = matrix.every((row, rowIndex) =>
+          row.every((_, colIndex) =>
+            cellIsCalled(rowIndex, colIndex, callsAtMoment)
+          )
+        );
+
+        const becameWinner = requiresFullHouse
+          ? fullHouseAtMoment
+          : completedAtMoment.length >= targetCount;
+
+        if (becameWinner) {
+          winOnCallNumber = callIndex + 1;
+          break;
+        }
+      }
+    }
+
+    // 11. Return the verification result for the existing popup.
+    setVerificationResult({
+      ...data,
+      sold: true,
+      cartela,
+      matrix,
+      cartelaId: enteredId,
+      calledNumbers,
+      winningCells,
+      winningNumbers,
+      winOnCallNumber,
+      recordedWinningPattern,
+      isWinner: serverSaysWinner,
+      isFullHouse: Boolean(data.isFullHouse),
+      isFourCorners: Boolean(data.isFourCorners),
+      message: serverSaysWinner
+        ? data.isFullHouse
+          ? "FULL HOUSE — WINNER!"
+          : data.isFourCorners
+            ? "FOUR CORNERS — WINNER!"
+            : "BINGO — WINNER!"
+        : "NOT A WINNER",
+    });
+  } catch (error) {
+    console.error("Cashier cartela verification failed:", error);
+
+    setVerificationError(
+      error.message || "Verification failed. Please try again."
+    );
+  } finally {
+    setVerificationLoading(false);
+  }
+};
+
+
   const [currentCashier, setCurrentCashier] = useState({});
   const [rawPackageInfo, setRawPackageInfo] = useState({
     totalAmount: 3642,
@@ -3194,6 +3787,670 @@ useEffect(() => {
     >
       Gross: {grossIncome} ETB
     </div>
+
+
+{/* =====================================================
+    CARD VERIFICATION BUTTON
+===================================================== */}
+<button
+  type="button"
+  onClick={() => {
+    setShowCardVerification(true);
+    setVerificationError("");
+    setVerificationResult(null);
+  }}
+  style={{
+    padding: "10px 16px",
+    background: "#087fba",
+    color: "#fff",
+    border: "1px solid #22d3ee",
+     fontSize: "32px",
+    borderRadius: "6px",
+    fontWeight: 800,
+    cursor: "pointer",
+  }}
+>
+  🔎 CARD VERIFICATION
+</button>
+
+{/* =====================================================
+    CARD ID INPUT MODAL
+===================================================== */}
+{showCardVerification && (
+  <div
+    onClick={(event) => {
+      if (event.target === event.currentTarget) {
+        setShowCardVerification(false);
+      }
+    }}
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 15000,
+      background: "rgba(0,0,0,0.78)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+       fontSize: "62px",
+      padding: 12,
+      boxSizing: "border-box",
+    }}
+  >
+    <div
+      style={{
+        width: "min(440px, 96vw)",
+        background: "#080f1e",
+        border: "1px solid #087fba",
+        borderRadius: 7,
+ fontSize: "62px",
+
+        padding: 12,
+        color: "#fff",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 12,
+        }}
+      >
+        <strong style={{ color: "#67e8f9", fontSize: 16 }}>
+          🔎 CARD VERIFICATION
+        </strong>
+
+        <button
+          type="button"
+          onClick={() => setShowCardVerification(false)}
+          style={{
+            background: "#991b1b",
+            border: 0,
+            color: "#fff",
+            borderRadius: 4,
+            padding: "5px 9px",
+            cursor: "pointer",
+             fontSize: "62px",
+            fontWeight: 800,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          verifyCashierCartela();
+        }}
+      >
+        <label
+          style={{
+            display: "block",
+            fontSize: 12,
+             fontSize: "32px",
+            marginBottom: 6,
+          }}
+        >
+          Enter Cartela ID to check it against the current game.
+        </label>
+
+        <div style={{ display: "flex", gap: 5 }}>
+          <input
+            type="text"
+            value={verificationCartelaId}
+            onChange={(event) =>
+              setVerificationCartelaId(event.target.value)
+            }
+            placeholder="Enter Cartela ID"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: 9,
+              background: "#151515",
+              color: "#fff",
+              border: "1px solid #64748b",
+              borderRadius: 4,
+              textAlign: "center",
+               fontSize: "32px",
+              fontWeight: 800,
+            }}
+          />
+
+          <button
+            type="submit"
+            disabled={verificationLoading}
+            style={{
+              padding: "8px 12px",
+              background: "#0891b2",
+              color: "#fff",
+              border: 0,
+              borderRadius: 4,
+               fontSize: "22px",
+              fontWeight: 900,
+              cursor: verificationLoading ? "wait" : "pointer",
+            }}
+          >
+            {verificationLoading ? "CHECKING..." : "VERIFY"}
+          </button>
+        </div>
+      </form>
+
+      {verificationError && (
+        <div
+          style={{
+            marginTop: 10,
+            padding: 9,
+            background: "#451a1a",
+            color: "#fecaca",
+            border: "1px solid #ef4444",
+            borderRadius: 4,
+            fontSize: 13,
+          }}
+        >
+          {verificationError}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{/* =====================================================
+    VERIFIED CARTELA POPUP
+===================================================== */}
+{verificationResult && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 20000,
+      background: "rgba(0,0,0,0.88)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 22,
+      boxSizing: "border-box",
+    }}
+  >
+    <div
+      style={{
+        position: "relative",
+        width: "min(900px, 106vw)",
+        maxHeight: "99vh",
+        overflowY: "auto",
+        background: "#080f1e",
+        border: `1px solid ${
+          verificationResult.isWinner ? "#22c55e" : "#ef233c"
+        }`,
+        borderRadius: 7,
+        padding: 10,
+        boxSizing: "border-box",
+        color: "#fff",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setVerificationResult(null)}
+        aria-label="Close verified cartela"
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          width: 86,
+          height: 86,
+          borderRadius: "50%",
+          background: "#172033",
+          border: "1px solid #64748b",
+          color: "#fff",
+          fontSize: 38,
+          cursor: "pointer",
+          lineHeight: 1,
+          zIndex: 2,
+        }}
+      >
+        ×
+      </button>
+
+{/* CURRENT CALL NUMBER */}
+<div
+  style={{
+    margin: "8px auto 14px",
+    padding: "10px 18px",
+    background: "#14532d",
+    border: "2px solid #22c55e",
+    borderRadius: "10px",
+    color: "#FFFFFF",
+    textAlign: "center",
+    width: "fit-content",
+    minWidth: "220px",
+    maxWidth: "90%",
+    boxSizing: "border-box",
+  }}
+>
+  <div
+    style={{
+      fontSize: "46px",
+      color: "#bbf7d0",
+      fontWeight: "bold",
+    }}
+  >
+    ያቆመበት ጥሪ
+  </div>
+
+  <div
+    style={{
+      fontSize: "72px",
+      fontWeight: 900,
+      lineHeight: 1.2,
+    }}
+  >
+    #{verificationResult.calledNumbers?.length ?? verificationCalledNumbers.length}
+  </div>
+</div>
+
+{verificationResult.sold && verificationResult.isWinner && (
+  <div
+    style={{
+      margin: "8px auto",
+      padding: "8px 12px",
+      background: "#172554",
+      border: "1px solid #3B82F6",
+      borderRadius: "8px",
+      color: "#FFFFFF",
+      textAlign: "center",
+      maxWidth: "240px",
+    }}
+  >
+    <div
+      style={{
+        fontSize: "62px",
+        color: "#BFDBFE",
+        fontWeight: "bold",
+      }}
+    >
+      ያሸነፈበት  ጥሪ
+    </div>
+
+    <div style={{ fontSize: "86px", fontWeight: 900 }}>
+      {verificationResult.winOnCallNumber != null
+        ? `#${verificationResult.winOnCallNumber}`
+        : "Not recorded"}
+    </div>
+  </div>
+)}
+
+
+      <div
+        style={{
+          textAlign: "center",
+          fontSize: "clamp(52px, 4vw, 72px)",
+          fontWeight: 900,
+          color: verificationResult.sold
+            ? verificationResult.isWinner
+              ? "#22c55e"
+              : "#ff1744"
+            : "#ff1744",
+          paddingRight: 35,
+        }}
+      >
+        {verificationResult.sold
+          ? verificationResult.isWinner
+            ? "🏆 WINNER"
+            : "❌ NOT WINNER"
+          : "❌ NOT SOLD"}
+      </div>
+
+      <div
+        style={{
+          textAlign: "center",
+          color: "#a6b5cb",
+          fontSize: "clamp(72px, 4.5vw, 68px)",
+          fontWeight: 900,
+          marginBottom: 8,
+        }}
+      >
+        Cartela #{verificationResult.cartelaId}
+      </div>
+
+      {(() => {
+        const card = verificationResult.cartela;
+
+        const parseMaybeJSON = (value) => {
+          if (typeof value !== "string") return value;
+          try {
+            return JSON.parse(value);
+          } catch {
+            return null;
+          }
+        };
+
+        let matrix = parseMaybeJSON(
+          verificationResult.matrix ?? card?.matrix
+        );
+
+        const numbers = parseMaybeJSON(card?.numbers);
+
+        if (
+          (!Array.isArray(matrix) ||
+            matrix.length !== 5 ||
+            !matrix.every(
+              (row) => Array.isArray(row) && row.length === 5
+            )) &&
+          numbers &&
+          ["B", "I", "N", "G", "O"].every((letter) =>
+            Array.isArray(numbers[letter])
+          )
+        ) {
+          matrix = Array.from({ length: 5 }, (_, rowIndex) =>
+            ["B", "I", "N", "G", "O"].map((letter, colIndex) =>
+              rowIndex === 2 && colIndex === 2
+                ? "FREE"
+                : numbers[letter][rowIndex]
+            )
+          );
+        }
+
+        if (
+          !Array.isArray(matrix) ||
+          matrix.length !== 5 ||
+          !matrix.every(
+            (row) => Array.isArray(row) && row.length === 5
+          )
+        ) {
+          return (
+            <div
+              style={{
+                textAlign: "center",
+                padding: 24,
+                color: "#fca5a5",
+              }}
+            >
+              {verificationResult.sold
+                ? "The cartela was verified, but its 5×5 numbers were not returned. Check the sold-cartelas API response."
+                : verificationResult.message || "Cartela not sold."}
+            </div>
+          );
+        }
+
+        // Convert numbers consistently, including strings such as "B-12".
+        const normalizeNumber = (value) => {
+          if (value === null || value === undefined) return null;
+
+          if (typeof value === "object") {
+            value = value.number ?? value.value ?? value.ball ?? "";
+          }
+
+          const text = String(value).trim().toUpperCase();
+
+          if (!text || text === "FREE") return null;
+
+          const match = text.match(/\d+/);
+          return match ? Number(match[0]) : null;
+        };
+
+        // Use the calls attached to the verification result first.
+        // Fall back to the calls loaded by verifyCashierCartela().
+        const rawCalledNumbers =
+          verificationResult.calledNumbers ??
+          verificationResult.called ??
+          verificationCalledNumbers ??
+          [];
+
+        const calledList = Array.isArray(rawCalledNumbers)
+          ? rawCalledNumbers
+          : [];
+
+        const calledSet = new Set(
+          calledList
+            .map(normalizeNumber)
+            .filter((number) => number !== null)
+        );
+
+        const winningCells = Array.isArray(
+          verificationResult.winningCells
+        )
+          ? verificationResult.winningCells
+          : [];
+
+        const winningNumbers = Array.isArray(
+          verificationResult.winningNumbers
+        )
+          ? verificationResult.winningNumbers
+              .map(normalizeNumber)
+              .filter((number) => number !== null)
+          : [];
+
+        return (
+          <>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 5,
+                marginBottom: 5,
+              }}
+            >
+              {["B", "I", "N", "G", "O"].map((letter) => (
+                <div
+                  key={letter}
+                  style={{
+                    height: "clamp(42px, 7vw, 70px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "#151515",
+                    border: "1px solid #454545",
+                    borderRadius: 3,
+                    fontSize: "clamp(48px, 5vw, 70px)",
+                    fontWeight: 900,
+                  }}
+                >
+                  {letter}
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+                gap: 4,
+              }}
+            >
+              {matrix.flatMap((row, rowIndex) =>
+                row.map((cell, colIndex) => {
+                  const cellValue =
+                    cell && typeof cell === "object"
+                      ? cell.number ?? cell.value ?? ""
+                      : cell;
+
+                  const isFree =
+                    (rowIndex === 2 && colIndex === 2) ||
+                    String(cellValue).trim().toUpperCase() === "FREE";
+
+                  const number = normalizeNumber(cellValue);
+
+                  const isWinningCell =
+                    !isFree &&
+                    (
+                      winningCells.some(
+                        (position) =>
+                          Array.isArray(position) &&
+                          Number(position[0]) === rowIndex &&
+                          Number(position[1]) === colIndex
+                      ) ||
+                      (number !== null &&
+                        winningNumbers.includes(number))
+                    );
+
+                  const isCalled =
+                    !isFree &&
+                    number !== null &&
+                    calledSet.has(number);
+
+                  // Priority: winning red, called blue, otherwise dark.
+                  const cellBackground = isFree
+                    ? "#1f1e1d"
+                    : isWinningCell
+                      ? "#dc2626"
+                      : isCalled
+                        ? "#1555df"
+                        : "#1e293b";
+
+                  const cellBorder = isFree
+                    ? "#6b5900"
+                    : isWinningCell
+                      ? "#ff6666"
+                      : isCalled
+                        ? "#3478ff"
+                        : "#8490a2";
+
+                  return (
+                    <div
+                      key={`${rowIndex}-${colIndex}`}
+                      title={
+                        isFree
+                          ? "FREE"
+                          : isWinningCell
+                            ? "Winning number"
+                            : isCalled
+                              ? "Called number"
+                              : "Not called"
+                      }
+                      style={{
+                        minWidth: 12,
+                        height: "clamp(85px, 8.5vw, 109px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxSizing: "border-box",
+                        background: cellBackground,
+                        color: "#fff",
+                        border: `1px solid ${cellBorder}`,
+                        borderRadius: 1,
+                        fontSize: isFree
+                          ? "clamp(69px, 3.5vw, 84px)"
+                          : "clamp(78px, 5.2vw, 94px)",
+                        fontWeight: 900,
+                        lineHeight: 1,
+                        overflow: "hidden",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isFree ? "FREE" : number ?? String(cellValue)}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                gap: 14,
+                marginTop: 12,
+                fontSize: 32,
+                fontWeight: 800,
+              }}
+            >
+              <span>
+                <span style={{ color: "#ff6666" }}>■</span> Winning
+              </span>
+              <span>
+                <span style={{ color: "#3478ff" }}>■</span> Called
+              </span>
+              <span>
+                <span style={{ color: "#8490a2" }}>■</span> Not called
+              </span>
+              <span>
+                <span style={{ color: "#a89b70" }}>■</span> FREE
+              </span>
+            </div>
+
+            {calledSet.size === 0 && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: 10,
+                  background: "#422006",
+                  border: "1px solid #d97706",
+                  borderRadius: 5,
+                  color: "#fde68a",
+                  fontSize: 12,
+                  textAlign: "center",
+                }}
+              >
+                No called numbers were received for this verification.
+                The blue cells will appear after the called-number data
+                is supplied by the API.
+              </div>
+            )}
+
+            {verificationResult.isWinner &&
+              winningCells.length === 0 &&
+              winningNumbers.length === 0 && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: "#fcd34d",
+                    fontSize: 12,
+                    textAlign: "center",
+                  }}
+                >
+                  The server marked this cartela as a winner but did not
+                  return its winning cells or winning numbers, so the
+                  winning pattern cannot yet be highlighted in red.
+                </div>
+              )}
+          </>
+        );
+      })()}
+    </div>
+  </div>
+)}
+{verificationResult?.isWinner &&
+  verificationResult.winOnCallNumber !== null &&
+  verificationResult.winOnCallNumber !== undefined && (
+    <div
+      style={{
+        marginTop: "10px",
+        padding: "14px",
+        borderRadius: "10px",
+        background: "#172554",
+        border: "2px solid #3B82F6",
+        color: "#FFFFFF",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "13px",
+          fontWeight: "bold",
+          color: "#BFDBFE",
+          marginBottom: "5px",
+        }}
+      >
+        WIN ON CALL NUMBER
+      </div>
+
+      <div
+        style={{
+          fontSize: "36px",
+          fontWeight: "900",
+          lineHeight: 1.2,
+        }}
+      >
+        #{verificationResult.winOnCallNumber}
+      </div>
+    </div>
+  )}
+
+
+
+  
 
  {/* 🏆 WINNER CARTELA HISTORY */}
 <div
