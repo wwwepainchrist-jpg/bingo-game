@@ -1,27 +1,83 @@
 import { useEffect, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 
+// Build a 5x5 grid from the ONLY source of cartela numbers:
+// public/cartela_patterns_1_to_200.json
+function getCartelaRows(pattern) {
+  if (!pattern || typeof pattern !== "object") return null;
+
+  const columns = ["B", "I", "N", "G", "O"];
+  const valid = columns.every(
+    (column) => Array.isArray(pattern[column]) && pattern[column].length === 5
+  );
+
+  if (!valid) return null;
+
+  return Array.from({ length: 5 }, (_, rowIndex) =>
+    columns.map((column) => {
+      const value = pattern[column][rowIndex];
+      // The JSON stores the center as a star; show it as FREE on the printed card.
+      if (rowIndex === 2 && column === "N") {
+        return value === "★" ? "FREE" : value;
+      }
+      return value;
+    })
+  );
+}
+
 export default function PrintCartelas() {
   const [cartelas, setCartelas] = useState([]);
+  const [cartelaPatterns, setCartelaPatterns] = useState({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchCartelas() {
       try {
-        const response = await fetch("https://bingo-backend-ccn6.onrender.com/api/cartelas");
-        if (response.ok) {
-          const data = await response.json();
-          setCartelas(data);
-        } else {
-          console.error("Failed to fetch cartelas from server");
+        // The backend supplies cartela records/IDs only. It does NOT supply printed numbers.
+        const [cartelasResponse, patternsResponse] = await Promise.all([
+          fetch("https://bingo-backend-ccn6.onrender.com/api/cartelas"),
+          fetch("/cartela_patterns_1_to_200.json"),
+        ]);
+
+        if (!cartelasResponse.ok) {
+          throw new Error("Failed to fetch cartela records from the server.");
+        }
+        if (!patternsResponse.ok) {
+          throw new Error("Could not load public/cartela_patterns_1_to_200.json.");
+        }
+
+        const cartelasData = await cartelasResponse.json();
+        const patternsData = await patternsResponse.json();
+
+        if (!Array.isArray(cartelasData)) {
+          throw new Error("The /api/cartelas response is not an array.");
+        }
+        if (!patternsData || typeof patternsData !== "object" || Array.isArray(patternsData)) {
+          throw new Error("The cartela patterns JSON has an invalid format.");
+        }
+
+        if (!cancelled) {
+          setCartelas(cartelasData);
+          setCartelaPatterns(patternsData);
+          setLoadError("");
         }
       } catch (error) {
-        console.error("Error connecting to backend API:", error);
+        console.error("Error loading cartelas or JSON patterns:", error);
+        if (!cancelled) {
+          setLoadError(error.message || "Unable to load cartelas.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     fetchCartelas();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
@@ -65,6 +121,30 @@ export default function PrintCartelas() {
   }
 
   // ─── FIX: Friendly empty state when no cartelas exist ───
+  if (loadError) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "12px",
+        padding: "32px",
+        backgroundColor: "#07090e",
+        color: "#f3f4f6",
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        textAlign: "center",
+      }}>
+        <h2 style={{ margin: 0, color: "#f87171" }}>Could Not Load Cartelas</h2>
+        <p style={{ maxWidth: "600px", color: "#d1d5db" }}>{loadError}</p>
+        <p style={{ maxWidth: "600px", color: "#9ca3af" }}>
+          Confirm that cartela_patterns_1_to_200.json is located in the public folder and that the backend API is available.
+        </p>
+      </div>
+    );
+  }
+
   if (cartelas.length === 0) {
     return (
       <div style={{
@@ -489,30 +569,57 @@ export default function PrintCartelas() {
                             ))}
                           </div>
 
-                          {cartela.numbers.rows.map((row, rowIndex) => (
-                            <div key={rowIndex} className="bingo-row">
-                              {row.map((cell, cellIndex) => {
-                                const vibrantColors = [
-                                  "#2563eb", "#dc2626", "#059669", "#7c3aed",
-                                  "#ea580c", "#0d9488", "#db2777", "#4f46e5",
-                                ];
-                                const colorIndex = (rowIndex * 5 + cellIndex) % vibrantColors.length;
-                                return (
-                                  <div
-                                    key={cellIndex}
-                                    className={`bingo-cell ${cell === "FREE" ? "bingo-cell-free" : ""}`}
-                                    style={cell !== "FREE" ? {
-                                      color: vibrantColors[colorIndex],
-                                      WebkitPrintColorAdjust: "exact",
-                                      printColorAdjust: "exact"
-                                    } : {}}
-                                  >
-                                    {cell}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ))}
+                          {(() => {
+                            // Assumption: the first API record maps to JSON key "1", the second to "2", etc.
+                            // Use the same sequential number displayed on the printed cartela.
+                            const pattern = cartelaPatterns[String(sequentialId)];
+                            const rows = getCartelaRows(pattern);
+
+                            if (!rows) {
+                              return (
+                                <div
+                                  style={{
+                                    color: "#b91c1c",
+                                    background: "#fee2e2",
+                                    border: "1px solid #b91c1c",
+                                    borderRadius: "6px",
+                                    padding: "8px",
+                                    fontSize: "12px",
+                                    fontWeight: 800,
+                                    textAlign: "center",
+                                  }}
+                                >
+                                  MISSING OR INVALID JSON PATTERN #{sequentialId}
+                                </div>
+                              );
+                            }
+
+                            return rows.map((row, rowIndex) => (
+                              <div key={rowIndex} className="bingo-row">
+                                {row.map((cell, cellIndex) => {
+                                  const vibrantColors = [
+                                    "#2563eb", "#dc2626", "#059669", "#7c3aed",
+                                    "#ea580c", "#0d9488", "#db2777", "#4f46e5",
+                                  ];
+                                  const colorIndex = (rowIndex * 5 + cellIndex) % vibrantColors.length;
+
+                                  return (
+                                    <div
+                                      key={cellIndex}
+                                      className={`bingo-cell ${cell === "FREE" ? "bingo-cell-free" : ""}`}
+                                      style={cell !== "FREE" ? {
+                                        color: vibrantColors[colorIndex],
+                                        WebkitPrintColorAdjust: "exact",
+                                        printColorAdjust: "exact",
+                                      } : {}}
+                                    >
+                                      {cell}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ));
+                          })()}
                         </div>
                       </div>
                     </div>

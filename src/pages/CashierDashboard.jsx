@@ -3519,6 +3519,7 @@ useEffect(() => {
     );
   };
 }, [id, currentCashier?.house_id]);
+     
   const playerQrUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/select-cartela`

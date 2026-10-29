@@ -1,8 +1,18 @@
+
+const path = require("path");
 const { Pool } = require("pg");
 
+// Load the project-root .env file explicitly.
+// Existing environment variables are not overwritten.
 require("dotenv").config({
-  path: "../.env"
+  path: path.resolve(__dirname, "../.env"),
 });
+
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL is missing from the project-root .env file."
+  );
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -11,21 +21,13 @@ const pool = new Pool({
     rejectUnauthorized: false,
   },
 
-  // Shared pool for all houses/cashiers
   max: 20,
-
-  // Keep idle connections reusable
   idleTimeoutMillis: 300000,
-
-  // Maximum time waiting for an available pool connection
-  connectionTimeoutMillis: 5000,
-
-  // Keep PostgreSQL connections alive
+  connectionTimeoutMillis: 15000,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
 });
 
-// Prevent idle connection errors from crashing Node
 pool.on("error", (err) => {
   console.error(
     "⚠️ PostgreSQL idle connection error:",
@@ -33,7 +35,6 @@ pool.on("error", (err) => {
   );
 });
 
-// Test connection when server starts
 (async () => {
   try {
     const result = await pool.query("SELECT NOW()");
