@@ -1053,148 +1053,6 @@ const [showInternetRestored, setShowInternetRestored] =
   const [winnerMessage, setWinnerMessage] = useState("");
   const [checkedCartela, setCheckedCartela] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(""); 
-
-  
-  const [winnerCartelaHistory, setWinnerCartelaHistory] = useState([]);
-const [showWinnerCartelaHistory, setShowWinnerCartelaHistory] = useState(false);
-
-// ============================================================
-// 🏆 RECORD A REAL WINNING CARTELA
-// Uses the actual cartela numbers and called balls.
-// ============================================================
-const recordWinnerCartela = (
-  cartela,
-  callList = called,
-  patternName = "BINGO"
-) => {
-  if (!cartela) return;
-
-  const cartelaIdValue =
-    cartela.cartelaId ??
-    cartela.cartela_id ??
-    cartela.id ??
-    cartelaId.trim();
-
-  // Prefer authentic sold-cartela data if the verifier
-  // returned only the cartela ID.
-  let sourceCartela = cartela;
-
-  const hasNumbers =
-    sourceCartela.numbers ||
-    sourceCartela.matrix;
-
-  if (!hasNumbers) {
-    const matchingCartela = soldCartelaSource.find((item) => {
-      const itemId =
-        typeof item === "object"
-          ? item.cartelaId ?? item.cartela_id ?? item.id
-          : item;
-
-      return String(itemId) === String(cartelaIdValue);
-    });
-
-    if (matchingCartela) {
-      sourceCartela = matchingCartela;
-    }
-  }
-
-  let numbers = sourceCartela.numbers;
-  let matrix = sourceCartela.matrix;
-
-  try {
-    if (typeof numbers === "string") {
-      numbers = JSON.parse(numbers);
-    }
-
-    if (typeof matrix === "string") {
-      matrix = JSON.parse(matrix);
-    }
-  } catch (error) {
-    console.error("Could not parse winning cartela:", error);
-    return;
-  }
-
-  // Build the actual 5×5 board from the B/I/N/G/O columns
-  // when a matrix is not already available.
-  if (
-    !Array.isArray(matrix) &&
-    numbers &&
-    ["B", "I", "N", "G", "O"].every(
-      (letter) =>
-        Array.isArray(numbers[letter]) &&
-        numbers[letter].length === 5
-    )
-  ) {
-    matrix = Array.from({ length: 5 }, (_, row) =>
-      ["B", "I", "N", "G", "O"].map((letter, col) =>
-        row === 2 && col === 2
-          ? "FREE"
-          : numbers[letter][row]
-      )
-    );
-  }
-
-  if (
-    !Array.isArray(matrix) ||
-    matrix.length !== 5 ||
-    matrix.some(
-      (row) => !Array.isArray(row) || row.length !== 5
-    )
-  ) {
-    console.error(
-      "Winning cartela has no valid 5×5 matrix:",
-      cartelaIdValue
-    );
-    return;
-  }
-
-  const normalizedMatrix = matrix.map((row, rowIndex) =>
-    row.map((cell, colIndex) =>
-      rowIndex === 2 && colIndex === 2
-        ? "FREE"
-        : cell
-    )
-  );
-
-  const balls = Array.isArray(callList) ? callList : [];
-
-  const calledNumbers = balls
-    .map((ball) => {
-      const value =
-        typeof ball === "object"
-          ? ball.number ?? ball.ball
-          : ball;
-
-      return parseInt(
-        String(value).trim().split(/\s+/).pop(),
-        10
-      );
-    })
-    .filter(Number.isFinite);
-
-  setWinnerCartelaHistory((previous) => {
-    // Avoid duplicate entries if the same cartela is checked again.
-    if (
-      previous.some(
-        (item) => String(item.id) === String(cartelaIdValue)
-      )
-    ) {
-      return previous;
-    }
-
-    return [
-      {
-        id: cartelaIdValue,
-        matrix: normalizedMatrix,
-        calledNumbers,
-        callCount: balls.length,
-        pattern: patternName,
-        wonAt: new Date().toLocaleTimeString(),
-      },
-      ...previous,
-    ];
-  });
-};
 // ============================================================
 // 🎵 NEXT BINGO AUDIO PRELOADER
 // Keeps the next ball's MP3 ready before it is displayed.
@@ -1228,14 +1086,13 @@ const winningCallTargetRef = useRef(null);
 // ONLY DURING INITIAL SHUFFLE
 // ==========================================================
 
-
 const startRandomBingoBlink = () => {
+  // Only first play of a NEW game
   if (!firstGamePlayRef.current) {
-    console.log("⚠️ INITIAL BLINK ALREADY USED");
     return;
   }
 
-  // Clear any previous blink timers.
+  // Clean up anything left over
   if (bingoBlinkTimeoutRef.current) {
     clearTimeout(bingoBlinkTimeoutRef.current);
     bingoBlinkTimeoutRef.current = null;
@@ -1246,31 +1103,45 @@ const startRandomBingoBlink = () => {
     bingoBlinkIntervalRef.current = null;
   }
 
-  console.log("🎰 SHUFFLE BLINK STARTED");
+  console.log("🎰 BOARD BLINK TIMER STARTED");
 
-  // Start blinking after a short delay.
+  // Wait 2 seconds
   bingoBlinkTimeoutRef.current = setTimeout(() => {
-    // Do not check stateRef.current.paused here.
-    // The game is intentionally paused during shuffle.
 
-    if (!shuffleInProgressRef.current) {
+    if (stateRef.current.paused) {
+      console.log("⏸️ BLINK NOT STARTED - GAME PAUSED");
       return;
     }
 
+    if (!firstGamePlayRef.current) {
+      return;
+    }
+
+    console.log("🎰 RANDOM NUMBER BLINK STARTED");
+
     bingoBlinkIntervalRef.current = setInterval(() => {
-      // Keep blinking only while the Shuffle button is active.
-      if (!shuffleInProgressRef.current) {
+
+      if (
+        stateRef.current.paused ||
+        !firstGamePlayRef.current
+      ) {
         return;
       }
 
-      const randomNumber = Math.floor(Math.random() * 75) + 1;
+      const randomNumber =
+        Math.floor(Math.random() * 75) + 1;
+
       setBlinkingNumber(randomNumber);
-    }, 180);
+
+    }, 50);
+
   }, 100);
 };
 
+
 const stopRandomBingoBlink = () => {
-  console.log("🛑 STOPPING SHUFFLE BLINK");
+
+  console.log("🛑 STOPPING RANDOM NUMBER BLINK");
 
   if (bingoBlinkTimeoutRef.current) {
     clearTimeout(bingoBlinkTimeoutRef.current);
@@ -1283,9 +1154,11 @@ const stopRandomBingoBlink = () => {
   }
 
   setBlinkingNumber(null);
+
+  // IMPORTANT:
+  // This game has now used its initial rolling effect.
   firstGamePlayRef.current = false;
 };
-
   const hasAnnouncedLetsGo = useRef(false);
   const animationRef = useRef(null);
   const shuffleAudioRef = useRef(null);
@@ -3757,53 +3630,52 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
 
   
  
-
 function playShuffleSound(onFinished = () => {}) {
-  console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO");
-
+  console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO CHANNEL RESOURCE");
+  
   const audio = new Audio("/oromo/shuffle.wav");
   audio.preload = "auto";
+  
+  // Bind the channel to our global component reference so togglePlayPause can control it
   shuffleAudioRef.current = audio;
 
-  let finished = false;
-
-  const finishOnce = () => {
-    if (finished) return;
-    finished = true;
-
-    if (shuffleAudioRef.current === audio) {
-      shuffleAudioRef.current = null;
-    }
-
-    sessionStorage.removeItem("paused_shuffle_timestamp");
-
+  audio.onended = () => {
+    console.log("🧹 CAGE SHUFFLE TRACK ENDED NATURALLY");
+    shuffleAudioRef.current = null;
+    sessionStorage.removeItem("paused_shuffle_timestamp"); // Flush clean tracking cache
+    
+    // Execute our callback pipeline route link
     try {
       onFinished();
-    } catch (error) {
-      console.error("❌ SHUFFLE COMPLETION ERROR:", error);
+    } catch(error) {
+      console.error("❌ SHUFFLE COMPLETION HANDSHAKE ERROR:", error);
     }
-  };
-
-  audio.onended = () => {
-    console.log("🏁 SHUFFLE AUDIO FINISHED");
-    finishOnce();
   };
 
   audio.onerror = (error) => {
-    console.error("❌ SHUFFLE AUDIO FAILED TO LOAD:", error);
-    finishOnce();
+    console.error("❌ SHUFFLE TRACK CRITICAL LOADING FAILURE EXCEPTION:", error);
+    shuffleAudioRef.current = null;
+    sessionStorage.removeItem("paused_shuffle_timestamp");
+    
+    // Failsafe auto-rescue: If the shuffle sound file crashes or fails to load,
+    // fire the completion hook anyway so the game room doesn't stay frozen!
+    onFinished();
   };
 
-  audio.play()
-    .then(() => {
-      console.log("▶️ SHUFFLE AUDIO PLAYING");
-    })
-    .catch((error) => {
-      console.warn("⚠️ SHUFFLE AUDIO COULD NOT PLAY:", error.message);
-      finishOnce();
-    });
+  // Safe promise-wrapped stream execution execution thread
+  const playPromise = audio.play();
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        console.log("▶️ SHUFFLE AUDIO CURRENTLY SPINNING SUCCESSFULLY");
+      })
+      .catch((err) => {
+        console.warn("⚠️ Shuffle element blocked or muted by browser protocols:", err.message);
+        // Fallback auto-advance execution trigger
+        onFinished();
+      });
+  }
 }
-
 
 
    
@@ -3975,14 +3847,12 @@ function announceLetsGo(callback) {
 }
 
  
-
- 
 const togglePlayPause = () => {
   const actionId = ++playPauseActionRef.current;
   const isCurrentlyPaused = stateRef.current.paused;
 
   // ==========================================================
-  // PAUSE ENGINE
+  // ⏸️ PAUSE ENGINE
   // ==========================================================
   if (!isCurrentlyPaused) {
     console.log("⏸️ PAUSE");
@@ -4000,33 +3870,34 @@ const togglePlayPause = () => {
       audioFailsafeTimeoutRef.current = null;
     }
 
-    // Pause shuffle audio if it is playing.
+    // Capture the precise millisecond marker if the shuffle track is running
     if (shuffleAudioRef.current) {
-      try {
-        const currentShuffleTime =
-          Number(shuffleAudioRef.current.currentTime) || 0;
-
-        sessionStorage.setItem(
-          "paused_shuffle_timestamp",
-          String(currentShuffleTime)
-        );
-
-        shuffleAudioRef.current.pause();
-      } catch (error) {
-        console.error("Error pausing shuffle audio:", error);
-      }
+      try { 
+        const currentShuffleTime = Number(shuffleAudioRef.current.currentTime) || 0;
+        console.log("⏸️ PAUSING CAGE SHUFFLE BACKGROUND TRACK MID-RUN AT POSITION:", currentShuffleTime);
+        
+        sessionStorage.setItem("paused_shuffle_timestamp", String(currentShuffleTime));
+        shuffleAudioRef.current.pause(); 
+      } catch(e){}
     }
 
-    // Pause the active number voice.
     const audio = activeAudioRef.current;
-
     if (audio && !audio.ended) {
       const currentTime = Number(audio.currentTime) || 0;
+      console.log("⏸️ PAUSING ACTIVE ANNOUNCER VOICE ELEMENT:", audio.src, "AT POSITION:", currentTime);
+      
       const currentBallStr = stateRef.current.current || "";
-      const parts = currentBallStr.trim().split(/\s+/);
+const parts = currentBallStr.trim().split(/\s+/);
 
-      const extractedLetter = parts[0] || "";
-      const extractedNumber = Number(parts[1]) || 0;
+const extractedLetter = parts[0] || "";
+const extractedNumber = Number(parts[1]) || 0;
+
+console.log(
+  "💾 PAUSE SNAPSHOT:",
+  extractedLetter,
+  extractedNumber,
+  currentTime
+);
 
       pausedAudioRef.current = {
         audio,
@@ -4037,124 +3908,124 @@ const togglePlayPause = () => {
 
       try {
         audio.pause();
-      } catch (error) {
-        console.error("Error pausing number audio:", error);
-      }
-
+      } catch (error) {}
+      
       isDrawingBallRef.current = false;
       return;
     }
 
     if (pendingBingoCallRef.current || isDrawingBallRef.current) {
       console.log("⏸️ DRAW ENGINE DISARMED MID-FLIGHT");
-
-      audioGenerationRef.current++;
+      audioGenerationRef.current++; 
       isDrawingBallRef.current = false;
       return;
     }
-
     return;
   }
 
   // ==========================================================
-  // PLAY / RESUME ENGINE — NO AUTOMATIC SHUFFLE
+  // ▶️ PLAY / RESUME ENGINE (TRUE SEAMLESS RESUMPTION)
   // ==========================================================
   console.log("▶️ PLAY");
 
   stateRef.current.paused = false;
   setPaused(false);
 
-  
+ // 🎰 ONLY FIRST PLAY OF NEW GAME
+if (firstGamePlayRef.current) {
+  startRandomBingoBlink();
+}
 
-  // Resume an interrupted number voice if one exists.
+  // 🎵 INITIAL MATCH LAUNCH GATING RESTRUCTURE
+  if (!hasPlayedShuffleRef.current) {
+    hasPlayedShuffleRef.current = true;
+    sessionStorage.setItem("bingo_shuffle_played", "true");
+    sessionStorage.removeItem("paused_shuffle_timestamp"); 
+
+    console.log("🚀 INITIAL MATCH LAUNCH: FIRING SHUFFLE TRACK ONLY");
+
+    // ✅ FIX: Fire the shuffle track, but do NOT call generateNumber() here!
+    // The number generator is now passed safely as a completion hook inside playShuffleSound.
+   playShuffleSound(() => {
+  console.log("🏁 SHUFFLE AUDIO FINISHED");
+
+  // 🛑 STOP RANDOM NUMBER BLINKING
+  stopRandomBingoBlink();
+
+  if (stateRef.current.paused) {
+    console.log("⏸️ GAME IS PAUSED - NOT GENERATING NUMBER");
+    return;
+  }
+
+  console.log("🎯 GENERATING NUMBER 1 NOW");
+
+  isDrawingBallRef.current = false;
+
+  generateNumber();
+});
+    return;
+  }
+
+  // 🎵 TRUE SHUFFLE RESUME VALVE (If unpausing mid-shuffle before any numbers dropped)
+  const currentRemainingPool = remainingNumbersRef.current || [];
+  if (currentRemainingPool.length === 75) {
+    const savedShuffleTimeStr = sessionStorage.getItem("paused_shuffle_timestamp");
+    const resumeShuffleTime = savedShuffleTimeStr ? Number(savedShuffleTimeStr) : 0;
+    
+    console.log(`🚀 INITIAL SHUFFLE RESUME VALVE: CONTINUING CAGE SOUND FROM POSITION: ${resumeShuffleTime}s`);
+    
+    if (shuffleAudioRef.current) {
+      try { 
+        if (resumeShuffleTime > 0) {
+          shuffleAudioRef.current.currentTime = resumeShuffleTime;
+        }
+        shuffleAudioRef.current.play(); 
+      } catch(e){
+        // Dynamic rescue if the object instance dropped out entirely
+        isDrawingBallRef.current = false;
+        generateNumber();
+      }
+    } else {
+      isDrawingBallRef.current = false;
+      generateNumber();
+    }
+    return;
+  }
+
+  // True voice audio resume gating snapshot
   const pausedData = pausedAudioRef.current;
-
   if (pausedData && pausedData.audio) {
     const resumeLetter = pausedData.letter;
     const resumeNumber = pausedData.number;
     const resumeTime = pausedData.time || 0;
-
-    pausedAudioRef.current = null;
+    
+    pausedAudioRef.current = null; 
     pendingBingoCallRef.current = null;
 
     if (actionId !== playPauseActionRef.current) return;
 
     if (resumeLetter && resumeNumber) {
-      console.log(
-        `🚀 RESUMING BALL ${resumeLetter} ${resumeNumber} FROM ${resumeTime}s`
-      );
-
+      console.log(`🚀 TRUE RESUME: REPLAYING INTERRUPTED BALL ${resumeLetter} ${resumeNumber} FROM POSITION: ${resumeTime}s`);
       isDrawingBallRef.current = true;
-
-      playRecordedBingoCall(
-        resumeLetter,
-        resumeNumber,
-        () => {
-          isDrawingBallRef.current = false;
-
-          if (stateRef.current.paused) return;
-
-          generateNumber();
-        },
-        resumeTime
-      );
-
+      
+      playRecordedBingoCall(resumeLetter, resumeNumber, () => {
+        isDrawingBallRef.current = false;
+        if (stateRef.current.paused) return;
+        generateNumber();
+      }, resumeTime);
       return;
     }
   }
 
-  // Prevent duplicate number generation.
   if (isDrawingBallRef.current) {
     console.log("⏳ CALL GENERATION STILL IN PROGRESS");
     return;
   }
 
-  // Start or continue calling numbers immediately.
-  console.log("🚀 STARTING NUMBER CALLING");
+  console.log("🚀 ADVANCING ENGINE TIMELINE SAFELY");
   generateNumber();
 };
 
-
-
-
-const shuffleInProgressRef = useRef(false);
-
-
-const handleShuffleClick = () => {
-  if (shuffleInProgressRef.current) {
-    console.log("⏳ SHUFFLE IS ALREADY IN PROGRESS");
-    return;
-  }
-
-  const remaining = remainingNumbersRef.current || [];
-
-  if (remaining.length < 75) {
-    console.log("⚠️ SHUFFLE IS ONLY AVAILABLE BEFORE THE FIRST BALL");
-    return;
-  }
-
-  shuffleInProgressRef.current = true;
-
-  stateRef.current.paused = true;
-  setPaused(true);
-
-  console.log("🔀 SHUFFLE BUTTON CLICKED — STARTING BLINK");
-
-  // Start blinking only for the Shuffle button.
-  startRandomBingoBlink();
-
-  playShuffleSound(() => {
-    shuffleInProgressRef.current = false;
-
-    console.log("🏁 SHUFFLE FINISHED — STOPPING BLINK");
-
-    stopRandomBingoBlink();
-
-    if (stateRef.current.paused) {
-      togglePlayPause();
-    }
-  });
-};
 
 
 
@@ -4323,57 +4194,6 @@ async function saveBallWithRetry(gameId, ball, retries = 3) {
   }
   return false; // Failed all 3 attempts
 }
-
-
-
-async function scanWinnerCartelaHistory(gameId) {
-  if (!gameId || !navigator.onLine) return;
-
-  try {
-    const response = await fetch(
-      `${API_URL}/games/${encodeURIComponent(gameId)}/winner-history/scan`
-    );
-
-    if (!response.ok) {
-      throw new Error(`Winner history scan failed: HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.success) return;
-
-    // Convert the backend's call groups into entries for the current UI.
-    const history = (data.groups || []).flatMap((group) =>
-      (group.cartelas || []).map((cartela) => ({
-        id: cartela.id,
-        pattern: cartela.pattern,
-        matrix: cartela.matrix,
-        callCount: group.callCount,
-        wonAt: `Call #${group.callCount}`,
-        gameId: data.gameId,
-      }))
-    );
-
-    setWinnerCartelaHistory(history);
-  } catch (error) {
-    console.error("Could not refresh winner cartela history:", error);
-  }
-}
-
-
-
-useEffect(() => {
-  const activeGameId =
-    game?.game_id ||
-    game?.id ||
-    stateRef.current?.game?.game_id ||
-    id;
-
-  if (!activeGameId || !navigator.onLine) return;
-
-  // Restore saved winners whenever the active game becomes available.
-  scanWinnerCartelaHistory(activeGameId);
-}, [id, game?.game_id, game?.id]);
-
 
 // ==========================================================
 // 🎱 2. AUTHORITATIVE GENERATOR ENGINE (Blazing 0s Instant Mode)
@@ -5014,7 +4834,6 @@ else {
     stateRef.current.current =
       result;
 
-    
     // ============================================================
     // 14. SAVE BALL TO BACKEND
     // ============================================================
@@ -5023,18 +4842,16 @@ else {
       currentGameId,
       result,
       3
-    ).then((saved) => {
-      if (!saved) {
-        console.error(
-          "❌ BACKEND TRANSACTION TIMEOUT:",
-          result
-        );
-        return;
+    ).then(
+      (saved) => {
+        if (!saved) {
+          console.error(
+            "❌ BACKEND TRANSACTION TIMEOUT:",
+            result
+          );
+        }
       }
-
-      // 🏆 Automatically scan and refresh winning cartela history.
-      scanWinnerCartelaHistory(currentGameId);
-    });
+    );
 
     // ============================================================
     // 15. SAVE OFFLINE BACKUP
@@ -6179,7 +5996,7 @@ if (
     setWinnerMessage(
       patternName
     );
-recordWinnerCartela(soldCartela, called, patternName);
+
     setVerificationStatus(
       "WINNER"
     );
@@ -6348,10 +6165,7 @@ playRecordedAudio("notsold");
       setWinnerMessage(
         patternName
       );
-console.log("ONLINE WINNER CARTELA:", verificationData.cartela);
-console.log("SOLD CARTELA SOURCE:", soldCartelaSource);
 
-recordWinnerCartela(verificationData.cartela, called, patternName);
       setVerificationStatus(
         "WINNER"
       );
@@ -7604,77 +7418,46 @@ WebkitBackdropFilter: "blur(4px)",
     </button>
   </div>
 
-  
-{/* PLAY / PAUSE / SHUFFLE */}
-<div
-  className="play-pause-card"
-  style={{
-    padding: "6px",
-    background: "rgba(13, 29, 45, 0.6)",
-    borderRadius: "14px",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
-    backdropFilter: "blur(4px)",
-    boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
-  }}
->
+  {/* PLAY / PAUSE */}
   <div
+    className="play-pause-card"
     style={{
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      gap: "16px",
+      padding: "6px",
+      background: "rgba(13, 29, 45, 0.6)",
+      borderRadius: "14px",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+      backdropFilter: "blur(4px)",
+      boxShadow: "0 0 12px rgba(8, 7, 7, 0.95)",
     }}
   >
-
- {/* SHUFFLE BUTTON */}
-    <button
-      type="button"
-      className="ctrl-btn"
+    <div
       style={{
-        padding: "2px 12px",
-        fontSize: "22px",
-        fontWeight: "800",
-        background: "#106fdb",
-        border: "2px solid #000000",
-        borderRadius: "100px",
-        height: "70px",
-        color: "#060606",
-        boxShadow: "0 0 10px rgba(240, 193, 75, 0.45)",
-        cursor: "pointer",
-      }}
-      onClick={handleShuffleClick}
-    >
-      🔀 SHUFFLE
-    </button>
-
-
-    {/* PLAY / PAUSE BUTTON */}
-    <button
-      type="button"
-      className="ctrl-btn gold-border"
-      style={{
-        padding: "2px 8px",
-        fontSize: "40px",
-        fontWeight: "800",
-        background: "#e01010",
-       flex: "0 1 550px",
-width: "150px",
+        display: "flex",
         justifyContent: "center",
-        borderRadius: "100px",
-        height: "70px",
-      
-        color: "#ffffff",
-        boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
-        cursor: "pointer",
+        alignItems: "center",
       }}
-      onClick={togglePlayPause}
     >
-      <span>{paused ? t.play : t.pause}</span>
-    </button>
-
-   
+      <button
+        className="ctrl-btn gold-border"
+        style={{
+          padding: "2px 8px",
+          fontSize: "40px",
+          fontWeight: "800",
+          background: "#e01010",
+          flex: 1,
+          justifyContent: "center",
+          borderRadius: "100px",
+          height: "70px",
+          color: "#ffffffff",
+          boxShadow: "0 0 10px rgba(245, 243, 243, 0.94)",
+          cursor: "pointer",
+        }}
+        onClick={togglePlayPause}
+      >
+        <span>{paused ? t.play : t.pause}</span>
+      </button>
+    </div>
   </div>
-</div>
 </div>
 
   </div> {/* Closes vertical column wrapper */}
@@ -8215,8 +7998,6 @@ width: "150px",
     ALL NUMBERS VISIBLE — NO SCROLLING
     ========================================================= */}
 {showSoldCartelas && (
-
- 
   <div
     style={{
       position: "fixed",
@@ -8229,7 +8010,6 @@ width: "150px",
       width: "min(92vw, 1600px)",
 
       maxHeight: "80vh",
-overflowY: "auto",
 
       background: "rgba(5, 12, 30, 0.98)",
 
@@ -8252,153 +8032,9 @@ overflowY: "auto",
 
       alignItems: "center",
 
-     justifyContent: "flex-start"
-
+      justifyContent: "center"
     }}
   >
-
-
-
-
-
-{showWinnerCartelaHistory && (
-  <div
-    style={{
-      width: "100%",
-      maxHeight: "350px",
-      overflowY: "auto",
-      flexShrink: 0,
-      marginBottom: "16px",
-      color: "#ffffff",
-      boxSizing: "border-box",
-    }}
-  >
-    {winnerCartelaHistory.length === 0 ? (
-      <p style={{ textAlign: "center" }}>
-        No winning cartelas recorded yet.
-      </p>
-    ) : (
-      winnerCartelaHistory.map((winner, index) => (
-        <div
-          key={`${winner.id}-${index}`}
-          style={{
-            marginBottom: "16px",
-            padding: "12px",
-            border: "1px solid #00f0ff",
-            borderRadius: "8px",
-            background: "rgba(0, 240, 255, 0.06)",
-          }}
-        >
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "16px",
-              marginBottom: "6px",
-            }}
-          >
-            🏆 Cartela: {winner.id} — {winner.pattern}
-          </div>
-
-          <div
-            style={{
-              fontSize: "13px",
-              marginBottom: "10px",
-              color: "#cccccc",
-            }}
-          >
-            Call #{winner.callCount} | Won at: {winner.wonAt}
-          </div>
-
-          {/* BINGO COLUMN HEADERS */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-              gap: "4px",
-              marginBottom: "4px",
-            }}
-          >
-            {["B", "I", "N", "G", "O"].map((letter) => (
-              <div
-                key={letter}
-                style={{
-                  textAlign: "center",
-                  fontWeight: "bold",
-                  color: "#00f0ff",
-                  padding: "5px",
-                }}
-              >
-                {letter}
-              </div>
-            ))}
-          </div>
-
-          {/* COMPLETE 5x5 CARTELA */}
-          {Array.isArray(winner.matrix) &&
-          winner.matrix.length === 5 ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-                gap: "4px",
-              }}
-            >
-              {winner.matrix.flatMap((row, rowIndex) =>
-                row.map((number, colIndex) => {
-                  const value = String(number);
-                  const numericValue = Number(
-                    value.replace(/^[BINGO]\s*/i, "")
-                  );
-
-                  const isFree =
-                    rowIndex === 2 && colIndex === 2;
-
-                  const isCalled =
-                    isFree ||
-                    (
-                      Array.isArray(winner.calledNumbers) &&
-                      winner.calledNumbers.includes(numericValue)
-                    );
-
-                  return (
-                    <div
-                      key={`${rowIndex}-${colIndex}`}
-                      style={{
-                        minWidth: 0,
-                        padding: "10px 2px",
-                        textAlign: "center",
-                        borderRadius: "4px",
-                        backgroundColor: isCalled
-                          ? "#16a34a"
-                          : "#e5e7eb",
-                        color: isCalled
-                          ? "#ffffff"
-                          : "#111827",
-                        fontWeight: "bold",
-                        fontSize: "14px",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {isFree
-                        ? "FREE"
-                        : value.replace(/^[BINGO]\s*/i, "")}
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          ) : (
-            <p style={{ color: "#fca5a5" }}>
-              Cartela numbers are unavailable for this winner.
-            </p>
-          )}
-        </div>
-      ))
-    )}
-  </div>
-)}
-
-
     {/* =====================================================
         PRIZE HISTORY
         ===================================================== */}
@@ -8524,10 +8160,6 @@ overflowY: "auto",
     )}
   </div>
 )}
-
-
-
-
     {/* =====================================================
         TITLE
         ===================================================== */}
