@@ -8908,7 +8908,7 @@ WebkitBackdropFilter: "blur(4px)",
         <span
           style={{
             fontSize: "12px",
-            color: "#ffd700",
+            color: "#cbb42c",
             fontWeight: "bold",
           }}
         >
