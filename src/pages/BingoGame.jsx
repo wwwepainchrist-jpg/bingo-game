@@ -3840,52 +3840,84 @@ function playRecordedAudio(fileName, onComplete = () => {}) {
 
   
  
+
 function playShuffleSound(onFinished = () => {}) {
   console.log("🎵 INITIALIZING CAGE SHUFFLE AUDIO CHANNEL RESOURCE");
-  
-  const audio = new Audio("/oromo/shuffle.wav");
-  audio.preload = "auto";
-  
-  // Bind the channel to our global component reference so togglePlayPause can control it
-  shuffleAudioRef.current = audio;
 
-  audio.onended = () => {
-    console.log("🧹 CAGE SHUFFLE TRACK ENDED NATURALLY");
-    shuffleAudioRef.current = null;
-    sessionStorage.removeItem("paused_shuffle_timestamp"); // Flush clean tracking cache
-    
-    // Execute our callback pipeline route link
+  let audio = null;
+  let objectUrl = null;
+  let finished = false;
+
+  // Prevent multiple completion callbacks from firing.
+  const finishOnce = () => {
+    if (finished) return;
+    finished = true;
+
+    console.log("🧹 CAGE SHUFFLE TRACK FINISHED");
+
+    if (shuffleAudioRef.current === audio) {
+      shuffleAudioRef.current = null;
+    }
+
+    sessionStorage.removeItem("paused_shuffle_timestamp");
+
+    // Release the temporary URL only after playback has finished.
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      objectUrl = null;
+    }
+
     try {
       onFinished();
-    } catch(error) {
+    } catch (error) {
       console.error("❌ SHUFFLE COMPLETION HANDSHAKE ERROR:", error);
     }
   };
 
-  audio.onerror = (error) => {
-    console.error("❌ SHUFFLE TRACK CRITICAL LOADING FAILURE EXCEPTION:", error);
-    shuffleAudioRef.current = null;
-    sessionStorage.removeItem("paused_shuffle_timestamp");
-    
-    // Failsafe auto-rescue: If the shuffle sound file crashes or fails to load,
-    // fire the completion hook anyway so the game room doesn't stay frozen!
-    onFinished();
-  };
+  // Load the shuffle recording from persistent browser storage.
+  (async () => {
+    try {
+      console.log("💾 CHECKING SAVED SHUFFLE AUDIO...");
 
-  // Safe promise-wrapped stream execution execution thread
-  const playPromise = audio.play();
-  if (playPromise !== undefined) {
-    playPromise
-      .then(() => {
-        console.log("▶️ SHUFFLE AUDIO CURRENTLY SPINNING SUCCESSFULLY");
-      })
-      .catch((err) => {
-        console.warn("⚠️ Shuffle element blocked or muted by browser protocols:", err.message);
-        // Fallback auto-advance execution trigger
-        onFinished();
-      });
-  }
+      const blob = await getOrDownloadAudioBlob("/oromo/shuffle.wav");
+
+      if (!blob || blob.size === 0) {
+        throw new Error("Shuffle audio file is empty");
+      }
+
+      objectUrl = URL.createObjectURL(blob);
+
+      audio = new Audio(objectUrl);
+      audio.preload = "auto";
+
+      // Keep the audio accessible to the existing pause/resume controls.
+      shuffleAudioRef.current = audio;
+
+      audio.onended = () => {
+        console.log("✅ SHUFFLE AUDIO PLAYBACK COMPLETED");
+        finishOnce();
+      };
+
+      audio.onerror = (error) => {
+        console.error("❌ SHUFFLE TRACK PLAYBACK ERROR:", error);
+        finishOnce();
+      };
+
+      const playPromise = audio.play();
+
+      if (playPromise !== undefined) {
+        await playPromise;
+      }
+
+      console.log("▶️ SHUFFLE AUDIO PLAYING SUCCESSFULLY");
+
+    } catch (error) {
+      console.error("❌ SHUFFLE AUDIO LOADING/PLAYBACK FAILED:", error);
+      finishOnce();
+    }
+  })();
 }
+
 
 
    
