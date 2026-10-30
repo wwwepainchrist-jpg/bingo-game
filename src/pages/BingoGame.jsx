@@ -3176,6 +3176,7 @@ console.log("🎙️ SELECTED BINGO VOICE:", {
 
 
 
+
 function playCompleteRecording(
   path,
   onFinished = () => {},
@@ -3191,68 +3192,59 @@ function playCompleteRecording(
 
     const generationId = audioGenerationRef.current;
 
-    // ============================================================
-    // 1. INITIAL STATE CHECKS
-    // ============================================================
-
     if (stateRef.current.paused) {
-      console.log("⏸️ GAME PAUSED BEFORE AUDIO CREATION:", completeName);
       resolve({ paused: true, completed: false });
       return;
     }
 
     if (generationId !== audioGenerationRef.current) {
-      console.log("🛑 GENERATION NO LONGER CURRENT:", generationId);
       resolve({ cancelled: true, completed: false });
       return;
     }
 
-    // ============================================================
-    // 2. SELECT AUDIO OBJECT
-    // ============================================================
     let audio;
 
     if (preloadedAudio) {
       audio = preloadedAudio;
-      console.log(
-        "♻️ PRELOADED AUDIO OBJECT TRANSFERRED TO PLAYBACK:",
-        completeName,
-        "readyState:",
-        audio.readyState
-      );
       globalAudioInstanceRef.current = audio;
     } else {
       if (!globalAudioInstanceRef.current) {
         globalAudioInstanceRef.current = new Audio();
         globalAudioInstanceRef.current.preload = "auto";
       }
+
       audio = globalAudioInstanceRef.current;
-      console.log("📦 NORMAL AUDIO OBJECT USED:", completeName);
     }
 
     let finished = false;
     let started = false;
+    let watchdogTimer = null;
 
-    // ============================================================
-    // 3. CLEANUP
-    // ============================================================
+    // =====================================================
+    // CLEANUP
+    // =====================================================
+
     const cleanup = () => {
-      if (finished) {
-        return;
-      }
+      if (finished) return;
+
       finished = true;
+
+      if (watchdogTimer !== null) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
 
       if (activeAudioRef.current === audio) {
         activeAudioRef.current = null;
       }
 
-      // Remove all handlers installed by this playback.
       audio.onended = null;
       audio.onerror = null;
       audio.onpause = null;
       audio.onwaiting = null;
       audio.onstalled = null;
       audio.oncanplay = null;
+      audio.onplaying = null;
       audio.onloadstart = null;
       audio.ontimeupdate = null;
       audio.ondurationchange = null;
@@ -3260,279 +3252,335 @@ function playCompleteRecording(
 
       try {
         audio.pause();
-      } catch (error) {
-        // Ignore pause errors safely.
-      }
+      } catch (e) {}
 
-      // 🛡️ RE-RENDERING FRAME GUARD: Only clear state variables if another ball has not overtaken this thread loop
       if (generationId === audioGenerationRef.current) {
         setAudioCurrentTime(0);
         setAudioDuration(0);
-      } else {
-        console.log("🛡️ BYPASSED WIPING STATE: Next ball has already claimed the UI countdown tracker!");
       }
-
-      console.log("🧹 AUDIO SOURCE WIPED CLEAN:", completeName);
     };
 
-    // ============================================================
-    // 4. REMOVE OLD EVENT HANDLERS
-    // ============================================================
-    audio.onended = null;
-    audio.onerror = null;
-    audio.onpause = null;
-    audio.onwaiting = null;
-    audio.onstalled = null;
-    audio.oncanplay = null;
-    audio.onloadstart = null;
-    audio.ontimeupdate = null;
-    audio.ondurationchange = null;
-    audio.onloadedmetadata = null;
+    // =====================================================
+    // SAFE COMPLETION
+    // =====================================================
 
-    // ============================================================
-    // 5. SOURCE SETUP
-    // ============================================================
-    if (!preloadedAudio) {
-      audio.src = path;
-      audio.preload = "auto";
-      console.log("📦 NORMAL AUDIO SOURCE LOADING:", completeName);
-    } else {
+    const completePlayback = (result) => {
+      if (finished) return;
+
+      cleanup();
+
+      try {
+        onFinished();
+      } catch (error) {
+        console.error("AUDIO COMPLETION CALLBACK ERROR:", error);
+      }
+
+      resolve(result);
+    };
+
+    // =====================================================
+    // WATCHDOG
+    // =====================================================
+
+    const armWatchdog = (delay, reason) => {
+      if (finished) return;
+
+      if (watchdogTimer !== null) {
+        clearTimeout(watchdogTimer);
+      }
+
+      watchdogTimer = setTimeout(() => {
+
+        if (finished) return;
+
+        if (stateRef.current.paused) {
+          cleanup();
+          resolve({ paused: true, completed: false });
+          return;
+        }
+
+        if (generationId !== audioGenerationRef.current) {
+          cleanup();
+          resolve({ cancelled: true, completed: false });
+          return;
+        }
+
+        console.error(
+          "🚨 AUDIO WATCHDOG RECOVERY:",
+          completeName,
+          reason,
+          "currentTime:",
+          audio.currentTime,
+          "readyState:",
+          audio.readyState,
+          "networkState:",
+          audio.networkState
+        );
+
+        // The current audio cannot recover.
+        // Release it and allow the next bingo call.
+        completePlayback({
+          completed: true,
+          recovered: true
+        });
+
+      }, delay);
+    };
+
+    // =====================================================
+    // INITIAL HANDLERS
+    // =====================================================
+
+    audio.onended = () => {
+
+      console.log("✅ VOICE FINISHED:", completeName);
+
+      completePlayback({
+        completed: true,
+        recovered: false
+      });
+    };
+
+    audio.onerror = (error) => {
+
+      if (finished) return;
+
+      console.error(
+        "❌ VOICE AUDIO ERROR:",
+        path,
+        error,
+        audio.error
+      );
+
+      if (stateRef.current.paused) {
+        cleanup();
+        resolve({ paused: true, completed: false });
+        return;
+      }
+
+      if (generationId !== audioGenerationRef.current) {
+        cleanup();
+        resolve({ cancelled: true, completed: false });
+        return;
+      }
+
+      cleanup();
+      reject(new Error(`Could not play ${path}`));
+    };
+
+    // =====================================================
+    // AUDIO WAITING
+    // =====================================================
+
+    audio.onwaiting = () => {
+
+      console.warn(
+        "⏳ AUDIO WAITING:",
+        completeName,
+        "time:",
+        audio.currentTime
+      );
+
+      armWatchdog(8000, "WAITING");
+    };
+
+    // =====================================================
+    // AUDIO STALLED
+    // =====================================================
+
+    audio.onstalled = () => {
+
+      console.warn(
+        "🚨 AUDIO STALLED:",
+        completeName,
+        "time:",
+        audio.currentTime
+      );
+
+      armWatchdog(8000, "STALLED");
+    };
+
+    // =====================================================
+    // PLAYBACK PROGRESS
+    // =====================================================
+
+    audio.onplaying = () => {
+      console.log("▶️ AUDIO PLAYING:", completeName);
+
+      armWatchdog(10000, "NO PLAYBACK PROGRESS");
+    };
+
+    audio.ontimeupdate = () => {
+
+      if (finished) return;
+
+      setAudioCurrentTime(audio.currentTime || 0);
+
+      if (!audio.paused && !audio.ended) {
+        armWatchdog(10000, "PLAYBACK PROGRESS STOPPED");
+      }
+    };
+
+    audio.ondurationchange = () => {
+      if (Number.isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
+      }
+    };
+
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration)) {
+        setAudioDuration(audio.duration);
+      }
+    };
+
+    audio.oncanplay = () => {
       console.log(
-        "♻️ PRELOADED AUDIO SOURCE REUSED:",
+        "✅ CAN PLAY:",
         completeName,
         "readyState:",
         audio.readyState
       );
-    }
 
-    // ============================================================
-    // 6. INITIAL UI AUDIO STATE
-    // ============================================================
-    setAudioCurrentTime(resumeTime);
-    
-    // ⚡ FIX 1: Instantly inject the duration from preloaded memory instead of clearing it to 0
+      startPlayback();
+    };
+
+    // =====================================================
+    // START PLAYBACK
+    // =====================================================
+
+    const startPlayback = () => {
+
+      if (finished || started) return;
+
+      if (stateRef.current.paused) {
+        cleanup();
+        resolve({ paused: true, completed: false });
+        return;
+      }
+
+      if (generationId !== audioGenerationRef.current) {
+        cleanup();
+        resolve({ cancelled: true, completed: false });
+        return;
+      }
+
+      started = true;
+
+      if (resumeTime > 0) {
+        try {
+          audio.currentTime = Number(resumeTime);
+        } catch (e) {}
+      }
+
+      console.log(
+        "🚀 STARTING RECORDED VOICE:",
+        completeName
+      );
+
+      armWatchdog(10000, "PLAYBACK NEVER STARTED");
+
+      try {
+
+        const playPromise = audio.play();
+
+        if (playPromise !== undefined) {
+
+          playPromise.then(() => {
+
+            if (finished) return;
+
+            console.log(
+              "▶️ AUDIO ACTUALLY PLAYING:",
+              completeName
+            );
+
+            if (Number.isFinite(audio.duration)) {
+              setAudioDuration(audio.duration);
+            }
+
+            armWatchdog(10000, "PLAYBACK PROGRESS STOPPED");
+
+          }).catch((error) => {
+
+            if (finished) return;
+
+            if (error.name === "AbortError") {
+              cleanup();
+              resolve({
+                paused: true,
+                completed: false
+              });
+              return;
+            }
+
+            console.error(
+              "❌ AUDIO PLAY PROMISE ERROR:",
+              completeName,
+              error
+            );
+
+            cleanup();
+            reject(error);
+          });
+        }
+
+      } catch (error) {
+
+        cleanup();
+        reject(error);
+      }
+    };
+
+    // =====================================================
+    // LOAD AUDIO
+    // =====================================================
+
+    audio.onloadstart = () => {
+      console.log("📥 AUDIO LOAD START:", completeName);
+    };
+
+    activeAudioRef.current = audio;
+
     if (audio.duration && Number.isFinite(audio.duration)) {
       setAudioDuration(audio.duration);
     } else {
       setAudioDuration(0);
     }
 
-    // ============================================================
-    // 7. LIVE AUDIO TIME UPDATES
-    // ============================================================
-    audio.ontimeupdate = () => {
-      setAudioCurrentTime(audio.currentTime || 0);
-    };
+    setAudioCurrentTime(resumeTime);
 
-    audio.ondurationchange = () => {
-      setAudioDuration(audio.duration || 0);
-    };
-
-    // ⚡ FIX 2: Safeguard loader to extract asset length variations asynchronously
-    audio.onloadedmetadata = () => {
-      if (audio.duration && Number.isFinite(audio.duration)) {
-        setAudioDuration(audio.duration);
-      }
-    };
-
-    // ============================================================
-    // 8. LOAD START DIAGNOSTIC
-    // ============================================================
-    audio.onloadstart = () => {
-      console.log("📥 LOAD START:", completeName, Date.now());
-    };
-
-    // ============================================================
-    // 9. VOLUME
-    // ============================================================
     const selectedVolume = Number(volumeRef.current);
-    audio.volume = Math.max(0, Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1));
 
-    // ============================================================
-    // 10. PLAYBACK SPEED
-    // ============================================================
+    audio.volume = Math.max(
+      0,
+      Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
+    );
+
     const selectedSpeed = Number(voiceSpeedRef.current);
-    audio.playbackRate = Math.max(0.5, Math.min(2, Number.isFinite(selectedSpeed) ? selectedSpeed : 1));
+
+    audio.playbackRate = Math.max(
+      0.5,
+      Math.min(2, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
+    );
+
     audio.defaultPlaybackRate = audio.playbackRate;
 
-    // ============================================================
-    // 11. MARK AS ACTIVE AUDIO
-    // ============================================================
-    activeAudioRef.current = audio;
+    // Maximum wait for initial loading.
+    armWatchdog(15000, "INITIAL AUDIO LOAD TIMEOUT");
 
-    // ============================================================
-    // 12. START PLAYBACK
-    // ============================================================
-    const startPlayback = () => {
-      if (finished || started) {
-        return;
-      }
-
-      if (stateRef.current.paused) {
-        cleanup();
-        resolve({ paused: true, completed: false });
-        return;
-      }
-
-      if (generationId !== audioGenerationRef.current) {
-        cleanup();
-        resolve({ cancelled: true, completed: false });
-        return;
-      }
-
-  started = true;
-
-      if (resumeTime > 0) {
-        try {
-          audio.currentTime = Number(resumeTime);
-          console.log("🎯 RESUME POSITION:", completeName, resumeTime, "seconds");
-        } catch (error) {
-          console.warn("⚠️ RESUME POSITION SET FAILED:", error);
-        }
-      }
-
-      console.log(
-        "🚀 STARTING RECORDED VOICE:",
-        completeName,
-        "readyState:",
-        audio.readyState,
-        Date.now()
-      );
-
-      let playPromise;
-      try {
-        playPromise = audio.play();
-      } catch (error) {
-        console.error("❌ AUDIO.PLAY() ERROR:", error);
-        cleanup();
-        reject(error);
-        return;
-      }
-
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            console.log("▶️ AUDIO ACTUALLY PLAYING:", completeName, Date.now());
-            // ⚡ FIX 3: Safety backup state refresh right as sound output begins
-            if (audio.duration && Number.isFinite(audio.duration)) {
-              setAudioDuration(audio.duration);
-            }
-          })
-          .catch((error) => {
-            if (error && error.name === "AbortError") {
-              console.log("⏸️ AUDIO PLAYBACK ABORTED:", completeName);
-              cleanup();
-              resolve({ paused: true, completed: false });
-              return;
-            }
-            console.error("❌ AUDIO PLAY PROMISE ERROR:", error);
-            cleanup();
-            reject(error);
-          });
-      }
-    };
-
-    // ============================================================
-    // 13. CAN PLAY HANDLER
-    // ============================================================
-    audio.oncanplay = () => {
-      console.log(
-        "✅ CAN PLAY:",
-        completeName,
-        Date.now(),
-        "readyState:",
-        audio.readyState
-      );
-      startPlayback();
-    };
-
-    // ============================================================
-    // 14. WAITING
-    // ============================================================
-    audio.onwaiting = () => {
-      console.warn("⏳ AUDIO WAITING:", completeName, "time:", audio.currentTime.toFixed(3));
-    };
-
-    // ============================================================
-    // 15. STALLED
-    // ============================================================
-    audio.onstalled = () => {
-      console.warn("🚨 AUDIO STALLED:", completeName);
-    };
-
-    // ============================================================
-    // 16. AUDIO FINISHED
-    // ============================================================
-    audio.onended = () => {
-      if (finished) {
-        return;
-      }
-      console.log("✅ VOICE FINISHED:", completeName, Date.now());
-      cleanup();
-
-      try {
-        onFinished();
-      } catch (error) {
-        console.error("❌ COMPLETION CALLBACK ERROR:", error);
-      }
-
-      resolve({ completed: true });
-    };
-
-       // ============================================================
-    // 17. AUDIO ERROR
-    // ============================================================
-    audio.onerror = (error) => {
-      if (finished) {
-        return;
-      }
-
-      if (stateRef.current.paused) {
-        cleanup();
-        resolve({ paused: true, completed: false });
-        return;
-      }
-
-      if (generationId !== audioGenerationRef.current) {
-        cleanup();
-        resolve({ cancelled: true, completed: false });
-        return;
-      }
-
-      console.error("❌ VOICE AUDIO ERROR:", path, error);
-      cleanup();
-      reject(new Error(`Could not play ${path}`));
-    };
-
-    // ============================================================
-    // 18. NORMAL AUDIO LOAD
-    // ============================================================
     if (!preloadedAudio) {
+      audio.src = path;
+      audio.preload = "auto";
       audio.load();
-      console.log("📦 NORMAL AUDIO LOAD TRIGGERED:", completeName);
-    } else {
-      console.log(
-        "⚡ SKIPPING audio.load() — PRELOADED AUDIO:",
-        completeName,
-        "readyState:",
-        audio.readyState
-      );
     }
 
-    // ============================================================
-    // 19. ALREADY READY?
-    // ============================================================
     if (audio.readyState >= 3) {
-      console.log(
-        "⚡ AUDIO ALREADY READY — STARTING IMMEDIATELY:",
-        completeName,
-        "readyState:",
-        audio.readyState
-      );
       startPlayback();
     }
+
   });
 }
+
 
     // end of playCompleteRecording
 
