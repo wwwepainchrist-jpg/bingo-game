@@ -3363,163 +3363,17 @@ return;
 }
 
 useEffect(() => {
-  const syncWhenOnline = async () => {
-    // Prevent duplicate syncs
-    if (offlineSyncRunningRef.current) {
-      console.log(
-        "⏳ OFFLINE SYNC ALREADY RUNNING - SKIPPING DUPLICATE"
-      );
-      return;
-    }
-
-    // Must be online before syncing
-    if (!navigator.onLine) {
-      console.log("📴 OFFLINE - WAITING FOR CONNECTION");
-      return;
-    }
-
-    offlineSyncRunningRef.current = true;
-
-    console.log("🌐 INTERNET CONNECTION RESTORED");
-    console.log("🔄 STARTING OFFLINE SYNC:", {
-      cashierId: id,
-      houseId: currentCashier?.house_id,
-    });
-
-    try {
-      const SYNC_API_URL =
-        "https://bingo-backend-ccn6.onrender.com/api";
-
-      // ==============================
-      // 1. SYNC OFFLINE GAMES
-      // ==============================
-      const result = await syncOfflineGames({
-  apiUrl: SYNC_API_URL,
-  cashierId: id,
-});
-
-      console.log(
-        "✅ OFFLINE SYNC RESULT:",
-        result
-      );
-
-      // ==============================
-      // 2. REFRESH PACKAGE AFTER SYNC
-      // ==============================
-     if (
-  result?.success &&
-  currentHouseId
-) {
-        try {
-          const packageResponse = await fetch(
-            `${SYNC_API_URL}/houses/${currentHouseId}/package`,
-            {
-              method: "GET",
-              headers: {
-                "Content-Type": "application/json",
-              },
-            }
-          );
-
-          if (packageResponse.ok) {
-            const packageResult =
-              await packageResponse.json();
-
-            const serverPackage =
-              packageResult?.package ||
-              packageResult;
-
-            if (serverPackage) {
-              const normalizedPackage = {
-                ...serverPackage,
-                house_id: String(currentHouseId),
-                synced: true,
-                offline_created: false,
-                updated_at:
-                  new Date().toISOString(),
-              };
-
-              // Save fresh server package locally
-              await saveLocalPackage(
-                String(currentHouseId),
-                normalizedPackage
-              );
-
-              // Update React state
-              setRawPackageInfo(
-                normalizedPackage
-              );
-
-              console.log(
-                "💰 PACKAGE REFRESHED AFTER SYNC:",
-                normalizedPackage
-              );
-            } else {
-              console.warn(
-                "⚠️ PACKAGE RESPONSE DID NOT CONTAIN PACKAGE"
-              );
-            }
-          } else {
-            console.warn(
-              "⚠️ PACKAGE FETCH FAILED:",
-              packageResponse.status,
-              packageResponse.statusText
-            );
-          }
-        } catch (packageError) {
-          console.warn(
-            "⚠️ PACKAGE REFRESH AFTER SYNC FAILED:",
-            packageError
-          );
-        }
-      }
-
-      console.log(
-        "🏁 OFFLINE SYNC PROCESS COMPLETED"
-      );
-    } catch (syncError) {
-      console.error(
-        "❌ OFFLINE SYNC ERROR:",
-        syncError
-      );
-    } finally {
-      // IMPORTANT:
-      // Always release the lock so future
-      // online events can trigger another sync.
-      offlineSyncRunningRef.current = false;
-
-      console.log(
-        "🔓 OFFLINE SYNC LOCK RELEASED"
-      );
-    }
-  };
-
   // ==========================================
-  // SYNC IMMEDIATELY IF ALREADY ONLINE
+  // ONLINE-ONLY MODE
+  // Disable automatic offline game synchronization.
+  // Keep IndexedDB available for persistent audio.
   // ==========================================
-  if (navigator.onLine) {
-    syncWhenOnline();
-  }
 
-  // ==========================================
-  // SYNC WHEN INTERNET COMES BACK
-  // ==========================================
-  window.addEventListener(
-    "online",
-    syncWhenOnline
+  console.log(
+    "🌐 ONLINE-ONLY MODE: OFFLINE GAME SYNC DISABLED"
   );
 
-  // ==========================================
-  // CLEANUP
-  // ==========================================
-  return () => {
-    window.removeEventListener(
-      "online",
-      syncWhenOnline
-    );
-  };
-}, [id, currentCashier?.house_id]);
-     
+}, []);
   const playerQrUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/select-cartela`

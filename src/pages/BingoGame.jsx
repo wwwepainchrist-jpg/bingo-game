@@ -2853,64 +2853,226 @@ function resetNextBingoPreload() {
 }
 
 
+// ============================================================
+// 💾 PERSISTENT AUDIO STORAGE
+// Reuse downloaded WAV files from IndexedDB
+// ============================================================
+
+const audioBlobRequests = new Map();
+
+async function getOrDownloadAudioBlob(path) {
+  // Prevent duplicate downloads of the same recording
+  if (audioBlobRequests.has(path)) {
+    return audioBlobRequests.get(path);
+  }
+
+  const request = (async () => {
+    // 1. Check browser storage first
+    try {
+      const savedAudio = await offlineDB.audioFiles.get(path);
+
+      if (savedAudio?.blob instanceof Blob && savedAudio.blob.size > 0) {
+        console.log("💾 USING SAVED AUDIO:", path);
+        return savedAudio.blob;
+      }
+    } catch (error) {
+      console.warn("⚠️ AUDIO STORAGE READ FAILED:", error);
+    }
+
+    // 2. Download from the online server if not saved
+    console.log("📥 DOWNLOADING NEW AUDIO:", path);
+
+    const response = await fetch(path);
+
+    if (!response.ok) {
+      throw new Error(
+        `Audio download failed: ${path} (${response.status})`
+      );
+    }
+
+    const blob = await response.blob();
+
+    if (!blob || blob.size === 0) {
+      throw new Error(`Downloaded audio is empty: ${path}`);
+    }
+
+    // 3. Save the WAV file for future games
+    try {
+      await offlineDB.audioFiles.put({
+        path,
+        blob,
+        updated_at: Date.now(),
+      });
+
+      console.log(
+        "✅ AUDIO SAVED PERMANENTLY IN BROWSER:",
+        path,
+        "Size:",
+        blob.size
+      );
+    } catch (error) {
+      console.warn(
+        "⚠️ COULD NOT SAVE AUDIO — WILL PLAY FROM DOWNLOAD:",
+        path,
+        error
+      );
+    }
+
+    return blob;
+  })();
+
+  audioBlobRequests.set(path, request);
+
+  try {
+    return await request;
+  } finally {
+    audioBlobRequests.delete(path);
+  }
+}
+
+
+// Prevent duplicate preparation of the same recording
+const bingoPreloadRequests = new Map();
 
 function preloadNextBingoVoice(letter, number) {
   const letterName = String(letter).trim().toLowerCase();
   const numberName = String(number).trim();
   const path = `/oromo/${letterName}${numberName}.wav`;
 
-  // Already loading/loaded this exact voice path in our cache map
   if (preloadedVoicesCacheRef.current[path]) {
-    console.log("🎵 NEXT VOICE ALREADY PRELOADING/PRELOADED IN CACHE:", path);
+    console.log("🎵 NEXT VOICE ALREADY PRELOADED:", path);
     return;
   }
 
-  // Clean old cache entries to protect device memory limits (keep last 3 items max)
-  const cachedPaths = Object.keys(preloadedVoicesCacheRef.current);
-  if (cachedPaths.length > 3) {
-    const oldestPath = cachedPaths[0];
-    try {
-      preloadedVoicesCacheRef.current[oldestPath].pause();
-      preloadedVoicesCacheRef.current[oldestPath].removeAttribute("src");
-      preloadedVoicesCacheRef.current[oldestPath].load();
-    } catch (e) {}
-    delete preloadedVoicesCacheRef.current[oldestPath];
+  if (bingoPreloadRequests.has(path)) {
+    return;
   }
 
-  const audio = new Audio();
-  audio.preload = "auto";
-  audio.src = path;
+  const preloadTask = (async () => {
+    let audio = null;
+    let objectUrl = null;
 
-  const selectedVolume = Number(volumeRef.current);
-  audio.volume = Math.max(0, Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1));
+    try {
+      console.log("💾 PREPARING AUDIO FROM PERSISTENT STORAGE:", path);
 
-  const selectedSpeed = Number(voiceSpeedRef.current);
-  audio.playbackRate = Math.max(0.5, Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1));
-  audio.defaultPlaybackRate = audio.playbackRate;
+      // Read from IndexedDB, or download and save if not present
+      const blob = await getOrDownloadAudioBlob(path);
 
-  // Store the active audio instance inside our cache dictionary instantly
-  preloadedVoicesCacheRef.current[path] = audio;
+      if (!blob || blob.size === 0) {
+        throw new Error("Audio file is empty: " + path);
+      }
 
-  console.log("📦 PRELOADING EXACT NEXT VOICE TO CACHE MAP:", path, Date.now());
+      objectUrl = URL.createObjectURL(blob);
 
-  audio.onloadstart = () => {
-    console.log("📥 NEXT VOICE LOAD START:", path, Date.now());
-  };
+      audio = new Audio();
+      audio.preload = "auto";
+      audio.src = objectUrl;
+      audio._bingoObjectUrl = objectUrl;
 
-  audio.oncanplay = () => {
-    console.log("✅ NEXT VOICE READY IN CACHE MAP:", path, Date.now());
-  };
+      const selectedVolume = Number(volumeRef.current);
+      audio.volume = Math.max(
+        0,
+        Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
+      );
 
-  audio.onloadeddata = () => {
-    console.log("📥 NEXT VOICE DATA LOADED:", path, Date.now());
-  };
+      const selectedSpeed = Number(voiceSpeedRef.current);
+      audio.playbackRate = Math.max(
+        0.5,
+        Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
+      );
 
-  audio.onerror = (error) => {
-    console.error("❌ NEXT VOICE PRELOAD FAILED:", path, error);
-    delete preloadedVoicesCacheRef.current[path]; // Remove failed asset records completely
-  };
+      audio.defaultPlaybackRate = audio.playbackRate;
 
-  audio.load();
+      // Keep the same small in-memory cache limit
+      const cachedPaths = Object.keys(preloadedVoicesCacheRef.current);
+
+      while (cachedPaths.length >= 3) {
+        const oldestPath = cachedPaths.shift();
+        const oldAudio = preloadedVoicesCacheRef.current[oldestPath];
+
+        if (oldAudio) {
+          try {
+            oldAudio.pause();
+            oldAudio.removeAttribute("src");
+            oldAudio.load();
+          } catch (error) {}
+
+          delete preloadedVoicesCacheRef.current[oldestPath];
+        }
+      }
+
+      preloadedVoicesCacheRef.current[path] = audio;
+
+      console.log("📦 PRELOADING PERSISTENT AUDIO:", path);
+
+      audio.oncanplay = () => {
+        console.log("✅ PERSISTENT AUDIO READY:", path);
+      };
+
+      audio.onloadeddata = () => {
+        console.log("📥 PERSISTENT AUDIO DATA LOADED:", path);
+      };
+
+      audio.onerror = (error) => {
+        console.error("❌ PERSISTENT AUDIO PRELOAD FAILED:", path, error);
+
+        if (preloadedVoicesCacheRef.current[path] === audio) {
+          delete preloadedVoicesCacheRef.current[path];
+        }
+
+        try {
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+          URL.revokeObjectURL(objectUrl);
+        } catch (e) {}
+      };
+
+      audio.load();
+
+    } catch (error) {
+      console.error(
+        "⚠️ PERSISTENT AUDIO PRELOAD FAILED — USING ORIGINAL URL:",
+        path,
+        error
+      );
+
+      // Preserve the original online playback as a fallback
+      audio = new Audio();
+      audio.preload = "auto";
+      audio.src = path;
+
+      const selectedVolume = Number(volumeRef.current);
+      audio.volume = Math.max(
+        0,
+        Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
+      );
+
+      const selectedSpeed = Number(voiceSpeedRef.current);
+      audio.playbackRate = Math.max(
+        0.5,
+        Math.min(2.0, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
+      );
+
+      audio.defaultPlaybackRate = audio.playbackRate;
+
+      preloadedVoicesCacheRef.current[path] = audio;
+
+      audio.onerror = () => {
+        if (preloadedVoicesCacheRef.current[path] === audio) {
+          delete preloadedVoicesCacheRef.current[path];
+        }
+      };
+
+      audio.load();
+    }
+  })();
+
+  bingoPreloadRequests.set(path, preloadTask);
+
+  preloadTask.finally(() => {
+    bingoPreloadRequests.delete(path);
+  });
 }
 
 // ============================================================
