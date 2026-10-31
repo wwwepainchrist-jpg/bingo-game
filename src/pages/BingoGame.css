@@ -802,3 +802,13 @@ body,
 .bingo-board {
   min-width: 1400px;
 }
+.internet-status-alert.unstable {
+  background: #fff3cd;
+  color: #856404;
+  border: 2px solid #ffc107;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-align: center;
+  font-weight: bold;
+  z-index: 9999;
+}

@@ -1047,6 +1047,74 @@ const [isInternetOffline, setIsInternetOffline] = useState(
   !navigator.onLine
 );
 
+const [networkStatus, setNetworkStatus] = useState(
+  navigator.onLine ? "good" : "offline"
+);
+
+// =====================================================
+// NETWORK QUALITY MONITOR
+// =====================================================
+useEffect(() => {
+  let mounted = true;
+  let timer;
+
+  const checkNetwork = async () => {
+    if (!navigator.onLine) {
+      if (mounted) setNetworkStatus("offline");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const startedAt = performance.now();
+
+    try {
+      const response = await fetch(
+        `${API_URL}/games/active/${id}`,
+        {
+          method: "GET",
+          cache: "no-store",
+          signal: controller.signal
+        }
+      );
+
+      const elapsed = performance.now() - startedAt;
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      if (mounted) {
+        setNetworkStatus(elapsed >= 2500 ? "unstable" : "good");
+      }
+    } catch (error) {
+      if (mounted) {
+        setNetworkStatus("unstable");
+      }
+    } finally {
+      clearTimeout(timeout);
+      if (mounted) {
+        timer = setTimeout(checkNetwork, 15000);
+      }
+    }
+  };
+
+  const handleOffline = () => setNetworkStatus("offline");
+  const handleOnline = () => checkNetwork();
+
+  window.addEventListener("offline", handleOffline);
+  window.addEventListener("online", handleOnline);
+
+  checkNetwork();
+
+  return () => {
+    mounted = false;
+    clearTimeout(timer);
+    window.removeEventListener("offline", handleOffline);
+    window.removeEventListener("online", handleOnline);
+  };
+}, [id]);
+
 const [showInternetRestored, setShowInternetRestored] =
   useState(false);
  
@@ -6577,6 +6645,13 @@ const closeVerificationBoard = () => {
       </div>
     )}
 
+    {networkStatus === "unstable" && (
+  <div className="internet-status-alert unstable">
+    <strong>⚠️ UNSTABLE NETWORK</strong>
+    <span>Internet is slow..</span>
+  </div>
+)}
+
     <div 
       className="bingo-container"
       style={{
@@ -7870,7 +7945,7 @@ WebkitBackdropFilter: "blur(4px)",
           >
             {verificationStatus === "WINNER"
               ? `🎉 ${t.winner}!`
-              : "❌ NOT WINNER "}
+              : "❌  አልዘጋም "}
           </div>
 
           <div
