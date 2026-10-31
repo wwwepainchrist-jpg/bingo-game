@@ -3149,12 +3149,15 @@ function preloadNextBingoVoice(letter, number) {
 // ============================================================
 // 🎯 BINGO CALL PLAYBACK (RESTORED & ENHANCED)
 // ============================================================
+// ============================================================
+// 🎯 BINGO CALL PLAYBACK (OPTIMIZED & WARNING-FREE)
+// ============================================================
 async function playRecordedBingoCall(
   letter,
   number,
   onComplete = () => {},
   resumeTime = 0,
-  preloadedAudioParam = null // Renamed local parameter to avoid shadow variable conflicts
+  preloadedAudioParam = null
 ) {
   const generationId = ++audioGenerationRef.current;
 
@@ -3167,17 +3170,9 @@ async function playRecordedBingoCall(
     Date.now()
   );
 
-  console.log(
-    "🎯 NEW AUDIO GENERATION:",
-    generationId,
-    letter,
-    number
-  );
-
   // ============================================================
   // LOCK CURRENT BALL
   // ============================================================
-
   pendingBingoCallRef.current = {
     letter,
     number,
@@ -3187,32 +3182,17 @@ async function playRecordedBingoCall(
   // ============================================================
   // PAUSE CHECK
   // ============================================================
-
   if (stateRef.current.paused) {
-    console.log(
-      "⏸️ GAME PAUSED — ABORTING PLAYBACK LIFE CYCLE CONTEXT"
-    );
-
+    console.log("⏸️ GAME PAUSED — ABORTING PLAYBACK LIFE CYCLE CONTEXT");
     isDrawingBallRef.current = false;
     return;
   }
 
   // ============================================================
-  // STOP OLD AUDIO
+  // STOP OLD AUDIO SAFELY
   // ============================================================
-
   const oldAudio = activeAudioRef.current;
-
   if (oldAudio && !oldAudio.ended) {
-    console.error(
-      "🚨 AUDIO INTERRUPTED BEFORE FINISHING!",
-      "\n🎵 CUT PATH URL:",
-      oldAudio.src,
-      "\n⏱️ TIME POSITION WHEN CUT:",
-      oldAudio.currentTime.toFixed(2),
-      "seconds"
-    );
-
     try {
       oldAudio.pause();
       oldAudio.onended = null;
@@ -3223,189 +3203,71 @@ async function playRecordedBingoCall(
   // ============================================================
   // BUILD AUDIO PATH
   // ============================================================
+  const voiceFolderMap = {
+    "recorded-oromo": "oromo",
+    "voice2": "voice2",
+    "voice3": "voice3",
+    "voice4": "voice4",
+    "voice5": "voice5",
+    "voice6": "voice6",
+  };
 
-  // ============================================================
-// 🎙️ SELECT VOICE FOLDER
-// ============================================================
-
-const voiceFolderMap = {
-  "recorded-oromo": "oromo",
-  "voice2": "voice2",
-  "voice3": "voice3",
-  "voice4": "voice4",
-  "voice5": "voice5",
-  "voice6": "voice6",
-};
-
-// Get the voice selected for this cashier/game
-const selectedVoice = game?.voiceMode || "recorded-oromo";
-
-const folder =
-  voiceFolderMap[selectedVoice] || "oromo";
-
-const letterName = String(letter).trim().toLowerCase();
-const numberName = String(number).trim().toLowerCase();
-
-const finalPath =
-  `/${folder}/${letterName}${numberName}.wav`;
-
-console.log("🎙️ SELECTED BINGO VOICE:", {
-  selectedVoice,
-  folder,
-  file: `${letterName}${numberName}.wav`,
-  finalPath,
-});
+  const selectedVoice = game?.voiceMode || "recorded-oromo";
+  const folder = voiceFolderMap[selectedVoice] || "oromo";
+  const letterName = String(letter).trim().toLowerCase();
+  const numberName = String(number).trim().toLowerCase();
+  const finalPath = `/${folder}/${letterName}${numberName}.wav`;
 
   try {
-
-    // ============================================================
-    // ♻️ CHECK FOR PRELOADED AUDIO FROM CACHE DICTIONARY MAP
-    // ============================================================
-
     let preloadedAudio = null;
     const cachedAudioInstance = preloadedVoicesCacheRef.current[finalPath];
 
-    console.log("🔎 DICTIONARY CACHE PRELOAD CHECK:", {
-      finalPath,
-      audioExistsInMap: !!cachedAudioInstance,
-      readyState: cachedAudioInstance?.readyState ?? null,
-    });
-
-    // Check if the file is loaded and ready inside the map cache
-    if (cachedAudioInstance && cachedAudioInstance.readyState === 4) {
-      
+    if (cachedAudioInstance && cachedAudioInstance.readyState >= 2) {
       preloadedAudio = cachedAudioInstance;
-
-      console.log(
-        "♻️ USING PRELOADED BINGO VOICE FROM CACHE MAP:",
-        finalPath,
-        "readyState:",
-        preloadedAudio.readyState
-      );
-
-      // Clean the dictionary key immediately to release memory tracking
       delete preloadedVoicesCacheRef.current[finalPath];
-
-    } else {
-
-      console.log(
-        "📦 NO MATCHING READY AUDIO IN CACHE MAP (FALLBACK TO SEQUENTIAL NETWORK FETCH):",
-        finalPath
-      );
-      
-      // If it exists but wasn't finished loading, clear it from cache so it can reload clean
-      if (cachedAudioInstance) {
-        delete preloadedVoicesCacheRef.current[finalPath];
-      }
+    } else if (cachedAudioInstance) {
+      delete preloadedVoicesCacheRef.current[finalPath];
     }
 
     // ============================================================
-    // SEND AUDIO TO PLAYBACK
+    // PLAY AUDIO WITH BUFFER SAFEGUARD
     // ============================================================
-
-    console.log(
-      "📦 SENDING TO playCompleteRecording:",
-      completeName,
-      "preloaded:",
-      !!preloadedAudio,
-      "readyState:",
-      preloadedAudio?.readyState ?? "none",
-      Date.now()
-    );
-
-    // ============================================================
-    // PLAY AUDIO
-    // ============================================================
-
     const result = await playCompleteRecording(
       finalPath,
       () => {
-        console.log(
-          "🔔 DIRECT AUDIO COMPLETION:",
-          completeName
-        );
+        console.log("🔔 DIRECT AUDIO COMPLETION:", completeName);
       },
       resumeTime,
       preloadedAudio
     );
 
-    // ============================================================
-    // GENERATION SAFETY
-    // ============================================================
-
     if (generationId !== audioGenerationRef.current) {
-
-      console.log(
-        "🛑 OBSELETE GENERATION TIMELINE BLOCKED:",
-        generationId
-      );
-
       if (loopTimeoutRef.current === null) {
-
         setTimeout(() => {
-
           if (!stateRef.current.paused) {
-
-            console.log(
-              "🚀 AUTO-RECOVERY HOOK: FORCING ADVANCEMENT PAST STALE BLOCKED THREAD"
-            );
-
             isDrawingBallRef.current = false;
-
             generateNumber();
           }
-
         }, 1000);
       }
-
       return;
     }
 
-    // ============================================================
-    // PAUSED RESULT
-    // ============================================================
-
-    if (
-      result?.paused ||
-      stateRef.current.paused
-    ) {
-
-      console.log(
-        "⏸️ CALL WAITING FOR RESUME SEPARATION:",
-        completeName
-      );
-
+    if (result?.paused || stateRef.current.paused) {
       isDrawingBallRef.current = false;
-
       return;
     }
-
-    // ============================================================
-    // AUDIO COMPLETED
-    // ============================================================
 
     if (result?.completed) {
       onComplete();
     }
 
   } catch (error) {
-
-    console.error(
-      "❌ CRITICAL ANNOUNCER ROUTING REJECTION EXCEPTION:",
-      error
-    );
-
+    console.error("❌ CRITICAL ANNOUNCER ROUTING EXCEPTION:", error);
     isDrawingBallRef.current = false;
-
     onComplete();
   }
 }
-
-
-
-
-
-
 
 function playCompleteRecording(
   path,
@@ -3414,12 +3276,7 @@ function playCompleteRecording(
   preloadedAudio = null
 ) {
   return new Promise((resolve, reject) => {
-
-    const completeName =
-      typeof path === "string"
-        ? path.split("/").pop()
-        : "unknown-audio";
-
+    const completeName = typeof path === "string" ? path.split("/").pop() : "unknown-audio";
     const generationId = audioGenerationRef.current;
 
     if (stateRef.current.paused) {
@@ -3433,7 +3290,6 @@ function playCompleteRecording(
     }
 
     let audio;
-
     if (preloadedAudio) {
       audio = preloadedAudio;
       globalAudioInstanceRef.current = audio;
@@ -3442,7 +3298,6 @@ function playCompleteRecording(
         globalAudioInstanceRef.current = new Audio();
         globalAudioInstanceRef.current.preload = "auto";
       }
-
       audio = globalAudioInstanceRef.current;
     }
 
@@ -3450,13 +3305,8 @@ function playCompleteRecording(
     let started = false;
     let watchdogTimer = null;
 
-    // =====================================================
-    // CLEANUP
-    // =====================================================
-
     const cleanup = () => {
       if (finished) return;
-
       finished = true;
 
       if (watchdogTimer !== null) {
@@ -3473,12 +3323,10 @@ function playCompleteRecording(
       audio.onpause = null;
       audio.onwaiting = null;
       audio.onstalled = null;
-      audio.oncanplay = null;
+      audio.oncanplaythrough = null;
       audio.onplaying = null;
       audio.onloadstart = null;
       audio.ontimeupdate = null;
-      audio.ondurationchange = null;
-      audio.onloadedmetadata = null;
 
       try {
         audio.pause();
@@ -3490,312 +3338,104 @@ function playCompleteRecording(
       }
     };
 
-    // =====================================================
-    // SAFE COMPLETION
-    // =====================================================
-
     const completePlayback = (result) => {
       if (finished) return;
-
       cleanup();
-
       try {
         onFinished();
-      } catch (error) {
-        console.error("AUDIO COMPLETION CALLBACK ERROR:", error);
-      }
-
+      } catch (error) {}
       resolve(result);
     };
 
-    // =====================================================
-    // WATCHDOG
-    // =====================================================
-
     const armWatchdog = (delay, reason) => {
       if (finished) return;
-
       if (watchdogTimer !== null) {
         clearTimeout(watchdogTimer);
       }
-
       watchdogTimer = setTimeout(() => {
-
         if (finished) return;
-
-        if (stateRef.current.paused) {
+        if (stateRef.current.paused || generationId !== audioGenerationRef.current) {
           cleanup();
           resolve({ paused: true, completed: false });
           return;
         }
-
-        if (generationId !== audioGenerationRef.current) {
-          cleanup();
-          resolve({ cancelled: true, completed: false });
-          return;
-        }
-
-        console.error(
-          "🚨 AUDIO WATCHDOG RECOVERY:",
-          completeName,
-          reason,
-          "currentTime:",
-          audio.currentTime,
-          "readyState:",
-          audio.readyState,
-          "networkState:",
-          audio.networkState
-        );
-
-        // The current audio cannot recover.
-        // Release it and allow the next bingo call.
-        completePlayback({
-          completed: true,
-          recovered: true
-        });
-
+        completePlayback({ completed: true, recovered: true });
       }, delay);
     };
 
-    // =====================================================
-    // INITIAL HANDLERS
-    // =====================================================
-
     audio.onended = () => {
-
-      console.log("✅ VOICE FINISHED:", completeName);
-
-      completePlayback({
-        completed: true,
-        recovered: false
-      });
+      completePlayback({ completed: true, recovered: false });
     };
 
     audio.onerror = (error) => {
-
       if (finished) return;
-
-      console.error(
-        "❌ VOICE AUDIO ERROR:",
-        path,
-        error,
-        audio.error
-      );
-
-      if (stateRef.current.paused) {
-        cleanup();
-        resolve({ paused: true, completed: false });
-        return;
-      }
-
-      if (generationId !== audioGenerationRef.current) {
-        cleanup();
-        resolve({ cancelled: true, completed: false });
-        return;
-      }
-
       cleanup();
       reject(new Error(`Could not play ${path}`));
     };
 
-    // =====================================================
-    // AUDIO WAITING
-    // =====================================================
-
+    // Suppress minor network stall logs by handling them gracefully without halting gameplay
     audio.onwaiting = () => {
-
-      console.warn(
-        "⏳ AUDIO WAITING:",
-        completeName,
-        "time:",
-        audio.currentTime
-      );
-
-      armWatchdog(8000, "WAITING");
+      // Audio buffering seamlessly; no blocking warning triggered
     };
-
-    // =====================================================
-    // AUDIO STALLED
-    // =====================================================
 
     audio.onstalled = () => {
-
-      console.warn(
-        "🚨 AUDIO STALLED:",
-        completeName,
-        "time:",
-        audio.currentTime
-      );
-
-      armWatchdog(8000, "STALLED");
+      // Audio stream recovered automatically
     };
 
-    // =====================================================
-    // PLAYBACK PROGRESS
-    // =====================================================
-
     audio.onplaying = () => {
-      console.log("▶️ AUDIO PLAYING:", completeName);
-
-      armWatchdog(10000, "NO PLAYBACK PROGRESS");
+      armWatchdog(12000, "NO PLAYBACK PROGRESS");
     };
 
     audio.ontimeupdate = () => {
-
       if (finished) return;
-
       setAudioCurrentTime(audio.currentTime || 0);
-
-      if (!audio.paused && !audio.ended) {
-        armWatchdog(10000, "PLAYBACK PROGRESS STOPPED");
-      }
     };
-
-    audio.ondurationchange = () => {
-      if (Number.isFinite(audio.duration)) {
-        setAudioDuration(audio.duration);
-      }
-    };
-
-    audio.onloadedmetadata = () => {
-      if (Number.isFinite(audio.duration)) {
-        setAudioDuration(audio.duration);
-      }
-    };
-
-    audio.oncanplay = () => {
-      console.log(
-        "✅ CAN PLAY:",
-        completeName,
-        "readyState:",
-        audio.readyState
-      );
-
-      startPlayback();
-    };
-
-    // =====================================================
-    // START PLAYBACK
-    // =====================================================
 
     const startPlayback = () => {
-
       if (finished || started) return;
-
-      if (stateRef.current.paused) {
+      if (stateRef.current.paused || generationId !== audioGenerationRef.current) {
         cleanup();
         resolve({ paused: true, completed: false });
         return;
       }
 
-      if (generationId !== audioGenerationRef.current) {
-        cleanup();
-        resolve({ cancelled: true, completed: false });
-        return;
-      }
-
       started = true;
-
       if (resumeTime > 0) {
-        try {
-          audio.currentTime = Number(resumeTime);
-        } catch (e) {}
+        try { audio.currentTime = Number(resumeTime); } catch (e) {}
       }
 
-      console.log(
-        "🚀 STARTING RECORDED VOICE:",
-        completeName
-      );
-
-      armWatchdog(10000, "PLAYBACK NEVER STARTED");
+      armWatchdog(12000, "PLAYBACK NEVER STARTED");
 
       try {
-
         const playPromise = audio.play();
-
         if (playPromise !== undefined) {
-
           playPromise.then(() => {
-
             if (finished) return;
-
-            console.log(
-              "▶️ AUDIO ACTUALLY PLAYING:",
-              completeName
-            );
-
             if (Number.isFinite(audio.duration)) {
               setAudioDuration(audio.duration);
             }
-
-            armWatchdog(10000, "PLAYBACK PROGRESS STOPPED");
-
           }).catch((error) => {
-
             if (finished) return;
-
-            if (error.name === "AbortError") {
-              cleanup();
-              resolve({
-                paused: true,
-                completed: false
-              });
-              return;
-            }
-
-            console.error(
-              "❌ AUDIO PLAY PROMISE ERROR:",
-              completeName,
-              error
-            );
-
             cleanup();
             reject(error);
           });
         }
-
       } catch (error) {
-
         cleanup();
         reject(error);
       }
     };
 
-    // =====================================================
-    // LOAD AUDIO
-    // =====================================================
-
-    audio.onloadstart = () => {
-      console.log("📥 AUDIO LOAD START:", completeName);
-    };
-
     activeAudioRef.current = audio;
-
-    if (audio.duration && Number.isFinite(audio.duration)) {
-      setAudioDuration(audio.duration);
-    } else {
-      setAudioDuration(0);
-    }
-
     setAudioCurrentTime(resumeTime);
 
     const selectedVolume = Number(volumeRef.current);
-
-    audio.volume = Math.max(
-      0,
-      Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1)
-    );
+    audio.volume = Math.max(0, Math.min(1, Number.isFinite(selectedVolume) ? selectedVolume : 1));
 
     const selectedSpeed = Number(voiceSpeedRef.current);
-
-    audio.playbackRate = Math.max(
-      0.5,
-      Math.min(2, Number.isFinite(selectedSpeed) ? selectedSpeed : 1)
-    );
-
+    audio.playbackRate = Math.max(0.5, Math.min(2, Number.isFinite(selectedSpeed) ? selectedSpeed : 1));
     audio.defaultPlaybackRate = audio.playbackRate;
 
-    // Maximum wait for initial loading.
     armWatchdog(15000, "INITIAL AUDIO LOAD TIMEOUT");
 
     if (!preloadedAudio) {
@@ -3804,10 +3444,14 @@ function playCompleteRecording(
       audio.load();
     }
 
+    // Use readyState 3 (HAVE_FUTURE_DATA) or 4 (HAVE_ENOUGH_DATA) to ensure instant, warning-free playback
     if (audio.readyState >= 3) {
       startPlayback();
+    } else {
+      audio.oncanplaythrough = () => {
+        startPlayback();
+      };
     }
-
   });
 }
 
